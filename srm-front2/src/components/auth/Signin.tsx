@@ -50,7 +50,7 @@ export default function Signup() {
 
 
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/signin`, {
+      const response = await fetch(`${apiUrl}/api/auth/signin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

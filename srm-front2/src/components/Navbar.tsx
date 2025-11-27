@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Facebook, Twitter, Linkedin, Instagram, Youtube, MessageCircle, LogOut, Menu, X, LayoutDashboard } from 'lucide-react';
+import { Facebook, Twitter, Linkedin, Instagram, Youtube, MessageCircle, LogOut, Menu, X, LayoutDashboard, Settings } from 'lucide-react';
 // import Logo from "./images/lo.png"
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
@@ -142,7 +142,7 @@ const Navbar: React.FC = () => {
 
             {/* Dashboard Link (Left side, visible when logged in) */}
             {isLoggedIn && (
-              <div className="hidden md:flex items-center ml-6 mr-3">
+              <div className="hidden md:flex items-center ml-6 mr-3 gap-2">
                 <Link 
                   to={localStorage.getItem('role') === 'Reviewer' ? '/reviewer' : '/dashboard'}
                   className={`flex items-center py-2 px-3 rounded-md transition-colors ${
@@ -154,6 +154,22 @@ const Navbar: React.FC = () => {
                   <LayoutDashboard size={18} className="mr-2" />
                   <span className="font-medium">Dashboard</span>
                 </Link>
+
+                {/* Admin Panel Link (Only for Admin users) */}
+                {localStorage.getItem('role') === 'Admin' && (
+                  <Link 
+                    to="/admin"
+                    className={`flex items-center py-2 px-3 rounded-md transition-colors ${
+                      location.pathname === '/admin'
+                        ? 'bg-red-600 text-white' 
+                        : 'text-white hover:bg-red-600'
+                    }`}
+                    title="Admin Panel - Manage Editors"
+                  >
+                    <Settings size={18} className="mr-2" />
+                    <span className="font-medium">Admin</span>
+                  </Link>
+                )}
               </div>
             )}
 
@@ -222,17 +238,34 @@ const Navbar: React.FC = () => {
               
               {/* Dashboard link in mobile menu (only when logged in) */}
               {isLoggedIn && (
-                <li>
-                  <Link 
-                    to={localStorage.getItem('role') === 'Reviewer' ? '/reviewer' : '/dashboard'}
-                    className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/dashboard') || isActive('/reviewer')}`}
-                  >
-                    <div className="flex items-center">
-                      <LayoutDashboard size={16} className="mr-2" />
-                      Dashboard
-                    </div>
-                  </Link>
-                </li>
+                <>
+                  <li>
+                    <Link 
+                      to={localStorage.getItem('role') === 'Reviewer' ? '/reviewer' : '/dashboard'}
+                      className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/dashboard') || isActive('/reviewer')}`}
+                    >
+                      <div className="flex items-center">
+                        <LayoutDashboard size={16} className="mr-2" />
+                        Dashboard
+                      </div>
+                    </Link>
+                  </li>
+
+                  {/* Admin Panel link in mobile menu (only for Admin users) */}
+                  {localStorage.getItem('role') === 'Admin' && (
+                    <li>
+                      <Link 
+                        to="/admin"
+                        className={`block py-2.5 px-4 hover:bg-red-600 rounded-md transition-colors ${isActive('/admin')}`}
+                      >
+                        <div className="flex items-center">
+                          <Settings size={16} className="mr-2" />
+                          Admin Panel
+                        </div>
+                      </Link>
+                    </li>
+                  )}
+                </>
               )}
               
               <li>

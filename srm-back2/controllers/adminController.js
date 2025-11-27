@@ -3,7 +3,7 @@ import { User } from '../models/User.js';
 import { PaperSubmission } from '../models/Paper.js';
 import { Review } from '../models/Review.js';
 import { generateRandomPassword } from '../utils/helpers.js';
-import { sendEditorAssignmentEmail } from '../utils/emailService.js';
+import { sendEditorAssignmentEmail, sendEditorCredentialsEmail } from '../utils/emailService.js';
 
 // Create editor account
 export const createEditor = async (req, res) => {
@@ -32,6 +32,17 @@ export const createEditor = async (req, res) => {
         });
 
         await newEditor.save();
+        
+        console.log(`📧 Sending credentials email to ${email}...`);
+        
+        // Send credentials email
+        try {
+            await sendEditorCredentialsEmail(email, username || email.split('@')[0], userPassword);
+            console.log(`✅ Credentials email sent successfully to ${email}`);
+        } catch (emailError) {
+            console.error(`⚠️  Failed to send credentials email to ${email}:`, emailError);
+            // Don't fail the entire operation if email fails
+        }
 
         return res.status(201).json({
             success: true,
@@ -42,7 +53,8 @@ export const createEditor = async (req, res) => {
                 username: newEditor.username,
                 role: newEditor.role
             },
-            temporaryPassword: password ? null : userPassword
+            temporaryPassword: password ? null : userPassword,
+            emailSent: true
         });
     } catch (error) {
         console.error("Error creating editor:", error);
@@ -57,24 +69,43 @@ export const createEditor = async (req, res) => {
 // Get all editors
 export const getAllEditors = async (req, res) => {
     try {
-        const editors = await User.find({ role: 'Editor' })
+        console.log('📋 Fetching all editors from database...');
+        
+        // Query all users and check their roles
+        const allUsers = await User.find({});
+        console.log(`Total users in database: ${allUsers.length}`);
+        console.log('User roles:', allUsers.map(u => ({ email: u.email, role: u.role })));
+
+        // Find editors - handle case sensitivity
+        const editors = await User.find({ 
+            role: { $in: ['Editor', 'editor', 'EDITOR'] }
+        })
             .select('-password')
             .sort({ createdAt: -1 });
+
+        console.log(`✓ Found ${editors.length} editor(s)`);
 
         return res.status(200).json({
             success: true,
             count: editors.length,
-            editors
+            editors,
+            debug: {
+                totalUsers: allUsers.length,
+                rolesInDB: [...new Set(allUsers.map(u => u.role))]
+            }
         });
     } catch (error) {
-        console.error("Error fetching editors:", error);
+        console.error("❌ Error fetching editors:", error);
         return res.status(500).json({
             success: false,
             message: "Error fetching editors",
             error: error.message
         });
     }
+
 };
+       
+
 
 // Assign editor to paper
 export const assignEditor = async (req, res) => {

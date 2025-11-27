@@ -21,6 +21,7 @@ import EditSubmission from "./components/EditSubmission";
 import Venue from './components/Venue';
 import KeynoteSpeakers from './components/KeynoteSpeakers';
 import SpeakerProfile from './components/SpeakerProfile';
+import AdminPanel from './components/AdminPanel';
 // import SubmitPaperForm from "./components/SubmitPaperForm";
 // The App component should contain BrowserRouter
 const App = () => {
@@ -105,6 +106,13 @@ const AppRoutes = () => {
         
         <Route path="/commitee" element={
           <RouteWithLoading element={<Commitee />} />
+        } />
+        
+        {/* Admin Dashboard - protected route for admins only */}
+        <Route path="/admin" element={
+          <RoleProtectedRoute roles={["Admin"]}>
+            <RouteWithLoading element={<AdminPanel />} />
+          </RoleProtectedRoute>
         } />
         
         {/* Apply loading effect to Dashboard */}

@@ -498,4 +498,97 @@ export const sendReviewerReminderEmail = async (reviewerEmail, reviewerName, pap
     return transporter.sendMail(mailOptions);
 };
 
+// Send editor credentials email
+export const sendEditorCredentialsEmail = async (email, username, password) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const loginUrl = `${frontendUrl}/login`;
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Your Editor Account Credentials - ICMBNT 2026",
+        html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
+          <h2 style="color: #F5A051; margin: 0; text-align: center;">Welcome to ICMBNT 2026!</h2>
+          <p style="color: #666; margin: 10px 0 0 0;">Editor Account Setup</p>
+        </div>
+        
+        <div style="padding: 20px 0;">
+          <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
+            Dear Editor,
+          </p>
+          
+          <p style="font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Your editor account has been successfully created by the ICMBNT 2026 administration team. You can now log in to the editor dashboard to manage paper submissions and assign reviewers.
+          </p>
+
+          <div style="background-color: #f5f5f5; padding: 20px; border-left: 4px solid #F5A051; margin: 25px 0; border-radius: 4px;">
+            <p style="margin: 0 0 15px 0; font-weight: bold; color: #333; font-size: 16px;">Your Login Credentials:</p>
+            
+            <div style="background-color: white; padding: 15px; border-radius: 4px; margin-bottom: 15px; font-family: monospace;">
+              <p style="margin: 0 0 10px 0; color: #666;">
+                <strong>Email/Username:</strong><br>
+                <span style="color: #333; word-break: break-all;">${email}</span>
+              </p>
+              <p style="margin: 0; color: #666;">
+                <strong>Password:</strong><br>
+                <span style="color: #333; word-break: break-all;">${password}</span>
+              </p>
+            </div>
+
+            <p style="margin: 0; font-size: 12px; color: #F5A051; font-weight: bold;">
+              ⚠️  For your security, please change your password after your first login.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${loginUrl}" 
+               style="background-color: #F5A051; color: white; padding: 12px 32px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold; font-size: 16px;">
+               Go to Login
+            </a>
+          </div>
+
+          <div style="background-color: #ecf3ff; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 13px; color: #1a5490;">
+              <strong>📋 Your Role:</strong><br>
+              As an Editor, you will be able to:
+              <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                <li>View and manage paper submissions</li>
+                <li>Assign papers to reviewers</li>
+                <li>Track review progress</li>
+                <li>Communicate with reviewers and authors</li>
+                <li>Make final decisions on paper acceptance/rejection</li>
+              </ul>
+            </p>
+          </div>
+
+          <p style="font-size: 13px; color: #666; line-height: 1.6; margin-top: 20px;">
+            If you did not expect this email or have any questions about your account, please contact the ICMBNT 2026 administration team.
+          </p>
+
+          <p style="font-size: 13px; color: #666;">
+            Best regards,<br>
+            <strong>ICMBNT 2026 Committee</strong>
+          </p>
+        </div>
+
+        <div style="background-color: #f9fafb; padding: 15px; text-align: center; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; border-radius: 0 0 5px 5px;">
+          <p style="margin: 0 0 8px 0;">This is an automated email. Please do not reply to this message.</p>
+          <p style="margin: 0;">© 2025 ICMBNT Conference. All rights reserved.</p>
+        </div>
+      </div>
+    `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log("Editor credentials email sent:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("Error sending editor credentials email:", error);
+        throw error;
+    }
+};
+
 export default transporter;
