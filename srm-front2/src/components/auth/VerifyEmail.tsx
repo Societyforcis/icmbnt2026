@@ -75,9 +75,10 @@ const VerifyEmail: React.FC = () => {
       } catch (error: any) {
         console.error("Verification error:", error);
         
-      
-
-       
+        setVerificationStatus({
+          success: false,
+          message: error.message || 'Email verification failed. Please try again or contact support.'
+        });
       } finally {
         setIsVerifying(false);
       }

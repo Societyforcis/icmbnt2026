@@ -8,22 +8,22 @@ try {
 
 const timelineData = [
   {
-    date: "25 March 2026",
+    date: "15 February 2026",
     title: "Manuscript Submission Deadline",
     description: "Last date to submit your research papers and manuscripts"
   },
   {
-    date: "5 April 2026",
+    date: "28 February 2026",
     title: "Acceptance Notification",
     description: "Authors will be notified about the acceptance of their papers"
   },
   {
-    date: "12 April 2026",
+    date: "10 March 2026",
     title: "Registration Deadline",
     description: "Last date for conference registration"
   },
   {
-    date: "26-27 April 2026",
+    date: "13-14 March 2026",
     title: "Conference Dates",
     description: "Main conference days"
   }

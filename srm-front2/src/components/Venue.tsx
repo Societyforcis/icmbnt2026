@@ -1,5 +1,5 @@
 import PageTransition from './PageTransition';
-import { MapPin, Phone, Mail, Link as LinkIcon } from 'lucide-react';
+import { MapPin, Mail, Calendar } from 'lucide-react';
 import VenuePic from './images/srm_venue.jpeg';
 import MadrasHighCourt from './images/Madras_High_Court.jpg';
 
@@ -12,7 +12,8 @@ const Venue = () => {
           <div className="container mx-auto max-w-6xl">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Conference Venue</h1>
             <p className="text-xl md:text-2xl opacity-90 max-w-3xl">
-              International Conference on Multidisciplinary Breakthroughs and NextGen Technologies - ICMBNT 2026
+              International Conference on Multidisciplinary Breakthroughs and NextGen Technologies - ICMBNT 2026<br/>
+              <span className="text-lg">13-14 March 2026 | Bali, Indonesia</span>
             </p>
           </div>
         </div>
@@ -23,78 +24,60 @@ const Venue = () => {
             <h2 className="text-3xl font-bold text-center mb-8 text-[#F5A051]">Conference Location</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-              {/* SRM Hotel Image */}
+              {/* Bali Venue Image */}
               <div className="relative overflow-hidden rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 group">
                 <img 
                   src={VenuePic} 
-                  alt="SRM Hotel - Conference Venue" 
+                  alt="Bali - Conference Venue" 
                   className="w-full object-cover h-80 group-hover:scale-105 transition-transform duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent group-hover:opacity-75 transition-opacity duration-300"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white transform group-hover:-translate-y-2 transition-transform duration-300">
-                  <h3 className="text-2xl font-bold mb-1">SRM HOTEL</h3>
-                  <p>Maraimalai Nagar, Chennai</p>
+                  <h3 className="text-2xl font-bold mb-1">BALI</h3>
+                  <p>Bali, Indonesia</p>
                 </div>
               </div>
 
-              {/* Madras High Court Image */}
+              {/* Conference Dates Image */}
               <div className="relative overflow-hidden rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 group">
                 <img 
                   src={MadrasHighCourt} 
-                  alt="Madras High Court" 
+                  alt="Conference Dates - 13-14 March 2026" 
                   className="w-full object-cover h-80 group-hover:scale-105 transition-transform duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent group-hover:opacity-75 transition-opacity duration-300"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white transform group-hover:-translate-y-2 transition-transform duration-300">
-                  <h3 className="text-2xl font-bold mb-1">Conference Held at</h3>
-                  <p>Chennai, Tamil Nadu</p>
+                  <h3 className="text-2xl font-bold mb-1">Conference Dates</h3>
+                  <p>13-14 March 2026</p>
                 </div>
               </div>
             </div>
 
             {/* Venue Details */}
             <div className="bg-gray-50 p-8 rounded-lg shadow-md mb-12">
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">SRM Hotel</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">BALI, INDONESIA</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                   <div className="flex items-start mb-4">
                     <MapPin className="w-5 h-5 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
                     <p className="text-gray-700">
-                      No 1, Bharathi Salai, SRM Nagar, Potheri, Kattankulathur,<br/>
-                      Chengalpattu District, Maraimalai Nagar - 603203<br/>
-                      Chennai, Tamil Nadu, India
+                      Bali, Indonesia<br/>
+                      A tropical paradise destination perfect for an international conference
                     </p>
                   </div>
                   
                   <div className="flex items-start mb-4">
-                    <Phone className="w-5 h-5 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
-                    <p className="text-gray-700">+91-44-27453159</p>
-                  </div>
-                  
-                  <div className="flex items-start mb-4">
-                    <Mail className="w-5 h-5 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
-                    <p className="text-gray-700">info@srmhotel.in</p>
-                  </div>
-                  
-                  <div className="flex items-start">
-                    <LinkIcon className="w-5 h-5 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
-                    <a 
-                      href="http://www.srmhotel.in" 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-blue-600 hover:underline"
-                    >
-                      www.srmhotel.in
-                    </a>
+                    <Calendar className="w-5 h-5 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
+                    <p className="text-gray-700"><strong>13-14 March 2026</strong></p>
                   </div>
                 </div>
                 
                 <div>
                   <h4 className="text-lg font-semibold text-gray-800 mb-3">About the Venue</h4>
                   <p className="text-gray-700 mb-4">
-                    SRM Hotel provides a comfortable and professional environment for conferences and academic events. 
-                    With modern amenities, spacious conference halls, and excellent hospitality services, it's an ideal 
-                    location for ICMBNT 2026.
+                    Bali provides a unique and inspiring setting for ICMBNT 2026. The island's world-class 
+                    hospitality, modern conference facilities, and vibrant atmosphere create an ideal environment 
+                    for academic excellence and networking opportunities.
                   </p>
                   
                   <h4 className="text-lg font-semibold text-gray-800 mb-3">Facilities Include:</h4>
@@ -104,7 +87,7 @@ const Venue = () => {
                     <li>Accommodations for international delegates</li>
                     <li>Multiple dining options</li>
                     <li>Business center services</li>
-                    <li>Proximity to SRM Institute of Science and Technology</li>
+                    <li>Beautiful tropical setting</li>
                   </ul>
                 </div>
               </div>
@@ -112,54 +95,67 @@ const Venue = () => {
 
             {/* Map Section */}
             <div className="mb-12">
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">Location Map</h3>
-              <div className="rounded-lg overflow-hidden shadow-md h-96">
-                <iframe 
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3890.7770484215324!2d80.03672731482064!3d12.795633990974073!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a52f707c2da76c5%3A0xe9dd5afcafe7e0cf!2sSRM%20Hotel%20Potheri!5e0!3m2!1sen!2sin!4v1620471703936!5m2!1sen!2sin" 
-                  width="100%" 
-                  height="100%" 
-                  style={{ border: 0 }} 
-                  allowFullScreen 
-                  loading="lazy"
-                  title="SRM Hotel Map Location"
-                ></iframe>
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Conference Information</h3>
+              <div className="bg-white p-6 rounded-lg shadow-md">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-800 mb-3">Event Details</h4>
+                    <ul className="space-y-3 text-gray-700">
+                      <li><strong>Location:</strong> Bali, Indonesia</li>
+                      <li><strong>Dates:</strong> 13-14 March 2026</li>
+                      <li><strong>Conference Type:</strong> International Multi-disciplinary Conference</li>
+                      <li><strong>Format:</strong> In-person + Virtual Hybrid</li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-800 mb-3">Important Dates</h4>
+                    <ul className="space-y-3 text-gray-700">
+                      <li><strong>Paper Submission:</strong> 15 February 2026</li>
+                      <li><strong>Acceptance Notification:</strong> 28 February 2026</li>
+                      <li><strong>Registration Deadline:</strong> 10 March 2026</li>
+                      <li><strong>Conference Days:</strong> 13-14 March 2026</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Travel Information */}
             <div className="bg-gray-50 p-8 rounded-lg shadow-md">
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">Travel Information</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Getting to Bali</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-800 mb-3">From Chennai International Airport:</h4>
+                  <h4 className="text-lg font-semibold text-gray-800 mb-3">By Air:</h4>
                   <p className="text-gray-700 mb-4">
-                    The venue is approximately 35 kilometers from Chennai International Airport (MAA). 
-                    Travel time is around 45-60 minutes depending on traffic conditions.
+                    Bali is served by Ngurah Rai International Airport (DPS), which receives flights from 
+                    major cities worldwide. It's one of Southeast Asia's busiest airports with excellent 
+                    connectivity and modern facilities.
                   </p>
                   
-                  <h4 className="text-lg font-semibold text-gray-800 mb-3">Transportation Options:</h4>
+                  <h4 className="text-lg font-semibold text-gray-800 mb-3">Transportation from Airport:</h4>
                   <ul className="list-disc pl-5 text-gray-700 space-y-1">
                     <li>Taxi services available at the airport</li>
-                    <li>App-based cab services (Uber, Ola)</li>
-                    <li>Pre-booked hotel shuttle (contact hotel in advance)</li>
-                    <li>Public transportation options available</li>
+                    <li>Car rental services</li>
+                    <li>Pre-booked hotel shuttle (contact organizers)</li>
+                    <li>Ride-sharing apps (Gojek, Grab)</li>
                   </ul>
                 </div>
                 
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-800 mb-3">From Chennai Central Railway Station:</h4>
+                  <h4 className="text-lg font-semibold text-gray-800 mb-3">Visa & Travel Information:</h4>
                   <p className="text-gray-700 mb-4">
-                    The venue is approximately 45 kilometers from Chennai Central Railway Station.
-                    Travel time is around 1 hour 15 minutes depending on traffic conditions.
+                    Many countries enjoy visa-free or visa-on-arrival privileges to Indonesia. 
+                    Check the Indonesian embassy website for your country's requirements.
                   </p>
                   
-                  <h4 className="text-lg font-semibold text-gray-800 mb-3">Nearby Attractions:</h4>
+                  <h4 className="text-lg font-semibold text-gray-800 mb-3">Local Attractions & Activities:</h4>
                   <ul className="list-disc pl-5 text-gray-700 space-y-1">
-                    <li>SRM Institute of Science and Technology</li>
-                    <li>Mamallapuram (UNESCO World Heritage Site) - 40 km</li>
-                    <li>Chennai City Center - 40 km</li>
-                    <li>Marina Beach - 45 km</li>
-                    <li>Local markets and cultural attractions</li>
+                    <li>Beautiful beaches and water sports</li>
+                    <li>Ancient temples and cultural sites</li>
+                    <li>Rice terraces and natural landscapes</li>
+                    <li>Local cuisine and dining experiences</li>
+                    <li>Spa and wellness facilities</li>
                   </ul>
                 </div>
               </div>

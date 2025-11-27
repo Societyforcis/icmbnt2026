@@ -1,110 +1,77 @@
 "use client"
 
 import { Calendar, MapPin, Users, Target, Compass, Globe } from "lucide-react"
-import { useState, useEffect } from "react"
-import sponsor1 from "./images/isius.png"
 import bali from "./images/bali.png"
 import con from "./images/c.png"
-import c1 from "./images/bali/c1.png"
-import c2 from "./images/bali/c2.png"
-import c3 from "./images/bali/c3.png"
-
-const heroImages = [
-  c1,
-  c2,
-  c3,
-  c1
-]
-
+import society from "./images/bali/society.png"
+import isius from "./images/bali/isius.png"
 const Home = () => {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-
-  // Image carousel
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % heroImages.length)
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [])
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900">
-      <div className="relative min-h-screen text-white overflow-hidden">
-        {/* Background Images */}
-        {heroImages.map((image, index) => (
-          <div
-            key={index}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-              index === currentImageIndex ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            <img
-              src={image || "/placeholder.svg"}
-              alt={`Conference background ${index + 1}`}
-              className="w-full h-full object-cover"
-              loading={index === currentImageIndex ? "eager" : "lazy"}
-              decoding="async"
-            />
-          </div>
-        ))}
+      <div className="relative min-h-screen text-white overflow-hidden bg-gradient-to-r from-blue-900 to-[#F5A051] text-white">
+        {/* Blur Background */}
+        <div className="absolute inset-0 backdrop-blur-md bg-black/20"></div>
 
-        <div className="relative z-10 container mx-auto px-4 py-20 min-h-screen flex flex-col justify-center items-center text-center">
-          <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight max-w-5xl drop-shadow-lg">
+        <div className="relative z-10 container mx-auto px-4 py-12 min-h-screen flex flex-col justify-center items-center text-center">
+          <h1 className="text-3xl md:text-5xl font-bold mb-2 leading-tight max-w-5xl drop-shadow-lg">
             International Conference on Multidisciplinary Breakthroughs and NextGen Technologies
           </h1>
-          <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-[#F5A051] drop-shadow-md">(ICMBNT–2026)</h2>
+          <h2 className="text-2xl md:text-3xl font-semibold mb-1 text-[#F5A051] drop-shadow-md">(ICMBNT–2026)</h2>
+          <p className="text-2xl md:text-4xl mb-4 text-black drop-shadow-md font-bold animate-pulse">2nd International Conference</p>
 
-          <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-8">
-            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
+          <div className="flex flex-col md:flex-row justify-center items-center gap-2 mb-6">
+            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 animate-bounce">
               <Calendar className="w-5 h-5 mr-2 text-[#F5A051]" />
               <span>April 26 & 27, 2026</span>
             </div>
-            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
+            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 animate-bounce">
               <MapPin className="w-5 h-5 mr-2 text-[#F5A051]" />
               <span>Bali, Indonesia</span>
             </div>
-            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
+            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 animate-bounce">
               <Users className="w-5 h-5 mr-2 text-[#F5A051]" />
               <span>Hybrid Conference (In-person + Virtual)</span>
             </div>
           </div>
 
-          <div className="mb-8">
-            <div className="flex justify-center items-center gap-6 mb-6">
-              <img 
-                src={sponsor1} 
-                alt="Sponsor Logo" 
-                className="h-16 md:h-20 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
-            <p className="text-xl text-slate-200">
+          <div className="mb-4">
+            <p className="text-lg text-slate-200 mb-3">
               Organized by
               <br />
               <span className="font-bold text-white">Society for Cyber Intelligent Systems</span>
               <br />
               Puducherry – India
             </p>
+            <div className="flex justify-center items-center gap-6 mb-4">
+              <div className="flex flex-col items-center">
+                <img 
+                  src={isius} 
+                  alt="ICSCS Logo" 
+                  className="h-28 md:h-32 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <p className="text-sm text-slate-300 mt-2 font-semibold">Indian Council for Social Science and Sustainable Systems</p>
+                <p className="text-xs text-slate-400 mt-1">(ICSCS)</p>
+              </div>
+              <div className="flex flex-col items-center">
+                <img 
+                  src={society} 
+                  alt="Society CIS Logo" 
+                  className="h-40 md:h-48 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <p className="text-sm text-slate-300 mt-2 font-semibold">Society for Cyber Intelligent Systems</p>
+                <p className="text-xs text-slate-400 mt-1">Puducherry – India</p>
+              </div>
+            </div>
           </div>
 
           <button className="bg-[#F5A051] hover:bg-[#e08c3e] text-white font-bold py-3 px-8 rounded-full transition-all duration-300 text-lg inline-block shadow-lg shadow-[#F5A051]/30 hover:shadow-[#F5A051]/40 hover:scale-105">
             REGISTER NOW
           </button>
-
-          <div className="flex gap-2 mt-12">
-            {heroImages.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentImageIndex(index)}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index === currentImageIndex ? "bg-[#F5A051] w-8" : "bg-white/50 hover:bg-white/80"
-                }`}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
-          </div>
         </div>
 
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
@@ -128,7 +95,7 @@ const Home = () => {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white transform group-hover:-translate-y-2 transition-transform duration-300">
-                  <h3 className="text-2xl font-bold mb-1">BALI RESORT</h3>
+                  <h3 className="text-2xl font-bold mb-1">BALI</h3>
                   <p className="text-[#F5A051]">Bali, Indonesia</p>
                 </div>
               </div>
