@@ -9,6 +9,7 @@ import 'aos/dist/aos.css';
 // import EditSubmission from './components/EditSubmission.tsx'
 
 // Initialize AOS
+//m
 AOS.init({
   duration: 800,
   once: true,
