@@ -21,14 +21,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : ["https://icmbnt2026-yovz.vercel.app", "http://localhost:5173", "http://localhost:3000"];
-
 app.use(express.json({ limit: '10mb' }));
 const corsOptions = {
 // https://societycis.org
-  origin: ['https://society', 'http://localhost:173'],
+  origin: ['https://icmbnt2026-yovz.vercel.app', 'http://localhost:173'],
+  
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
