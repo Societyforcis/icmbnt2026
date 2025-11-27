@@ -1,248 +1,105 @@
-import express from "express";
-import mongoose from "mongoose";
-import cors from "cors";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
-import crypto from "crypto";
+import express from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { connectDatabase } from './config/database.js';
 import { User } from './models/User.js';
-import { PaperSubmission } from './models/Paper.js';  // Note the correct path and import
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { UserSubmission } from './models/UserSubmission.js';
+import { PaperSubmission } from './models/Paper.js';
+import { sendVerificationEmail, sendOTPEmail } from './utils/emailService.js';
+
+// Import routes
+import authRoutes from './routes/authRoutes.js';
+import paperRoutes from './routes/paperRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import editorRoutes from './routes/editorRoutes.js';
+import reviewerRoutes from './routes/reviewerRoutes.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const secret = process.env.JWT_SECRET;
 
-
+// Middleware
 app.use(cors({
-  origin: '*',  // Allow all origins
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  credentials: true
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Handle preflight requests
 app.options('*', cors());
 
+// Connect to database
+connectDatabase();
 
-app.options('/signin', cors());
-app.options('/login', cors());
-app.options('/submit-paper', cors());
-
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log("MongoDB Atlas Connected Successfully to database 'SRM'");
-  })
-  .catch(err => {
-    console.error("MongoDB Connection Error Details:", {
-      message: err.message,
-      stack: err.stack
+// Root route
+app.get('/', (req, res) => {
+    res.json({
+        success: true,
+        message: 'ICMBNT 2026 Research Paper Management System API',
+        version: '2.0.0',
+        endpoints: {
+            auth: '/api/auth',
+            papers: '/api/papers',
+            admin: '/api/admin',
+            editor: '/api/editor',
+            reviewer: '/api/reviewer'
+        }
     });
-    process.exit(1);
-  });
-
-// Create nodemailer transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
 });
 
-// Update the sendVerificationEmail function to use the frontend URL from environment
-const sendVerificationEmail = async (email, token) => {
-  console.log(`Sending verification email to ${email} with token: ${token}`);
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/papers', paperRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/editor', editorRoutes);
+app.use('/api/reviewer', reviewerRoutes);
 
+// Legacy auth routes (backward compatibility)
+app.use('/signin', authRoutes);
+app.use('/verify-email', authRoutes);
+app.use('/resend-verification', authRoutes);
+app.use('/forgot-password', authRoutes);
+app.use('/reset-password', authRoutes);
 
-  const verificationData = {
-    token: token,
-    email: email,
-    timestamp: Date.now()
-  };
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({
+        success: true,
+        status: 'healthy',
+        timestamp: new Date().toISOString()
+    });
+});
 
-
-  const encodedData = Buffer.from(JSON.stringify(verificationData)).toString('base64');
-
-  // Use frontend URL from environment or default to the deployed URL
-  const frontendUrl = process.env.FRONTEND_URL || 'https://societycisicmbnt2025.vercel.app';
-  const verificationUrl = `http://localhost:5173/verify?data=${encodedData}`;
-  console.log("Verification URL created:", verificationUrl);
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Verify Your Email - ICMBNT 2025",
-    html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-                <h2 style="color: #F5A051; text-align: center;">Welcome to ICMBNT 2025!</h2>
-                <p>Please verify your email address by clicking the button below:</p>
-                <div style="text-align: center; margin: 25px 0;">
-                    <a href="${verificationUrl}" 
-                       style="background-color: #F5A051; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">
-                       Verify Email Address
-                    </a>
-                </div>
-                <p style="color: #666; text-align: center;">
-                    This verification link will expire in 24 hours.
-                </p>
-                <p>
-                    If the button doesn't work, copy and paste this URL into your browser:<br>
-                    <a href="${verificationUrl}">${verificationUrl}</a>
-                </p>
-                <p style="font-size: 0.8em; color: #666; text-align: center;">
-                    If you didn't create an account, please ignore this email.
-                </p>
-            </div>
-        `
-  };
-
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Verification email sent:", info.messageId);
-    return info;
-  } catch (error) {
-    console.error("Error sending verification email:", error);
-    throw error;
-  }
-};
-
-const sendOTPEmail = async (email, otp) => {
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Password Reset OTP",
-    html: `
-            <h2>Password Reset Request</h2>
-            <p>Your OTP for password reset is: <strong>${otp}</strong></p>
-            <p>This OTP will expire in 10 minutes.</p>
-            <p>If you didn't request this, please ignore this email.</p>
-        `
-  };
-  return transporter.sendMail(mailOptions);
-};
-
-app.get("/", (req, res) => {
-  res.send("In srm backend");
-})
+// ==================== DIRECT AUTH ROUTES ====================
 // JWT verification middleware
 const verifyJWT = (req, res, next) => {
-  const token = req.headers["authorization"];
-  if (!token) {
-    return res.status(403).json({ success: false, message: "A token is required for authentication" });
-  }
-
-  try {
-    const decoded = jwt.verify(token, secret);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: "Invalid token" });
-  }
+    const token = req.headers["authorization"]?.replace('Bearer ', '');
+    if (!token) {
+        return res.status(403).json({ 
+            success: false, 
+            message: "A token is required for authentication" 
+        });
+    }
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(401).json({ 
+            success: false, 
+            message: "Invalid token" 
+        });
+    }
 };
 
-// Login route
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ success: false, message: "User does not exist" });
-    }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ success: false, message: "Incorrect password" });
-    }
-
-    // Check if the user's email is verified
-    if (!user.verified) {
-      return res.status(200).json({
-        success: false,
-        verified: false,
-        needsVerification: true,
-        message: "Please verify your email before logging in"
-      });
-    }
-
-    // User is verified and password is correct - create token and log in
-    const token = jwt.sign({
-      email,
-      userId: user._id,
-      username: user.username
-    }, secret, { expiresIn: '24h' });
-
-    return res.status(200).json({
-      success: true,
-      verified: true,
-      token,
-      email: user.email,
-      username: user.username
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "An error occurred during login",
-      error: error.message
-    });
-  }
-});
-
-// Signin (Registration) route
-app.post('/signin', async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: "User already exists" });
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-
-    const newUser = new User({
-      username: email.split('@')[0], // Generate a username from email
-      email,
-      password: hash,
-      verified: false,
-      verificationToken,
-      verificationExpires: new Date(Date.now() + 48 * 60 * 60 * 1000) // 48 hours
-    });
-
-    await newUser.save();
-
-    try {
-      await sendVerificationEmail(email, verificationToken);
-
-      return res.status(201).json({
-        success: true,
-        message: "Account created. Please check your email to verify your account."
-      });
-    } catch (emailError) {
-      // If email sending fails, still create the account but inform the user
-      console.error("Failed to send verification email:", emailError);
-      return res.status(201).json({
-        success: true,
-        message: "Account created, but we couldn't send a verification email. Please contact support."
-      });
-    }
-  } catch (error) {
-    console.error("Signin error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "An error occurred during registration",
-      error: error.message
-    });
-  }
-});
 
 // Email verification endpoint (legacy format)
 app.get('/verify-email', async (req, res) => {
@@ -482,613 +339,1412 @@ app.post('/resend-verification', async (req, res) => {
     });
   }
 });
-
-// Protected route example
-app.get('/protected', verifyJWT, (req, res) => {
-  res.json({ success: true, message: "You have access to protected data", user: req.user });
-});
-
-// Collections listing route
-app.get('/collections', async (req, res) => {
-  try {
-    const collections = await mongoose.connection.db.listCollections().toArray();
-    res.json(collections.map(col => col.name));
-  } catch (error) {
-    res.status(500).json({ error: 'Error fetching collections' });
-  }
-});
-
-// Debug route to check tokens
-app.get('/debug/tokens', async (req, res) => {
-  try {
-    // Find users with verification tokens
-    const users = await User.find({ verificationToken: { $exists: true } })
-      .select('email verificationToken verificationExpires')
-      .lean();
-
-    return res.json({
-      success: true,
-      count: users.length,
-      users: users.map(u => ({
-        email: u.email,
-        tokenExists: !!u.verificationToken,
-        tokenLength: u.verificationToken ? u.verificationToken.length : 0,
-        expires: u.verificationExpires,
-        isExpired: u.verificationExpires < new Date()
-      }))
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error checking tokens",
-      error: error.message
-    });
-  }
-});
-// File storage configuration for uploads
-const storage = multer.memoryStorage();
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 3 * 1024 * 1024 // 3MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /doc|docx|pdf/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    if (extname) {
-      return cb(null, true);
-    }
-    cb(new Error('Only .doc, .docx, and .pdf files are allowed'));
-  }
-});
-
-// Improved helper function to generate submission ID
-const generateSubmissionId = async (category) => {
-  const prefix = category.split(' ')[0].substring(0, 2).toUpperCase();
-
-  // Find the highest existing ID for this category
-  const highestSubmission = await PaperSubmission.findOne(
-    { submissionId: new RegExp(`^${prefix}\\d{3}$`) },
-    { submissionId: 1 }
-  ).sort({ submissionId: -1 });
-
-  let nextNum = 1;
-
-  if (highestSubmission) {
-    // Extract the number from the highest ID
-    const highestNum = parseInt(highestSubmission.submissionId.substring(2));
-    nextNum = highestNum + 1;
-  }
-
-  // Format with leading zeros
-  const paddedNum = nextNum.toString().padStart(3, '0');
-  const newId = `${prefix}${paddedNum}`;
-
-  // Check if this ID already exists
-  const existingSubmission = await PaperSubmission.findOne({ submissionId: newId });
-
-  if (existingSubmission) {
-    console.log(`ID ${newId} already exists, incrementing number...`);
-    // Try next number in sequence
-    return generateSubmissionIdWithNum(category, nextNum + 1);
-  }
-
-  return newId;
-};
-
-// Helper function to generate ID with a specific number
-const generateSubmissionIdWithNum = async (category, num) => {
-  const prefix = category.split(' ')[0].substring(0, 2).toUpperCase();
-  const paddedNum = num.toString().padStart(3, '0');
-  const newId = `${prefix}${paddedNum}`;
-
-  // Check if this ID already exists
-  const existingSubmission = await PaperSubmission.findOne({ submissionId: newId });
-
-  if (existingSubmission) {
-    console.log(`ID ${newId} already exists, incrementing number...`);
-    // Try next number in sequence
-    return generateSubmissionIdWithNum(category, num + 1);
-  }
-
-  return newId;
-};
-
-// Email sending function to be used by the paper submission route
-const sendPaperSubmissionEmails = async (submissionData) => {
-  // Create email options for author
-  const authorMailOptions = {
-    from: process.env.EMAIL_USER,
-    to: submissionData.email,
-    subject: `Paper Submission Confirmation - ${submissionData.submissionId}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #F5A051;">Paper Submission Confirmation</h2>
-        <p>Dear ${submissionData.authorName},</p>
-        <p>Your paper has been successfully submitted to ICMBNT 2025.</p>
-        <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0;">
-          <p><strong>Submission ID:</strong> ${submissionData.submissionId}</p>
-          <p><strong>Paper Title:</strong> ${submissionData.paperTitle}</p>
-          <p><strong>Category:</strong> ${submissionData.category}</p>
-          <p><strong>Status:</strong> Under Review</p>
-        </div>
-        <p>We will review your submission and notify you of any updates through this email address.</p>
-        <p>Best regards,<br>ICMBNT 2025 Committee</p>
-      </div>
-    `
-  };
-
-  // Email to admin with submission details
-  const adminMailOptions = {
-    from: process.env.EMAIL_USER,
-    to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
-    subject: `New Paper Submission - ${submissionData.submissionId}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #F5A051;">New Paper Submission Received</h2>
-        <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0;">
-          <p><strong>Submission ID:</strong> ${submissionData.submissionId}</p>
-          <p><strong>Author:</strong> ${submissionData.authorName}</p>
-          <p><strong>Email:</strong> ${submissionData.email}</p>
-          <p><strong>Paper Title:</strong> ${submissionData.paperTitle}</p>
-          <p><strong>Category:</strong> ${submissionData.category}</p>
-          ${submissionData.topic ? `<p><strong>Topic:</strong> ${submissionData.topic}</p>` : ''}
-          <p><strong>Status:</strong> Under Review</p>
-        </div>
-      </div>
-    `
-  };
-
-  // Add attachment if file was uploaded
-  if (submissionData.filePath && fs.existsSync(submissionData.filePath)) {
-    console.log(`Attaching file: ${submissionData.filePath}`);
-    // Add attachment to both emails
-    adminMailOptions.attachments = [{
-      filename: submissionData.fileName,
-      path: submissionData.filePath
-    }];
-    // Also attach to author confirmation if needed
-    authorMailOptions.attachments = [{
-      filename: submissionData.fileName,
-      path: submissionData.filePath
-    }];
-  } else {
-    console.log('No file to attach or file does not exist');
-  }
-
-  // Send both emails and handle any errors
-  try {
-    const [authorEmail, adminEmail] = await Promise.all([
-      transporter.sendMail(authorMailOptions),
-      transporter.sendMail(adminMailOptions)
-    ]);
-    return { authorEmail, adminEmail };
-  } catch (error) {
-    console.error('Error sending emails:', error);
-    throw error;
-  }
-};
-
-// Update the paper submission route with file attachment handling
-app.post('/submit-paper', upload.single('abstract'), async (req, res) => {
-  console.log('Received paper submission request:', req.body);
-  console.log('File:', req.file);
-
-  try {
-    const { email } = req.body;
-
-    // Check if user has already submitted a paper
-    const existingSubmission = await UserSubmission.findOne({ email });
-    if (existingSubmission) {
-      return res.status(400).json({
-        success: false,
-        message: "You have already submitted a paper. Please use the edit option in your dashboard if you need to make changes.",
-        existingSubmission: {
-          submissionId: existingSubmission.submissionId,
-          bookingId: existingSubmission.bookingId
-        }
-      });
-    }
-
-    // Validate required fields based on schema
-    const requiredFields = ['paperTitle', 'authorName', 'email', 'category'];
-    const missingFields = requiredFields.filter(field => !req.body[field]);
-
-    if (missingFields.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Missing required fields: ${missingFields.join(', ')}`
-      });
-    }
-
-    // Generate submission ID and booking ID
-    const submissionId = await generateSubmissionId(req.body.category);
-    const bookingId = generateBookingId();
-
-    console.log('Generated IDs:', { submissionId, bookingId });
-
-    // Get file details for the database and email
-    let abstractFileUrl = null;
-    let fileName = null;
-    let fileData = null;
-
-    if (req.file) {
-      fileName = req.file.originalname;
-      fileData = req.file.buffer.toString('base64');
-      abstractFileUrl = `data:${req.file.mimetype};base64,${fileData}`;
-      console.log(`File processed: ${fileName}`);
-    }
-
-    // Create new submission object matching the schema
-    const newSubmission = new PaperSubmission({
-      submissionId,
-      paperTitle: req.body.paperTitle,
-      authorName: req.body.authorName,
-      email: req.body.email,
-      category: req.body.category,
-      topic: req.body.topic || '', // Optional field
-      abstractFileUrl: abstractFileUrl,
-      status: 'Under Review' // Default status from schema
-    });
-
-    // Create user submission tracking record
-    const userSubmission = new UserSubmission({
-      email: req.body.email,
-      submissionId,
-      bookingId
-    });
-
-    // Validate submission against schema
-    const validationError = newSubmission.validateSync();
-    if (validationError) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation error",
-        errors: validationError.errors
-      });
-    }
-
-    console.log('Saving submission:', newSubmission);
-    await Promise.all([
-      newSubmission.save(),
-      userSubmission.save()
-    ]);
-    console.log('Submission saved successfully with booking ID:', bookingId);
-
-    // Send confirmation emails with proper error handling and file attachment
+// Login endpoint
+app.post("/api/auth/login", async (req, res) => {
+    const { email, password } = req.body;
     try {
-      // Create email options for author
-      const authorMailOptions = {
-        from: process.env.EMAIL_USER,
-        to: req.body.email,
-        subject: `Paper Submission Confirmation - ${submissionId}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #F5A051;">Paper Submission Confirmation</h2>
-            <p>Dear ${req.body.authorName},</p>
-            <p>Your paper has been successfully submitted to ICMBNT 2025.</p>
-            <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0;">
-              <p><strong>Submission ID:</strong> ${submissionId}</p>
-              <p><strong>Paper Title:</strong> ${req.body.paperTitle}</p>
-              <p><strong>Category:</strong> ${req.body.category}</p>
-              <p><strong>Status:</strong> Under Review</p>
-            </div>
-            <p>We will review your submission and notify you of any updates through this email address.</p>
-            <p>Best regards,<br>ICMBNT 2025 Committee</p>
-          </div>
-        `
-      };
-
-      // Email to admin with submission details
-      const adminMailOptions = {
-        from: process.env.EMAIL_USER,
-        to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
-        subject: `New Paper Submission - ${submissionId}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #F5A051;">New Paper Submission Received</h2>
-            <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0;">
-              <p><strong>Submission ID:</strong> ${submissionId}</p>
-              <p><strong>Author:</strong> ${req.body.authorName}</p>
-              <p><strong>Email:</strong> ${req.body.email}</p>
-              <p><strong>Paper Title:</strong> ${req.body.paperTitle}</p>
-              <p><strong>Category:</strong> ${req.body.category}</p>
-              ${req.body.topic ? `<p><strong>Topic:</strong> ${req.body.topic}</p>` : ''}
-              <p><strong>Status:</strong> Under Review</p>
-            </div>
-          </div>
-        `
-      };
-
-      // Add attachment if file was uploaded
-      if (req.file) {
-        const attachmentData = {
-          filename: fileName,
-          content: Buffer.from(fileData, 'base64'),
-          encoding: 'base64'
-        };
-
-        adminMailOptions.attachments = [attachmentData];
-        authorMailOptions.attachments = [attachmentData];
-      }
-
-      // Send both emails
-      const [authorEmail, adminEmail] = await Promise.all([
-        transporter.sendMail(authorMailOptions),
-        transporter.sendMail(adminMailOptions)
-      ]);
-
-      console.log('Confirmation emails sent successfully');
-
-      // Return success response
-      res.status(201).json({
-        success: true,
-        message: "Paper submitted successfully and confirmation emails sent",
-        submissionId,
-        bookingId,
-        paperDetails: {
-          title: req.body.paperTitle,
-          category: req.body.category,
-          status: 'Under Review'
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "User does not exist" 
+            });
         }
-      });
-    } catch (emailError) {
-      // Log email error but don't fail the submission
-      console.error('Error sending confirmation emails:', emailError);
-      res.status(201).json({
-        success: true,
-        message: "Paper submitted successfully but there was an issue sending confirmation emails",
-        submissionId,
-        bookingId,
-        paperDetails: {
-          title: req.body.paperTitle,
-          category: req.body.category,
-          status: 'Under Review'
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Incorrect password" 
+            });
         }
-      });
+
+        if (!user.verified) {
+            return res.status(200).json({
+                success: false,
+                verified: false,
+                needsVerification: true,
+                message: "Please verify your email before logging in"
+            });
+        }
+
+        const token = jwt.sign({
+            email,
+            userId: user._id,
+            username: user.username,
+            role: user.role
+        }, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+        return res.status(200).json({
+            success: true,
+            verified: true,
+            token,
+            email: user.email,
+            username: user.username,
+            role: user.role
+        });
+    } catch (error) {
+        console.error("Login error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred during login",
+            error: error.message
+        });
     }
-  } catch (error) {
-    console.error('Error submitting paper:', error);
-    res.status(500).json({
-      success: false,
-      message: "Error processing paper submission",
-      error: error.message
-    });
-  }
 });
 
-// Get submission status route
-app.get('/paper-status/:submissionId', async (req, res) => {
-  try {
-    const submission = await PaperSubmission.findOne({
-      submissionId: req.params.submissionId
-    });
+// Register/Signin endpoint
+app.post('/api/auth/register', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "User already exists" 
+            });
+        }
 
-    if (!submission) {
-      return res.status(404).json({
-        success: false,
-        message: "Submission not found"
-      });
+        const hash = await bcrypt.hash(password, 10);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+
+        const newUser = new User({
+            username: email.split('@')[0],
+            email,
+            password: hash,
+            verified: false,
+            verificationToken,
+            verificationExpires: new Date(Date.now() + 48 * 60 * 60 * 1000)
+        });
+
+        await newUser.save();
+
+        try {
+            await sendVerificationEmail(email, verificationToken);
+            return res.status(201).json({
+                success: true,
+                message: "Account created. Please check your email to verify your account."
+            });
+        } catch (emailError) {
+            console.error("Failed to send verification email:", emailError);
+            return res.status(201).json({
+                success: true,
+                message: "Account created, but we couldn't send a verification email. Please contact support."
+            });
+        }
+    } catch (error) {
+        console.error("Registration error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred during registration",
+            error: error.message
+        });
     }
-
-    res.json({
-      success: true,
-      submission
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Error retrieving submission status",
-      error: error.message
-    });
-  }
 });
 
-// Add this route to test email functionality
-app.get('/test-email', async (req, res) => {
-  try {
-    const testMailOptions = {
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER,
-      subject: 'Test Email',
-      text: 'This is a test email to verify the configuration is working.'
-    };
+// Signin (same as register)
+app.post('/api/auth/signin', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "User already exists" 
+            });
+        }
 
-    console.log('Sending test email...');
-    const info = await transporter.sendMail(testMailOptions);
-    console.log('Test email sent:', info);
+        const hash = await bcrypt.hash(password, 10);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    res.json({
-      success: true,
-      message: 'Test email sent successfully',
-      messageId: info.messageId
-    });
-  } catch (error) {
-    console.error('Test email error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
+        const newUser = new User({
+            username: email.split('@')[0],
+            email,
+            password: hash,
+            verified: false,
+            verificationToken,
+            verificationExpires: new Date(Date.now() + 48 * 60 * 60 * 1000)
+        });
+
+        await newUser.save();
+
+        try {
+            await sendVerificationEmail(email, verificationToken);
+            return res.status(201).json({
+                success: true,
+                message: "Account created. Please check your email to verify your account."
+            });
+        } catch (emailError) {
+            console.error("Failed to send verification email:", emailError);
+            return res.status(201).json({
+                success: true,
+                message: "Account created, but we couldn't send a verification email. Please contact support."
+            });
+        }
+    } catch (error) {
+        console.error("Signin error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred during registration",
+            error: error.message
+        });
+    }
 });
 
-app.get('/user-submission', verifyJWT, async (req, res) => {
-  try {
-    const { email } = req.user;
-
-    const userSubmission = await UserSubmission.findOne({ email });
-    if (!userSubmission) {
-      return res.status(200).json({
-        success: true,
-        hasSubmission: false
-      });
+// Verify email endpoint - supports both GET and POST
+app.get('/api/auth/verify-email', async (req, res) => {
+    const { token } = req.query;
+    if (!token) {
+        return res.status(400).json({
+            success: false,
+            message: "Verification token is required"
+        });
     }
+    try {
+        const user = await User.findOne({
+            verificationToken: token,
+            verificationExpires: { $gt: new Date() }
+        });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid or expired verification token"
+            });
+        }
+        user.verified = true;
+        user.verificationToken = undefined;
+        user.verificationExpires = undefined;
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: "Email verified successfully. You can now log in."
+        });
+    } catch (error) {
+        console.error("Verification error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred during verification",
+            error: error.message
+        });
+    }
+});
 
-    const paperSubmission = await PaperSubmission.findOne({
-      submissionId: userSubmission.submissionId
-    });
+app.post('/api/auth/verify-email', async (req, res) => {
+    const { token, email } = req.body;
+    if (!token) {
+        return res.status(400).json({
+            success: false,
+            message: "Verification token is required"
+        });
+    }
+    try {
+        let query = { verificationToken: token, verificationExpires: { $gt: new Date() } };
+        if (email) query.email = email;
+        const user = await User.findOne(query);
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid or expired verification token"
+            });
+        }
+        user.verified = true;
+        user.verificationToken = undefined;
+        user.verificationExpires = undefined;
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: "Email verified successfully. You can now log in."
+        });
+    } catch (error) {
+        console.error("Verification error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred during verification",
+            error: error.message
+        });
+    }
+});
 
-    return res.status(200).json({
-      success: true,
-      hasSubmission: true,
-      submission: {
-        ...paperSubmission.toObject(),
-        bookingId: userSubmission.bookingId,
-        submissionDate: userSubmission.submissionDate
-      }
-    });
-  } catch (error) {
-    console.error("Error fetching user submission:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching submission details",
-      error: error.message
-    });
-  }
+// Resend verification email
+app.post('/api/auth/resend-verification', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+        if (user.verified) {
+            return res.status(400).json({
+                success: false,
+                message: "Email already verified"
+            });
+        }
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        user.verificationToken = verificationToken;
+        user.verificationExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
+        await user.save();
+        await sendVerificationEmail(email, verificationToken);
+        return res.status(200).json({
+            success: true,
+            message: "Verification email sent. Please check your inbox."
+        });
+    } catch (error) {
+        console.error("Resend verification error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred while sending the verification email",
+            error: error.message
+        });
+    }
+});
+
+// Forgot password
+app.post('/api/auth/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiry = new Date();
+        otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
+        user.resetPasswordOTP = otp;
+        user.resetPasswordExpiry = otpExpiry;
+        await user.save();
+        await sendOTPEmail(email, otp);
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent to your email"
+        });
+    } catch (error) {
+        console.error("Forgot password error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred",
+            error: error.message
+        });
+    }
+});
+
+// Reset password
+app.post('/api/auth/reset-password', async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+    try {
+        const user = await User.findOne({
+            email,
+            resetPasswordOTP: otp,
+            resetPasswordExpiry: { $gt: new Date() }
+        });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid or expired OTP"
+            });
+        }
+        const hash = await bcrypt.hash(newPassword, 10);
+        user.password = hash;
+        user.resetPasswordOTP = undefined;
+        user.resetPasswordExpiry = undefined;
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: "Password reset successful"
+        });
+    } catch (error) {
+        console.error("Reset password error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred",
+            error: error.message
+        });
+    }
+});
+
+// Get current user
+app.get('/api/auth/me', verifyJWT, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).select('-password');
+        return res.status(200).json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching user data",
+            error: error.message
+        });
+    }
+});
+
+// ==================== TEST ROUTES ====================
+// Simple test route to fetch all papers without any verification
+app.get('/test/paperfetch', async (req, res) => {
+    try {
+        const papers = await PaperSubmission.find({})
+            .populate('assignedEditor', 'username email')
+            .populate('assignedReviewers', 'username email')
+            .sort({ createdAt: -1 });
+
+        console.log(`Found ${papers.length} papers in database`);
+        
+        // Log the first paper to see structure
+        if (papers.length > 0) {
+            console.log('First paper:', JSON.stringify(papers[0], null, 2));
+        }
+        
+        return res.status(200).json({
+            success: true,
+            count: papers.length,
+            papers: papers
+        });
+    } catch (error) {
+        console.error('Error fetching papers:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching papers',
+            error: error.message
+        });
+    }
+});
+
+// ✅ Get PDF as Base64 - For editors to fetch user submissions
+app.get('/api/editor/pdf/:submissionId', async (req, res) => {
+    try {
+        const token = req.headers["authorization"]?.replace('Bearer ', '');
+        if (!token) {
+            return res.status(403).json({ 
+                success: false, 
+                message: "A token is required for authentication" 
+            });
+        }
+
+        // Verify JWT
+        let decodedUser;
+        try {
+            decodedUser = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            return res.status(401).json({ 
+                success: false, 
+                message: "Invalid token" 
+            });
+        }
+
+        // Check if user is editor or admin
+        const user = await User.findById(decodedUser.userId);
+        if (!user || (user.role !== 'Editor' && user.role !== 'Admin')) {
+            return res.status(403).json({
+                success: false,
+                message: "Only editors and admins can access PDFs"
+            });
+        }
+
+        const { submissionId } = req.params;
+
+        // Find paper in database
+        const paper = await PaperSubmission.findOne({ submissionId });
+        
+        if (!paper || !paper.pdfBase64) {
+            return res.status(404).json({
+                success: false,
+                message: 'Paper or PDF not found'
+            });
+        }
+
+        // Return PDF as base64 string
+        return res.status(200).json({
+            success: true,
+            submissionId,
+            pdfBase64: paper.pdfBase64,
+            pdfFileName: paper.pdfFileName,
+            paperTitle: paper.paperTitle,
+            authorName: paper.authorName,
+            email: paper.email,
+            message: 'PDF fetched successfully'
+        });
+    } catch (error) {
+        console.error('Error getting PDF:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching PDF',
+            error: error.message
+        });
+    }
+});
+
+// ✅ Get All Papers for Editor - With User Details
+app.get('/api/editor/papers', async (req, res) => {
+    try {
+        const token = req.headers["authorization"]?.replace('Bearer ', '');
+        if (!token) {
+            return res.status(403).json({ 
+                success: false, 
+                message: "A token is required for authentication" 
+            });
+        }
+
+        // Verify JWT
+        let decodedUser;
+        try {
+            decodedUser = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            return res.status(401).json({ 
+                success: false, 
+                message: "Invalid token" 
+            });
+        }
+
+        // Check if user is editor or admin
+        const user = await User.findById(decodedUser.userId);
+        if (!user || (user.role !== 'Editor' && user.role !== 'Admin')) {
+            return res.status(403).json({
+                success: false,
+                message: "Only editors and admins can access papers"
+            });
+        }
+
+        // Fetch all papers, excluding pdfBase64 from list view (too large)
+        const papers = await PaperSubmission.find({})
+            .select('-pdfBase64 -versions')
+            .populate('assignedEditor', 'username email')
+            .populate('assignedReviewers', 'username email')
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            count: papers.length,
+            papers
+        });
+    } catch (error) {
+        console.error("Error fetching papers:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching papers",
+            error: error.message
+        });
+    }
+});
+
+// PDF Fetch endpoint - Streams PDF directly from Cloudinary with proper CORS handling
+app.get('/test/pdf-fetch', async (req, res) => {
+    try {
+        const { url, publicId } = req.query;
+        
+        if (!url && !publicId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'PDF URL or publicId required' 
+            });
+        }
+
+        let pdfUrl = url ? decodeURIComponent(url) : null;
+
+        // If publicId is provided, construct the URL
+        if (publicId && process.env.CLOUDINARY_CLOUD_NAME) {
+            const decodedPublicId = decodeURIComponent(publicId);
+            const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+            // Remove .pdf extension if present in publicId and add it back to ensure proper format
+            const publicIdWithoutExt = decodedPublicId.replace(/\.pdf$/, '');
+            pdfUrl = `https://res.cloudinary.com/${cloudName}/raw/upload/${publicIdWithoutExt}.pdf`;
+        }
+
+        console.log('Fetching Cloudinary PDF:', pdfUrl);
+
+        // Fetch the PDF
+        const response = await fetch(pdfUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/pdf, */*',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://cloudinary.com/'
+            }
+        });
+
+        console.log('Cloudinary Response Status:', response.status, response.statusText);
+
+        if (!response.ok) {
+            console.error('Failed to fetch PDF:', {
+                status: response.status,
+                statusText: response.statusText,
+                url: pdfUrl
+            });
+            
+            // Try alternative Cloudinary format if URL is restricted
+            if (response.status === 401 || response.status === 403) {
+                console.log('Access denied, trying with download transformation');
+                
+                // Extract cloud name and public ID from URL
+                const urlObj = new URL(pdfUrl);
+                const pathMatch = pdfUrl.match(/\/upload\/(.+?)\.pdf$/);
+                
+                if (pathMatch) {
+                    const transformedUrl = pdfUrl.replace(
+                        /\/upload\//,
+                        `/upload/fl_attachment/`
+                    );
+                    
+                    console.log('Trying transformed URL:', transformedUrl);
+                    
+                    const retryResponse = await fetch(transformedUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/pdf',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        }
+                    });
+                    
+                    if (retryResponse.ok) {
+                        const buffer = await retryResponse.arrayBuffer();
+                        res.setHeader('Content-Type', 'application/pdf');
+                        res.setHeader('Content-Length', buffer.byteLength);
+                        res.setHeader('Cache-Control', 'public, max-age=3600');
+                        res.setHeader('Access-Control-Allow-Origin', '*');
+                        return res.send(Buffer.from(buffer));
+                    }
+                }
+            }
+            
+            return res.status(response.status).json({
+                success: false,
+                message: `Failed to fetch PDF: ${response.statusText}`,
+                status: response.status,
+                url: pdfUrl
+            });
+        }
+
+        // Successfully fetched - set response headers and stream
+        const contentType = response.headers.get('content-type') || 'application/pdf';
+        const contentLength = response.headers.get('content-length');
+        
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        
+        if (contentLength) {
+            res.setHeader('Content-Length', contentLength);
+        }
+
+        const buffer = await response.arrayBuffer();
+        console.log('Successfully fetched PDF size:', buffer.byteLength, 'bytes');
+        
+        res.send(Buffer.from(buffer));
+    } catch (error) {
+        console.error('PDF Fetch Error:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching PDF',
+            error: error.message
+        });
+    }
+});
+
+// Direct Cloudinary fetch endpoint (for PDFs stored in Cloudinary)
+app.get('/test/cloudinary-pdf', async (req, res) => {
+    try {
+        const { publicId } = req.query;
+        
+        if (!publicId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Cloudinary public ID required' 
+            });
+        }
+
+        console.log('Fetching Cloudinary PDF:', publicId);
+        
+        // Construct Cloudinary URL with transformation to get PDF
+        const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+        const pdfUrl = `https://res.cloudinary.com/${cloudName}/fl_attachment/v1/${publicId}`;
+        
+        console.log('Cloudinary URL:', pdfUrl);
+
+        const response = await fetch(pdfUrl, {
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/pdf',
+                'Cache-Control': 'no-cache'
+            }
+        });
+
+        console.log('Cloudinary Response Status:', response.status);
+
+        if (!response.ok) {
+            console.error('Cloudinary PDF fetch failed:', response.status, response.statusText);
+            return res.status(response.status).json({ 
+                success: false, 
+                message: 'Failed to fetch PDF from Cloudinary',
+                status: response.status
+            });
+        }
+
+        const contentType = response.headers.get('content-type') || 'application/pdf';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', 'inline; filename="paper.pdf"');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
+        const buffer = await response.arrayBuffer();
+        res.send(Buffer.from(buffer));
+    } catch (error) {
+        console.error('Cloudinary PDF Error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching Cloudinary PDF',
+            error: error.message
+        });
+    }
+});
+
+// ==================== EDITOR ROUTES ====================
+// Verify editor access
+app.get('/api/editor/verify-access', verifyJWT, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const userRole = req.user.role;
+
+        if (userRole !== 'Editor' && userRole !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. Only editors can access this resource.'
+            });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        if (user.role !== 'Editor' && user.role !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'User does not have editor privileges'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Editor access verified',
+            user: {
+                id: user._id,
+                email: user.email,
+                username: user.username,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        console.error('Error verifying editor access:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error verifying editor access',
+            error: error.message
+        });
+    }
 });
 
 // Get all papers (for editor dashboard)
-app.get('/api/papers', verifyJWT, async (req, res) => {
-  try {
-    const papers = await PaperSubmission.find({}).sort({ createdAt: -1 });
-    return res.status(200).json({
-      success: true,
-      count: papers.length,
-      papers: papers
-    });
-  } catch (error) {
-    console.error("Error fetching papers:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching papers",
-      error: error.message
-    });
-  }
-});
-
-app.put('/edit-submission/:submissionId', verifyJWT, upload.single('abstract'), async (req, res) => {
-  try {
-    const { submissionId } = req.params;
-    const { email } = req.user;
-
-    // Verify the submission belongs to the user
-    const userSubmission = await UserSubmission.findOne({
-      email,
-      submissionId
-    });
-
-    if (!userSubmission) {
-      return res.status(403).json({
-        success: false,
-        message: "You do not have permission to edit this submission"
-      });
-    }
-
-    // Get the existing submission
-    const paperSubmission = await PaperSubmission.findOne({ submissionId });
-    if (!paperSubmission) {
-      return res.status(404).json({
-        success: false,
-        message: "Submission not found"
-      });
-    }
-
-    // Update the fields
-    if (req.body.paperTitle) paperSubmission.paperTitle = req.body.paperTitle;
-    if (req.body.category) paperSubmission.category = req.body.category;
-    if (req.body.topic) paperSubmission.topic = req.body.topic;
-    if (req.body.authorName) paperSubmission.authorName = req.body.authorName;
-
-    // Handle file upload if new file provided
-    if (req.file) {
-      // If there's an existing file, you might want to delete it
-      // Delete old file code would go here
-
-      paperSubmission.abstractFileUrl = `/uploads/${req.file.filename}`;
-
-      // Get file details for the email
-      filePath = req.file.path;
-      fileName = req.file.originalname;
-    }
-
-    // Save the updated submission
-    await paperSubmission.save();
-
-    // Send confirmation email for the update
+app.get('/api/editor/papers', verifyJWT, async (req, res) => {
     try {
-      await sendUpdateConfirmationEmail({
-        submissionId,
-        bookingId: userSubmission.bookingId,
-        paperTitle: paperSubmission.paperTitle,
-        authorName: paperSubmission.authorName,
-        email,
-        category: paperSubmission.category,
-        filePath: req.file ? req.file.path : null,
-        fileName: req.file ? req.file.originalname : null
-      });
-    } catch (emailError) {
-      console.error("Failed to send update confirmation:", emailError);
+        const userRole = req.user.role;
+
+        // Check editor access
+        if (userRole !== 'Editor' && userRole !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. Only editors can view papers.'
+            });
+        }
+
+        const papers = await PaperSubmission.find({})
+            .populate('assignedEditor', 'username email')
+            .populate('assignedReviewers', 'username email')
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            count: papers.length,
+            papers
+        });
+    } catch (error) {
+        console.error('Error fetching papers:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching papers',
+            error: error.message
+        });
+    }
+});
+
+// Get all reviewers
+app.get('/api/editor/reviewers', verifyJWT, async (req, res) => {
+    try {
+        const userRole = req.user.role;
+
+        if (userRole !== 'Editor' && userRole !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied.'
+            });
+        }
+
+        const reviewers = await User.find({ role: 'Reviewer' })
+            .select('-password')
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            count: reviewers.length,
+            reviewers
+        });
+    } catch (error) {
+        console.error('Error fetching reviewers:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching reviewers',
+            error: error.message
+        });
+    }
+});
+
+// Create reviewer account
+app.post('/api/editor/reviewers', verifyJWT, async (req, res) => {
+    try {
+        const { email, username, password } = req.body;
+        const userRole = req.user.role;
+
+        if (userRole !== 'Editor' && userRole !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Only editors can create reviewers.'
+            });
+        }
+
+        // Validate input
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email and password are required'
+            });
+        }
+
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'User with this email already exists'
+            });
+        }
+
+        // Hash password
+        const hash = await bcrypt.hash(password, 10);
+
+        // Create new reviewer
+        const newReviewer = new User({
+            username: username || email.split('@')[0],
+            email,
+            password: hash,
+            role: 'Reviewer',
+            verified: true
+        });
+
+        await newReviewer.save();
+
+        // Send credentials email
+        try {
+            const { sendReviewerCredentialsEmail } = await import('./utils/emailService.js');
+            await sendReviewerCredentialsEmail(email, username || email.split('@')[0], password);
+        } catch (emailError) {
+            console.error('Error sending reviewer credentials email:', emailError);
+            // Don't fail the request if email fails
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: 'Reviewer account created successfully',
+            reviewer: {
+                id: newReviewer._id,
+                email: newReviewer.email,
+                username: newReviewer.username,
+                role: newReviewer.role
+            }
+        });
+    } catch (error) {
+        console.error('Error creating reviewer:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error creating reviewer',
+            error: error.message
+        });
+    }
+});
+
+// Assign reviewers to paper
+app.post('/api/editor/assign-reviewers', verifyJWT, async (req, res) => {
+    try {
+        const { paperId, reviewerIds } = req.body;
+        const userRole = req.user.role;
+
+        if (userRole !== 'Editor' && userRole !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Only editors can assign reviewers.'
+            });
+        }
+
+        if (!paperId || !reviewerIds || reviewerIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Paper ID and reviewer IDs are required'
+            });
+        }
+
+        // Find paper
+        const paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Paper not found'
+            });
+        }
+
+        // Add reviewers
+        paper.assignedReviewers = [...new Set([...paper.assignedReviewers, ...reviewerIds])];
+        paper.status = 'Under Review';
+        await paper.save();
+
+        // Populate reviewers for response
+        await paper.populate('assignedReviewers', 'username email');
+
+        return res.status(200).json({
+            success: true,
+            message: 'Reviewers assigned successfully',
+            paper
+        });
+    } catch (error) {
+        console.error('Error assigning reviewers:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error assigning reviewers',
+            error: error.message
+        });
+    }
+});
+
+// Get paper reviews
+app.get('/api/editor/papers/:paperId/reviews', verifyJWT, async (req, res) => {
+    try {
+        const { paperId } = req.params;
+        const userRole = req.user.role;
+
+        if (userRole !== 'Editor' && userRole !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied.'
+            });
+        }
+
+        const reviews = await Review.find({ paper: paperId })
+            .populate('reviewer', 'username email')
+            .populate('paper', 'paperTitle submissionId');
+
+        return res.status(200).json({
+            success: true,
+            count: reviews.length,
+            reviews
+        });
+    } catch (error) {
+        console.error('Error fetching reviews:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching reviews',
+            error: error.message
+        });
+    }
+});
+
+// ==================== REVIEWER ROUTES ====================
+// Get papers assigned to reviewer
+app.get('/api/reviewer/papers', verifyJWT, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const userRole = req.user.role;
+
+        if (userRole !== 'Reviewer' && userRole !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied.'
+            });
+        }
+
+        const papers = await PaperSubmission.find({
+            assignedReviewers: userId
+        })
+        .populate('assignedEditor', 'username email')
+        .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            count: papers.length,
+            papers
+        });
+    } catch (error) {
+        console.error('Error fetching reviewer papers:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching papers',
+            error: error.message
+        });
+    }
+});
+
+// Submit review
+app.post('/api/reviewer/submit-review', verifyJWT, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { paperId, recommendation, ratings, commentsToAuthor, confidentialCommentsToEditor, additionalQuestions } = req.body;
+        const userRole = req.user.role;
+
+        if (userRole !== 'Reviewer' && userRole !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Only reviewers can submit reviews.'
+            });
+        }
+
+        if (!paperId || !recommendation) {
+            return res.status(400).json({
+                success: false,
+                message: 'Paper ID and recommendation are required'
+            });
+        }
+
+        // Check if review already exists
+        const existingReview = await Review.findOne({
+            paper: paperId,
+            reviewer: userId
+        });
+
+        let review;
+        if (existingReview) {
+            // Update existing review
+            existingReview.recommendation = recommendation;
+            existingReview.ratings = ratings;
+            existingReview.commentsToAuthor = commentsToAuthor;
+            existingReview.confidentialCommentsToEditor = confidentialCommentsToEditor;
+            existingReview.additionalQuestions = additionalQuestions;
+            existingReview.status = 'Submitted';
+            await existingReview.save();
+            review = existingReview;
+        } else {
+            // Create new review
+            review = new Review({
+                paper: paperId,
+                reviewer: userId,
+                recommendation,
+                ratings,
+                commentsToAuthor,
+                confidentialCommentsToEditor,
+                additionalQuestions,
+                status: 'Submitted'
+            });
+            await review.save();
+        }
+
+        await review.populate('paper', 'paperTitle submissionId');
+
+        return res.status(201).json({
+            success: true,
+            message: 'Review submitted successfully',
+            review
+        });
+    } catch (error) {
+        console.error('Error submitting review:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error submitting review',
+            error: error.message
+        });
+    }
+});
+
+// Get review for a specific paper (reviewer's own review)
+app.get('/api/reviewer/papers/:paperId/review', verifyJWT, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { paperId } = req.params;
+
+        const review = await Review.findOne({
+            paper: paperId,
+            reviewer: userId
+        })
+        .populate('paper', 'paperTitle submissionId pdfUrl')
+        .populate('reviewer', 'username email');
+
+        if (!review) {
+            return res.status(404).json({
+                success: false,
+                message: 'Review not found'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            review
+        });
+    } catch (error) {
+        console.error('Error fetching review:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching review',
+            error: error.message
+        });
+    }
+});
+
+// Get current user
+app.get('/api/auth/me', verifyJWT, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).select('-password');
+        return res.status(200).json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching user data",
+            error: error.message
+        });
+    }
+});
+
+// Legacy routes for backward compatibility
+app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "User does not exist" 
+            });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Incorrect password" 
+            });
+        }
+
+        if (!user.verified) {
+            return res.status(200).json({
+                success: false,
+                verified: false,
+                needsVerification: true,
+                message: "Please verify your email before logging in"
+            });
+        }
+
+        const token = jwt.sign({
+            email,
+            userId: user._id,
+            username: user.username,
+            role: user.role
+        }, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+        return res.status(200).json({
+            success: true,
+            verified: true,
+            token,
+            email: user.email,
+            username: user.username,
+            role: user.role
+        });
+    } catch (error) {
+        console.error("Login error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred during login",
+            error: error.message
+        });
+    }
+});
+
+app.post('/signin', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "User already exists" 
+            });
+        }
+
+        const hash = await bcrypt.hash(password, 10);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+
+        const newUser = new User({
+            username: email.split('@')[0],
+            email,
+            password: hash,
+            verified: false,
+            verificationToken,
+            verificationExpires: new Date(Date.now() + 48 * 60 * 60 * 1000)
+        });
+
+        await newUser.save();
+
+        try {
+            await sendVerificationEmail(email, verificationToken);
+            return res.status(201).json({
+                success: true,
+                message: "Account created. Please check your email to verify your account."
+            });
+        } catch (emailError) {
+            console.error("Failed to send verification email:", emailError);
+            return res.status(201).json({
+                success: true,
+                message: "Account created, but we couldn't send a verification email. Please contact support."
+            });
+        }
+    } catch (error) {
+        console.error("Signin error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred during registration",
+            error: error.message
+        });
+    }
+});
+
+app.get('/verify-email', async (req, res) => {
+    const { token } = req.query;
+    if (!token) {
+        return res.status(400).json({
+            success: false,
+            message: "Verification token is required"
+        });
+    }
+    try {
+        const user = await User.findOne({
+            verificationToken: token,
+            verificationExpires: { $gt: new Date() }
+        });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid or expired verification token"
+            });
+        }
+        user.verified = true;
+        user.verificationToken = undefined;
+        user.verificationExpires = undefined;
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: "Email verified successfully. You can now log in."
+        });
+    } catch (error) {
+        console.error("Verification error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred during verification",
+            error: error.message
+        });
+    }
+});
+
+app.post('/resend-verification', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+        if (user.verified) {
+            return res.status(400).json({
+                success: false,
+                message: "Email already verified"
+            });
+        }
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        user.verificationToken = verificationToken;
+        user.verificationExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
+        await user.save();
+        await sendVerificationEmail(email, verificationToken);
+        return res.status(200).json({
+            success: true,
+            message: "Verification email sent. Please check your inbox."
+        });
+    } catch (error) {
+        console.error("Resend verification error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred",
+            error: error.message
+        });
+    }
+});
+
+app.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiry = new Date();
+        otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
+        user.resetPasswordOTP = otp;
+        user.resetPasswordExpiry = otpExpiry;
+        await user.save();
+        await sendOTPEmail(email, otp);
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent to your email"
+        });
+    } catch (error) {
+        console.error("Forgot password error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred",
+            error: error.message
+        });
+    }
+});
+
+app.post('/reset-password', async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+    try {
+        const user = await User.findOne({
+            email,
+            resetPasswordOTP: otp,
+            resetPasswordExpiry: { $gt: new Date() }
+        });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid or expired OTP"
+            });
+        }
+        const hash = await bcrypt.hash(newPassword, 10);
+        user.password = hash;
+        user.resetPasswordOTP = undefined;
+        user.resetPasswordExpiry = undefined;
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: "Password reset successful"
+        });
+    } catch (error) {
+        console.error("Reset password error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred",
+            error: error.message
+        });
+    }
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Route not found',
+        path: req.path
+    });
+});
+
+
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+
+    // Multer errors
+    if (err.name === 'MulterError') {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({
+                success: false,
+                message: 'File too large. Maximum size is 10MB.'
+            });
+        }
+        return res.status(400).json({
+            success: false,
+            message: err.message
+        });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Submission updated successfully",
-      submission: paperSubmission
+    // Mongoose validation errors
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({
+            success: false,
+            message: 'Validation error',
+            errors: Object.values(err.errors).map(e => e.message)
+        });
+    }
+
+    // JWT errors
+    if (err.name === 'JsonWebTokenError') {
+        return res.status(401).json({
+            success: false,
+            message: 'Invalid token'
+        });
+    }
+
+    if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({
+            success: false,
+            message: 'Token expired'
+        });
+    }
+
+    // Default error
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
-  } catch (error) {
-    console.error("Error updating submission:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error updating submission",
-      error: error.message
-    });
-  }
 });
 
-const sendUpdateConfirmationEmail = async (submissionData) => {
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: submissionData.email,
-    subject: `Paper Submission Update - ${submissionData.submissionId}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #F5A051;">Paper Submission Update</h2>
-        <p>Dear ${submissionData.authorName},</p>
-        <p>Your paper submission has been successfully updated.</p>
-        <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0;">
-          <p><strong>Submission ID:</strong> ${submissionData.submissionId}</p>
-          <p><strong>Booking ID:</strong> ${submissionData.bookingId}</p>
-          <p><strong>Paper Title:</strong> ${submissionData.paperTitle}</p>
-          <p><strong>Category:</strong> ${submissionData.category}</p>
-          <p><strong>Status:</strong> Under Review</p>
-        </div>
-        <p>Best regards,<br>ICMBNT 2025 Committee</p>
-      </div>
-    `
-  };
-
-  // Add attachment if file was uploaded
-  if (submissionData.filePath && fs.existsSync(submissionData.filePath)) {
-    mailOptions.attachments = [{
-      filename: submissionData.fileName,
-      path: submissionData.filePath
-    }];
-  }
-
-  return transporter.sendMail(mailOptions);
-};
-
-// Add this function in the server.js file if missing
-
-// Generate booking ID
-const generateBookingId = () => {
-  const timestamp = Date.now().toString().substring(6);
-  const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-  return `BK${timestamp}${randomNum}`;
-};
-
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-  // console.log('Allowed origins for CORS:', allowedOrigins);
+    console.log(`
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║   ICMBNT 2026 Research Paper Management System           ║
+║   Server running on http://localhost:${PORT}                ║
+║                                                           ║
+║   API Endpoints:                                          ║
+║   - Auth:     /api/auth                                   ║
+║   - Papers:   /api/papers                                 ║
+║   - Admin:    /api/admin                                  ║
+║   - Editor:   /api/editor                                 ║
+║   - Reviewer: /api/reviewer                               ║
+║                                                           ║
+╚═══════════════════════════════════════════════════════════╝
+  `);
 });
+
+export default app;
