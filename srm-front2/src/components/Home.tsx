@@ -4,15 +4,39 @@ import { Calendar, MapPin, Users, Target, Compass, Globe } from "lucide-react"
 import { useState, useEffect } from "react"
 import bali from "./images/bali.png"
 import con from "./images/c.png"
+import sponsor1 from "./images/isius.png"
+import c1 from "./images/bali/c1.png"
+import c2 from "./images/bali/c2.png"
+import c3 from "./images/bali/c3.png"
+// import c4 from "./images/bali/c4.png"
+
 const heroImages = [
-  "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1920&q=80", // Conference hall
-  "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=1920&q=80", // Tech conference
-  "https://images.unsplash.com/photo-1591115765373-5207764f72e7?w=1920&q=80", // Modern venue
-  "https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?w=1920&q=80", // Auditorium
+  c1,
+  c2,
+  c3,
+  c1
 ]
+
+const typewriterText = "International Conference on Multidisciplinary Breakthroughs and NextGen Technologies"
+
 const Home = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [displayedText, setDisplayedText] = useState("")
+  const [isTypingComplete, setIsTypingComplete] = useState(false)
 
+  // Typewriter effect
+  useEffect(() => {
+    if (displayedText.length < typewriterText.length) {
+      const timeout = setTimeout(() => {
+        setDisplayedText(typewriterText.slice(0, displayedText.length + 1))
+      }, 50)
+      return () => clearTimeout(timeout)
+    } else if (displayedText.length === typewriterText.length && !isTypingComplete) {
+      setIsTypingComplete(true)
+    }
+  }, [displayedText, isTypingComplete])
+
+  // Image carousel
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % heroImages.length)
@@ -23,7 +47,84 @@ const Home = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900">
+      <style>{`
+        @keyframes typewriter {
+          from { width: 0; }
+          to { width: 100%; }
+        }
+        @keyframes blink {
+          from { border-color: #F5A051; }
+          to { border-color: transparent; }
+        }
+        @keyframes float1 {
+          0%, 100% { transform: translateY(0px) translateX(0px); }
+          25% { transform: translateY(-20px) translateX(10px); }
+          50% { transform: translateY(-40px) translateX(-10px); }
+          75% { transform: translateY(-20px) translateX(10px); }
+        }
+        @keyframes float2 {
+          0%, 100% { transform: translateY(0px) translateX(0px); }
+          25% { transform: translateY(-30px) translateX(-15px); }
+          50% { transform: translateY(-50px) translateX(15px); }
+          75% { transform: translateY(-25px) translateX(-10px); }
+        }
+        @keyframes float3 {
+          0%, 100% { transform: translateY(0px) translateX(0px); }
+          25% { transform: translateY(-25px) translateX(12px); }
+          50% { transform: translateY(-45px) translateX(-12px); }
+          75% { transform: translateY(-20px) translateX(8px); }
+        }
+        @keyframes float4 {
+          0%, 100% { transform: translateY(0px) translateX(0px); }
+          25% { transform: translateY(-35px) translateX(-18px); }
+          50% { transform: translateY(-55px) translateX(10px); }
+          75% { transform: translateY(-30px) translateX(-15px); }
+        }
+        .float-card-1 {
+          animation: float1 6s ease-in-out infinite;
+        }
+        .float-card-2 {
+          animation: float2 7s ease-in-out infinite;
+          animation-delay: 0.5s;
+        }
+        .float-card-3 {
+          animation: float3 8s ease-in-out infinite;
+          animation-delay: 1s;
+        }
+        .float-card-4 {
+          animation: float4 9s ease-in-out infinite;
+          animation-delay: 1.5s;
+        }
+        .typewriter-text {
+          display: inline-block;
+          border-right: 3px solid #F5A051;
+          animation: blink 0.7s infinite;
+          white-space: normal;
+          overflow: hidden;
+        }
+        .typewriter-text.complete {
+          border-right: none;
+          animation: none;
+        }
+        .bounce-container {
+          animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-20px); }
+        }
+      `}</style>
+
       <div className="relative min-h-screen text-white overflow-hidden">
+        {/* Animated floating cards background */}
+        <div className="absolute inset-0">
+          <div className="absolute top-10 left-10 w-32 h-32 bg-blue-500/20 rounded-lg backdrop-blur-sm float-card-1"></div>
+          <div className="absolute top-1/4 right-20 w-40 h-40 bg-purple-500/20 rounded-lg backdrop-blur-sm float-card-2"></div>
+          <div className="absolute bottom-1/4 left-1/3 w-36 h-36 bg-pink-500/20 rounded-lg backdrop-blur-sm float-card-3"></div>
+          <div className="absolute bottom-10 right-1/4 w-44 h-44 bg-orange-500/20 rounded-lg backdrop-blur-sm float-card-4"></div>
+        </div>
+
+        {/* Background Images */}
         {heroImages.map((image, index) => (
           <div
             key={index}
@@ -40,12 +141,12 @@ const Home = () => {
         ))}
 
         <div className="relative z-10 container mx-auto px-4 py-20 min-h-screen flex flex-col justify-center items-center text-center">
-          <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight max-w-5xl drop-shadow-lg">
-            International Conference on Multidisciplinary Breakthroughs and NextGen Technologies
+          <h1 className={`text-3xl md:text-5xl font-bold mb-4 leading-tight max-w-5xl drop-shadow-lg typewriter-text ${isTypingComplete ? 'complete' : ''}`}>
+            {displayedText}
           </h1>
           <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-[#F5A051] drop-shadow-md">(ICMBNT–2026)</h2>
 
-          <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-8">
+          <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-8 bounce-container">
             <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
               <Calendar className="w-5 h-5 mr-2 text-[#F5A051]" />
               <span>April 26 & 27, 2026</span>
@@ -60,13 +161,22 @@ const Home = () => {
             </div>
           </div>
 
-          <p className="text-xl mb-8 text-slate-200">
-            Organized by
-            <br />
-            <span className="font-bold text-white">Society for Cyber Intelligent Systems</span>
-            <br />
-            Puducherry – India
-          </p>
+          <div className="mb-8">
+            <div className="flex justify-center items-center gap-6 mb-6">
+              <img 
+                src={sponsor1} 
+                alt="Sponsor Logo" 
+                className="h-16 md:h-20 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
+              />
+            </div>
+            <p className="text-xl text-slate-200">
+              Organized by
+              <br />
+              <span className="font-bold text-white">Society for Cyber Intelligent Systems</span>
+              <br />
+              Puducherry – India
+            </p>
+          </div>
 
           <button className="bg-[#F5A051] hover:bg-[#e08c3e] text-white font-bold py-3 px-8 rounded-full transition-all duration-300 text-lg inline-block shadow-lg shadow-[#F5A051]/30 hover:shadow-[#F5A051]/40 hover:scale-105">
             REGISTER NOW
