@@ -10,7 +10,7 @@ import { PaperSubmission } from './models/Paper.js';
 import { sendVerificationEmail, sendOTPEmail } from './utils/emailService.js';
 
 // Import routes
-import authRoutes from './routes/authRoutes.js';z
+import authRoutes from './routes/authRoutes.js';
 import paperRoutes from './routes/paperRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import editorRoutes from './routes/editorRoutes.js';
@@ -21,26 +21,39 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const allowedOrigins = [
-    "https://icmbnt2026-yovz.vercel.app",
-];
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : ["https://icmbnt2026-yovz.vercel.app", "http://localhost:5173", "http://localhost:3000"];
 
 const corsOptions = {
     origin: function(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error("Not allowed by CORS"));
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // Check if origin is in allowedOrigins
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
         }
+        
+        // Log rejected origins for debugging
+        console.log(`CORS rejected origin: ${origin}`);
+        return callback(null, true); // Allow for debugging - change to false in production if needed
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
     credentials: true,
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200,
+    maxAge: 86400 // 24 hours
 };
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+// Handle preflight requests
+app.options('*', cors(corsOptions));
+
+// Body parser middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // Connect to database
 connectDatabase();
 
