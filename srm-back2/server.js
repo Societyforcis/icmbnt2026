@@ -25,34 +25,20 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
     : ["https://icmbnt2026-yovz.vercel.app", "http://localhost:5173", "http://localhost:3000"];
 
+app.use(express.json({ limit: '10mb' }));
 const corsOptions = {
-    origin: function(origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
-        // Check if origin is in allowedOrigins
-        if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
-        
-        // Log rejected origins for debugging
-        console.log(`CORS rejected origin: ${origin}`);
-        return callback(null, true); // Allow for debugging - change to false in production if needed
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
-    credentials: true,
-    optionsSuccessStatus: 200,
-    maxAge: 86400 // 24 hours
+// https://societycis.org
+  origin: ['https://society', 'http://localhost:173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-app.use(cors(corsOptions));
-// Handle preflight requests
-app.options('*', cors(corsOptions));
-
-// Body parser middleware
+// Middleware
 app.use(express.json());
+app.use(cors(corsOptions));
 app.use(express.urlencoded({ extended: true }));
+// app.use(cookieParser());
 
 // Connect to database
 connectDatabase();
