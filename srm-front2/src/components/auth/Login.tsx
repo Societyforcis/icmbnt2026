@@ -51,9 +51,9 @@ const Login = () => {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
       // Log request details for debugging
-      console.log(`Sending verification request to ${apiUrl}/verify-email with token: ${token}`);
+      console.log(`Sending verification request to ${apiUrl}/api/auth/verify-email with token: ${token}`);
 
-      const response = await axios.get(`${apiUrl}/verify-email`, {
+      const response = await axios.get(`${apiUrl}/api/auth/verify-email`, {
         params: { token }
       });
 
@@ -198,7 +198,7 @@ const Login = () => {
     setIsLoading(true);
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await axios.post(`${apiUrl}/resend-verification`, { email });
+      const response = await axios.post(`${apiUrl}/api/auth/resend-verification`, { email });
 
       if (response.data.success) {
         Swal.fire({
@@ -240,7 +240,7 @@ const Login = () => {
       if (result.isConfirmed) {
         try {
           const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-          const response = await axios.post(`${apiUrl}/forgot-password`, {
+          const response = await axios.post(`${apiUrl}/api/auth/forgot-password`, {
             email: result.value
           });
 
@@ -312,7 +312,7 @@ const Login = () => {
       if (result.isConfirmed) {
         try {
           const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-          const response = await axios.post(`${apiUrl}/reset-password`, {
+          const response = await axios.post(`${apiUrl}/api/auth/reset-password`, {
             email,
             otp,
             newPassword: result.value
