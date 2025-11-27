@@ -155,9 +155,10 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
     try {
       // Get token from localStorage
       const token = localStorage.getItem('token');
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
       const response = await axios.post<SubmissionResponse>(
-        'http://localhost:5000/api/papers/submit',
+        `${apiUrl}/api/papers/submit`,
         submissionFormData,
         {
           headers: {

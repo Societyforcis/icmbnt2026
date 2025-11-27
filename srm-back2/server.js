@@ -10,7 +10,7 @@ import { PaperSubmission } from './models/Paper.js';
 import { sendVerificationEmail, sendOTPEmail } from './utils/emailService.js';
 
 // Import routes
-import authRoutes from './routes/authRoutes.js';
+import authRoutes from './routes/authRoutes.js';z
 import paperRoutes from './routes/paperRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import editorRoutes from './routes/editorRoutes.js';
@@ -21,19 +21,31 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Configure CORS with allowed origins from environment
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',').map(origin => origin.trim());
+
 // Middleware
-app.use(cors({
-    origin: '*',
+const corsOptions = {
+    origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Allow for now to debug
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    credentials: true
-}));
+    credentials: true,
+    optionsSuccessStatus: 200
+};
 
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Handle preflight requests
-app.options('*', cors());
+app.options('*', cors(corsOptions));
 
 // Connect to database
 connectDatabase();

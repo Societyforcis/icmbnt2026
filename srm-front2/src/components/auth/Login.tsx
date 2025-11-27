@@ -239,7 +239,8 @@ const Login = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const response = await axios.post(`http://localhost:5000/forgot-password`, {
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+          const response = await axios.post(`${apiUrl}/forgot-password`, {
             email: result.value
           });
 
@@ -310,7 +311,8 @@ const Login = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const response = await axios.post(`http://localhost:5000/reset-password`, {
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+          const response = await axios.post(`${apiUrl}/reset-password`, {
             email,
             otp,
             newPassword: result.value

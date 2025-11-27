@@ -59,7 +59,8 @@ const PaperSubmission = () => {
       
       try {
         // Check for existing submission
-        const response = await axios.get('http://localhost:5000/user-submission', {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const response = await axios.get(`${apiUrl}/user-submission`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

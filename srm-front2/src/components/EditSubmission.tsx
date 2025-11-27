@@ -73,7 +73,8 @@ const EditSubmission: React.FC = () => {
     const fetchSubmission = async () => {
       try {
         console.log("Fetching submission data...");
-        const response = await axios.get(`http://localhost:5000/user-submission`, {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const response = await axios.get(`${apiUrl}/user-submission`, {
           headers: { 'Authorization': token }
         });
         
@@ -189,8 +190,9 @@ const EditSubmission: React.FC = () => {
         hasFile: !!selectedFile
       });
       
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const response = await axios.put(
-        `http://localhost:5000/edit-submission/${submissionId}`, 
+        `${apiUrl}/edit-submission/${submissionId}`, 
         formData,
         {
           headers: {

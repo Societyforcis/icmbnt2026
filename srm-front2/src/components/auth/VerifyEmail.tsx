@@ -48,7 +48,7 @@ const VerifyEmail: React.FC = () => {
         }
         
         // Send verification request to server
-        const apiUrl = 'http://localhost:5000';
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const response = await axios.post(`${apiUrl}/verify-email-token`, {
           token: verificationData.token,
           email: verificationData.email,
