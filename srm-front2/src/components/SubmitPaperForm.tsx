@@ -140,31 +140,95 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
     // Set loading state to true when submission starts
     setIsSubmitting(true);
 
-    // Create FormData object for file upload
-    const submissionFormData = new FormData();
-
-    // For revision, only require PDF and optionally author response
+    // For revision, only require PDF and author response
     if (isRevision && revisionData) {
-      if (!abstractFile) {
-        toast.error('Please upload the revised paper');
+      // Note: File upload is optional for now - backend doesn't handle it yet
+      // We'll just send the data as JSON
+
+      // Get the submissionId from revisionData
+      const submissionId = revisionData.submissionId;
+      if (!submissionId) {
+        toast.error('Error: Submission ID not found. Please refresh and try again.');
         setIsSubmitting(false);
         return;
       }
 
-      submissionFormData.append('submissionId', revisionData.submissionId);
-      submissionFormData.append('pdf', abstractFile);
-      submissionFormData.append('authorResponse', formData.paperTitle || ''); // Using paperTitle field for response
-    } else {
-      // For regular submission, append all required fields
-      submissionFormData.append('paperTitle', formData.paperTitle);
-      submissionFormData.append('authorName', formData.authorName);
-      submissionFormData.append('email', formData.email);
-      submissionFormData.append('category', formData.category);
+      try {
+        // Get token from localStorage
+        const token = localStorage.getItem('token');
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-      // Append PDF file
-      if (abstractFile) {
-        submissionFormData.append('pdf', abstractFile);
+        console.log('📤 Sending revision with submissionId:', submissionId);
+        console.log('📤 Author response:', formData.paperTitle);
+
+        // Send revision data as JSON (file upload will be added later with multer)
+        const response = await axios.post<SubmissionResponse>(
+          `${apiUrl}/submit-revised-paper`,
+          {
+            submissionId: submissionId,
+            authorResponse: formData.paperTitle || '' // Using paperTitle field for response
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` })
+            },
+          }
+        );
+
+        if (response.data.success) {
+          toast.success('Revised paper submitted successfully!');
+          
+          console.log('✅ Revision submitted:', response.data);
+
+          // Reset form
+          setFormData({
+            paperTitle: "",
+            authorName: "",
+            email: "",
+            category: ""
+          });
+          setAbstractFile(null);
+          setAbstractFileName("Click to browse files");
+
+          // Call success callback or refresh page
+          if (onSubmissionSuccess) {
+            onSubmissionSuccess();
+          } else {
+            // For revision, just refresh the page
+            window.location.reload();
+          }
+        } else {
+          toast.error(response.data.message || "Revision submission failed");
+        }
+
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          const errorMessage = error.response?.data?.message || "Error submitting revised paper";
+          toast.error(errorMessage);
+          console.error('❌ Submission error:', error.response?.data);
+        } else {
+          toast.error("An unexpected error occurred");
+          console.error('❌ Submission error:', error);
+        }
+      } finally {
+        setIsSubmitting(false);
       }
+      return;
+    }
+
+    // Create FormData object for regular file upload
+    const submissionFormData = new FormData();
+
+    // For regular submission, append all required fields
+    submissionFormData.append('paperTitle', formData.paperTitle);
+    submissionFormData.append('authorName', formData.authorName);
+    submissionFormData.append('email', formData.email);
+    submissionFormData.append('category', formData.category);
+
+    // Append PDF file
+    if (abstractFile) {
+      submissionFormData.append('pdf', abstractFile);
     }
 
     try {
@@ -172,10 +236,8 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
       const token = localStorage.getItem('token');
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-      const endpoint = isRevision ? `${apiUrl}/submit-revised-paper` : `${apiUrl}/api/papers/submit`;
-
       const response = await axios.post<SubmissionResponse>(
-        endpoint,
+        `${apiUrl}/api/papers/submit`,
         submissionFormData,
         {
           headers: {
@@ -186,9 +248,7 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
       );
 
       if (response.data.success) {
-        const successMessage = isRevision 
-          ? 'Revised paper submitted successfully!' 
-          : `Paper submitted successfully! Submission ID: ${response.data.submissionId}`;
+        const successMessage = `Paper submitted successfully! Submission ID: ${response.data.submissionId}`;
         
         toast.success(successMessage);
         
@@ -210,9 +270,6 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
         // Call success callback or navigate
         if (onSubmissionSuccess) {
           onSubmissionSuccess();
-        } else if (isRevision) {
-          // For revision, just refresh the page
-          window.location.reload();
         } else {
           navigate('/submission-success', {
             state: {

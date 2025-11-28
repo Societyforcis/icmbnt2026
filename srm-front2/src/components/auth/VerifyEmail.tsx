@@ -37,22 +37,21 @@ const VerifyEmail: React.FC = () => {
           throw new Error('Invalid verification data format');
         }
 
-        // Check if verification link has expired (24 hours)
-        const tokenTimestamp = new Date(verificationData.timestamp).getTime();
+        // Check if verification link has expired (48 hours)
+        const tokenTimestamp = verificationData.timestamp;
         const currentTime = new Date().getTime();
         const tokenAge = currentTime - tokenTimestamp;
-        const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        const maxAge = 48 * 60 * 60 * 1000; // 48 hours in milliseconds
 
         if (tokenAge > maxAge) {
-          throw new Error('Verification link has expired');
+          throw new Error('Verification link has expired. Please request a new verification email.');
         }
         
-        // Send verification request to server
+        // Send verification request to server using /api/auth/verify-email endpoint
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        const response = await axios.post(`${apiUrl}/verify-email-token`, {
+        const response = await axios.post(`${apiUrl}/api/auth/verify-email`, {
           token: verificationData.token,
-          email: verificationData.email,
-          timestamp: verificationData.timestamp
+          email: verificationData.email
         });
 
         if (response.data.success) {
@@ -75,9 +74,13 @@ const VerifyEmail: React.FC = () => {
       } catch (error: any) {
         console.error("Verification error:", error);
         
+        const errorMessage = error.response?.data?.message || 
+                           error.message || 
+                           'Email verification failed. Please try again or contact support.';
+        
         setVerificationStatus({
           success: false,
-          message: error.message || 'Email verification failed. Please try again or contact support.'
+          message: errorMessage
         });
       } finally {
         setIsVerifying(false);

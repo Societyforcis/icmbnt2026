@@ -104,15 +104,6 @@ const PaperSubmission = () => {
     });
   };
   
-  // Function to handle edit navigation - Fix the navigation
-  const handleEditSubmission = () => {
-    if (existingSubmission) {
-      console.log("Navigating to edit page with ID:", existingSubmission.submissionId);
-      // Use absolute path to avoid relative path issues
-      navigate(`/edit-submission/${existingSubmission.submissionId}`);
-    }
-  };
-  
   // Format date for display
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -221,14 +212,14 @@ const PaperSubmission = () => {
                   <div className="flex items-center">
                     <FaExclamationTriangle className="text-blue-600 mr-3 flex-shrink-0" />
                     <p className="text-blue-700">
-                      You already have an existing submission. You can view and edit it below.
+                      You have a submitted paper. Your paper status is shown below.
                     </p>
                   </div>
                 </div>
                 
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex items-center">
                   <FaFileAlt className="text-blue-800 mr-3" />
-                  Your Existing Submission
+                  Your Paper Submission
                 </h2>
 
                 <div className="bg-gray-50 rounded-lg p-6 mb-6">
@@ -261,7 +252,17 @@ const PaperSubmission = () => {
                     <div>
                       <p className="text-gray-500 text-sm mb-1">Status</p>
                       <p>
-                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-semibold">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          existingSubmission.status === 'Submitted' 
+                            ? 'bg-yellow-100 text-yellow-800' 
+                            : existingSubmission.status === 'Under Review'
+                            ? 'bg-blue-100 text-blue-800'
+                            : existingSubmission.status === 'Accepted'
+                            ? 'bg-green-100 text-green-800'
+                            : existingSubmission.status === 'Rejected'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
                           {existingSubmission.status}
                         </span>
                       </p>
@@ -292,14 +293,6 @@ const PaperSubmission = () => {
                 </div>
                 
                 <div className="flex flex-col sm:flex-row justify-center gap-4 mt-6">
-                  <button 
-                    onClick={handleEditSubmission}
-                    className="bg-[#F5A051] text-white px-6 py-3 rounded-md hover:bg-[#e08c3e] transition-all duration-300 flex items-center justify-center"
-                  >
-                    <FaEdit className="mr-2" />
-                    Edit Submission
-                  </button>
-                  
                   <button 
                     onClick={() => navigate('/dashboard')}
                     className="bg-blue-800 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center justify-center"
