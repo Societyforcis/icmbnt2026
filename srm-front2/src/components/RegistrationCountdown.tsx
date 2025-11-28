@@ -26,30 +26,30 @@ const RegistrationCountdown = () => {
     const initialDeadlines: Deadline[] = [
       {
         name: 'Manuscript Submission Deadline',
-        date: new Date('2026-04-15T23:59:59'), // Updated date
+        date: new Date('2026-02-15T23:59:59'), // Updated to Feb 15
         icon: <FileText className="text-blue-600" />,
-        description: 'Last date for submitting your research papers (Extended)',
+        description: 'Last date for submitting your research papers',
         status: 'upcoming'
       },
       {
         name: 'Acceptance Notification',
-        date: new Date('2026-04-05T23:59:59'),
+        date: new Date('2026-02-28T23:59:59'), // Updated to Feb 28
         icon: <AlertCircle className="text-purple-600" />,
         description: 'Authors will be notified about acceptance',
         status: 'upcoming'
       },
       {
         name: 'Registration Deadline',
-        date: new Date('2026-04-20T23:59:59'), // Updated date
+        date: new Date('2026-03-08T23:59:59'), // Updated to Mar 8
         icon: <CalendarIcon className="text-yellow-600" />,
-        description: 'Last date for conference registration (Extended)',
+        description: 'Last date for conference registration',
         status: 'upcoming'
       },
       {
         name: 'Conference Dates',
-        date: new Date('2026-04-26T09:00:00'),
+        date: new Date('2026-03-13T09:00:00'), // Updated to Mar 13
         icon: <Calendar className="text-red-600" />,
-        description: 'ICMBNT-2026 Conference (April 26-27)',
+        description: 'ICMBNT-2026 Conference (March 13-14)',
         status: 'upcoming'
       }
     ];

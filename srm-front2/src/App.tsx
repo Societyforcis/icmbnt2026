@@ -129,6 +129,13 @@ const AppRoutes = () => {
           </RoleProtectedRoute>
         } />
         
+        {/* Reviewer Dashboard Alias - for email links */}
+        <Route path="/reviewer-dashboard" element={
+          <RoleProtectedRoute roles={["Reviewer"]}>
+            <RouteWithLoading element={<ReviewerDashboard />} />
+          </RoleProtectedRoute>
+        } />
+        
         {/* Backup link route - reviewer can access specific paper review */}
         <Route path="/reviewer/review/:submissionId" element={
           <RoleProtectedRoute roles={["Reviewer"]}>

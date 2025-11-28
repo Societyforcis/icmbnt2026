@@ -370,7 +370,7 @@ const Dashboard: React.FC = () => {
                               <span className="flex-1 w-0 truncate">Conference Dates</span>
                             </div>
                             <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium">26-27 April 2026</span>
+                              <span className="font-medium">13-14 March 2026</span>
                             </div>
                           </li>
                         </ul>

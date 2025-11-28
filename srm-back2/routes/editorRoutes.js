@@ -27,7 +27,8 @@ import {
     getRevisionStatus,
     submitRevisedPaper,
     removeReviewerFromPaper,
-    sendReviewerInquiry
+    sendReviewerInquiry,
+    sendReReviewEmails
 } from '../controllers/editorController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireEditor } from '../middleware/roleCheck.js';
@@ -65,6 +66,7 @@ router.post('/send-message-to-author', sendMessageToAuthor);
 router.post('/make-decision', makeFinalDecision);
 router.post('/request-revision', requestRevision);
 router.post('/accept-paper', acceptPaper);
+router.post('/send-re-review-emails', sendReReviewEmails);
 
 // Reviewer reminders
 router.get('/non-responding-reviewers', getNonRespondingReviewers);

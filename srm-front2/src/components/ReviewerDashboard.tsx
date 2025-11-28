@@ -78,7 +78,7 @@ const ReviewerDashboard = () => {
         const role = localStorage.getItem('role');
 
         if (!token || role !== 'Reviewer') {
-            alert('Access denied. Reviewer login required.');
+            // Redirect to login if not authenticated
             navigate('/login');
             return;
         }
@@ -87,18 +87,29 @@ const ReviewerDashboard = () => {
     const fetchAssignedPapers = async () => {
         try {
             const token = localStorage.getItem('token');
+            
+            if (!token) {
+                navigate('/login');
+                return;
+            }
+            
             const headers = { Authorization: `Bearer ${token}` };
             
             const response = await axios.get(`${API_URL}/api/reviewer/papers`, { headers });
             setPapers(response.data.papers || []);
             
-            // Auto-select first paper if available
-            if (response.data.papers && response.data.papers.length > 0) {
-                loadPaperForReview(response.data.papers[0].submissionId);
-            }
+            // Don't auto-select - let reviewer choose from list
+            // If no paper selected and user visits this route, they'll see the list
         } catch (error: any) {
             console.error('Error fetching papers:', error);
-            alert(error.response?.data?.message || 'Failed to load assigned papers');
+            if (error.response?.status === 401) {
+                // Token expired or invalid
+                localStorage.removeItem('token');
+                localStorage.removeItem('role');
+                navigate('/login');
+            } else {
+                alert(error.response?.data?.message || 'Failed to load assigned papers');
+            }
         } finally {
             setLoading(false);
         }
@@ -107,6 +118,12 @@ const ReviewerDashboard = () => {
     const loadPaperForReview = async (submissionId: string) => {
         try {
             const token = localStorage.getItem('token');
+            
+            if (!token) {
+                navigate('/login');
+                return;
+            }
+            
             const headers = { Authorization: `Bearer ${token}` };
             
             const response = await axios.get(
@@ -144,7 +161,14 @@ const ReviewerDashboard = () => {
             }
         } catch (error: any) {
             console.error('Error loading paper:', error);
-            alert(error.response?.data?.message || 'Failed to load paper details');
+            if (error.response?.status === 401) {
+                // Token expired or invalid
+                localStorage.removeItem('token');
+                localStorage.removeItem('role');
+                navigate('/login');
+            } else {
+                alert(error.response?.data?.message || 'Failed to load paper details');
+            }
         }
     };
 
@@ -160,6 +184,12 @@ const ReviewerDashboard = () => {
             setSubmitting(true);
             try {
                 const token = localStorage.getItem('token');
+                
+                if (!token) {
+                    navigate('/login');
+                    return;
+                }
+                
                 const headers = { Authorization: `Bearer ${token}` };
 
                 await axios.post(
@@ -186,7 +216,13 @@ const ReviewerDashboard = () => {
                 fetchAssignedPapers();
             } catch (error: any) {
                 console.error('Error submitting review:', error);
-                alert(error.response?.data?.message || 'Failed to submit review');
+                if (error.response?.status === 401) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('role');
+                    navigate('/login');
+                } else {
+                    alert(error.response?.data?.message || 'Failed to submit review');
+                }
             } finally {
                 setSubmitting(false);
             }
@@ -274,23 +310,79 @@ const ReviewerDashboard = () => {
 
             {/* Main Content */}
             <div className="max-w-full mx-auto px-6 py-6">
-                {papers.length === 0 ? (
+                {/* Papers List - Always visible at top */}
+                {papers.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h3 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <FileText className="w-6 h-6 text-blue-600" />
+                            Your Assigned Papers ({papers.length})
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {papers.map((paper) => (
+                                <button
+                                    key={paper._id}
+                                    onClick={() => loadPaperForReview(paper.submissionId)}
+                                    className={`p-4 rounded-lg text-left transition border-2 ${
+                                        selectedPaper?._id === paper._id
+                                            ? 'bg-blue-100 border-blue-600 shadow-lg scale-105'
+                                            : 'bg-gray-50 border-gray-200 hover:border-blue-400 hover:bg-blue-50'
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1">
+                                            <p className="text-sm font-bold text-gray-800">
+                                                {paper.submissionId}
+                                            </p>
+                                            <p className="text-sm font-medium text-gray-700 mt-1 line-clamp-2">
+                                                {paper.paperTitle}
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                Author: {paper.authorName}
+                                            </p>
+                                            <p className="text-xs text-gray-500">
+                                                Category: {paper.category}
+                                            </p>
+                                        </div>
+                                        {selectedPaper?._id === paper._id && (
+                                            <CheckCircle className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                                        )}
+                                    </div>
+                                    {paper.assignmentDetails && (
+                                        <div className={`mt-3 text-xs font-medium ${getDeadlineStatus(paper.assignmentDetails.deadline).color}`}>
+                                            {getDeadlineStatus(paper.assignmentDetails.deadline).text}
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* No Papers Message */}
+                {papers.length === 0 && (
                     <div className="bg-white rounded-lg shadow-md p-8 text-center">
                         <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                         <h3 className="text-xl font-semibold text-gray-800 mb-2">No Papers Assigned</h3>
                         <p className="text-gray-600">You don't have any papers assigned for review yet.</p>
                     </div>
-                ) : !selectedPaper ? (
-                    <div className="bg-white rounded-lg shadow-md p-8 text-center">
-                        <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold text-gray-800 mb-2">Select a Paper</h3>
-                        <p className="text-gray-600">Choose a paper from your assigned list to review.</p>
-                    </div>
-                ) : (
+                )}
+
+                {/* Review Section - Show after paper is selected */}
+                {selectedPaper && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Left Side - PDF Viewer (60%) */}
                         <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-4">
                             <div className="mb-4 border-b pb-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <button
+                                        onClick={() => setSelectedPaper(null)}
+                                        className="px-3 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 flex items-center gap-2 text-sm"
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                        Back to List
+                                    </button>
+                                </div>
                                 <h2 className="text-xl font-semibold text-gray-800">{selectedPaper.paperTitle}</h2>
                                 <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                                     <span><strong>ID:</strong> {selectedPaper.submissionId}</span>
@@ -491,39 +583,6 @@ const ReviewerDashboard = () => {
                             <p className="text-xs text-gray-500 mt-2 text-center">
                                 ⚠️ Review cannot be edited after submission
                             </p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Paper List Below (if multiple papers and not direct link) */}
-                {papers.length > 1 && !isDirectReviewLink && (
-                    <div className="mt-6 bg-white rounded-lg shadow-md p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">Your Assigned Papers</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {papers.map((paper) => (
-                                <div
-                                    key={paper._id}
-                                    onClick={() => loadPaperForReview(paper.submissionId)}
-                                    className={`p-3 border rounded-lg cursor-pointer hover:shadow-md transition ${
-                                        selectedPaper?.submissionId === paper.submissionId
-                                            ? 'border-blue-500 bg-blue-50'
-                                            : 'border-gray-300 hover:border-blue-300'
-                                    }`}
-                                >
-                                    <h4 className="font-semibold text-sm text-gray-800 mb-1">{paper.paperTitle}</h4>
-                                    <p className="text-xs text-gray-600 mb-2">
-                                        <strong>ID:</strong> {paper.submissionId} | <strong>Category:</strong> {paper.category}
-                                    </p>
-                                    {paper.assignmentDetails && (
-                                        <div className="flex items-center gap-1 text-xs">
-                                            <Clock className="w-3 h-3" />
-                                            <span className={getDeadlineStatus(paper.assignmentDetails.deadline).color}>
-                                                {getDeadlineStatus(paper.assignmentDetails.deadline).text}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
                         </div>
                     </div>
                 )}

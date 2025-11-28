@@ -658,7 +658,8 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">📅 Conference Schedule:</p>
                     <div style="font-size: 14px; color: #333;">
                         <p style="margin: 5px 0;"><strong>📌 Conference Dates:</strong> March 13-14, 2026</p>
-                        <p style="margin: 5px 0;"><strong>🏛️ Venue:</strong> KPR Institute of Technology, Coimbatore</p>
+                        <p style="margin: 5px 0;"><strong>🏛️ Venue:</strong> Bali, Indonesia</p>
+                        <p style="margin: 5px 0;"><strong>🌐 Format:</strong> Hybrid (In-person + Virtual)</p>
                     </div>
                 </div>
 
@@ -666,10 +667,10 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: #2e7d32;">✅ Next Steps:</p>
                     <ol style="margin: 0; padding-left: 20px; color: #333; font-size: 13px;">
                         <li style="margin: 5px 0;">Review and sign the attached Copyright Form</li>
-                        <li style="margin: 5px 0;">Prepare your presentation slides</li>
-                        <li style="margin: 5px 0;">Ensure you have a valid travel document for the conference</li>
+                        <li style="margin: 5px 0;">Prepare your presentation slides for March 13-14, 2026</li>
+                        <li style="margin: 5px 0;">Arrange your travel to Bali, Indonesia</li>
                         <li style="margin: 5px 0;"><strong><a href="https://icmbnt2026-yovz.vercel.app/Registrations" style="color: #0066cc; text-decoration: none;">Click here to register for the conference</a></strong></li>
-                        <li style="margin: 5px 0;">Plan your presence for March 13-14, 2026</li>
+                        <li style="margin: 5px 0;">Join us for this exciting hybrid conference experience!</li>
                     </ol>
                 </div>
 
@@ -679,8 +680,9 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
 
                 <p style="font-size: 13px; color: #999; margin: 15px 0 0 0; border-top: 1px solid #ddd; padding-top: 15px;">
                     <strong>ICMBNT 2026 Organizing Committee</strong><br>
-                    KPR Institute of Technology, Coimbatore<br>
-                    Email: icmbnt2026@kpriet.ac.in
+                    Society for Cyber Intelligent Systems<br>
+                    Puducherry, India<br>
+                    Email: icmbnt2026@gmail.com
                 </p>
             </div>
         `,
@@ -696,6 +698,121 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
         return info;
     } catch (error) {
         console.error("❌ Error sending acceptance email:", error);
+        throw error;
+    }
+};
+
+// Send re-review request email (Review 2 after revision)
+export const sendReReviewEmail = async (reviewerEmail, reviewerName, paperData) => {
+    const deadline = new Date(paperData.deadline);
+    const deadlineStr = deadline.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric'
+    });
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: reviewerEmail,
+        subject: `Re-Review Request - Revised Paper - ${paperData.submissionId}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+                    <h2 style="margin: 0 0 10px 0; color: #856404; font-size: 20px;">✓ Author Revision Received</h2>
+                    <p style="margin: 0; color: #856404; font-size: 14px;">The revised manuscript is ready for your second review (Re-Review)</p>
+                </div>
+
+                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear <strong>${reviewerName}</strong>,
+                </p>
+
+                <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 20px;">
+                    Thank you for your initial review of this paper for ICMBNT 2026. The author has now revised and resubmitted the manuscript addressing the feedback from reviewers. We kindly request that you provide a second review to evaluate how well the revised version addresses the concerns raised in your initial review.
+                </p>
+
+                <div style="background-color: #e8f4f8; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #004499;">📄 Revised Paper Information</p>
+                    <table style="width: 100%; font-size: 14px;">
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold; width: 120px;">Submission ID:</td>
+                            <td style="padding: 5px 0;">${paperData.submissionId}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold;">Paper Title:</td>
+                            <td style="padding: 5px 0;">${paperData.paperTitle}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold;">Category:</td>
+                            <td style="padding: 5px 0;">${paperData.category}</td>
+                        </tr>
+                        <tr style="background-color: #fff3cd;">
+                            <td style="padding: 8px; font-weight: bold; color: #856404;">Re-Review Deadline:</td>
+                            <td style="padding: 8px; font-weight: bold; color: #856404;">${deadlineStr}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #155724; font-size: 15px;">📝 What Changed in This Version</p>
+                    <p style="margin: 0; font-size: 14px; color: #155724; line-height: 1.6;">
+                        The author has carefully addressed the reviewers' comments and revised the manuscript accordingly. Your re-review should focus on:
+                    </p>
+                    <ul style="margin: 10px 0 0 0; padding-left: 20px; font-size: 14px; color: #155724;">
+                        <li>Whether the revisions adequately address your initial concerns</li>
+                        <li>Quality of the author's responses to your feedback</li>
+                        <li>Overall improvement in the manuscript</li>
+                        <li>Your final recommendation for acceptance or further revision</li>
+                    </ul>
+                </div>
+
+                <div style="background-color: #cfe9f3; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 15px 0; font-weight: bold; color: #004499; font-size: 15px;">🔐 Access the Review Portal</p>
+                    <p style="margin: 0 0 15px 0; font-size: 14px; color: #004499; line-height: 1.6;">
+                        Click the button below to login and submit your re-review:
+                    </p>
+                    <p style="margin: 0; text-align: center; padding: 15px 0;">
+                        <a href="${paperData.loginLink}" style="display: inline-block; background-color: #0066cc; color: white; padding: 10px 25px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;">Login to Re-Review Portal</a>
+                    </p>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; color: #004499; border-top: 1px solid #b3d9ff; padding-top: 10px;">
+                        Direct link: <a href="${paperData.loginLink}" style="color: #0066cc; word-break: break-all; text-decoration: none;">${paperData.loginLink}</a>
+                    </p>
+                </div>
+
+                <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0; border-radius: 4px; font-size: 13px; color: #666; line-height: 1.6;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold;">Re-Review Checklist:</p>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li>Review how well the author addressed your initial feedback</li>
+                        <li>Provide constructive comments on the revisions</li>
+                        <li>Rate the revised paper on a scale of 1-5</li>
+                        <li>Submit your final recommendation (Accept / Minor Revision / Major Revision / Reject)</li>
+                        <li>Complete your re-review before the deadline</li>
+                    </ul>
+                </div>
+
+                <p style="font-size: 13px; color: #888; line-height: 1.5; margin: 20px 0;">
+                    <strong>Important:</strong> This is Review Round 2. Please base your evaluation on both the quality of the revisions and the original paper merits.
+                </p>
+
+                <p style="font-size: 13px; color: #888; line-height: 1.5; margin: 20px 0;">
+                    If you have any questions or concerns, please contact the editorial team. Thank you for your continued contribution to ICMBNT 2026.
+                </p>
+
+                <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-top: 20px; text-align: center;">
+                    <p style="margin: 0; font-size: 12px; color: #999;">
+                        ICMBNT 2026 Editorial Team<br>
+                        This is an automated message. Please do not reply to this email.
+                    </p>
+                </div>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Re-review email sent to ${reviewerEmail} - Message ID:`, info.messageId);
+        return info;
+    } catch (error) {
+        console.error(`❌ Error sending re-review email to ${reviewerEmail}:`, error);
         throw error;
     }
 };

@@ -5,7 +5,7 @@ import { ReviewerReview } from '../models/ReviewerReview.js';
 import { ReviewerMessage } from '../models/ReviewerMessage.js';
 import { Revision } from '../models/Revision.js';
 import { generateRandomPassword } from '../utils/helpers.js';
-import { sendReviewerAssignmentEmail, sendDecisionEmail, sendReviewerCredentialsEmail, sendReviewerReminderEmail, sendAcceptanceEmail } from '../utils/emailService.js';
+import { sendReviewerAssignmentEmail, sendDecisionEmail, sendReviewerCredentialsEmail, sendReviewerReminderEmail, sendAcceptanceEmail, sendReReviewEmail } from '../utils/emailService.js';
 import { listPdfsFromCloudinary, deletePdfFromCloudinary } from '../config/cloudinary-pdf.js';
 
 // Verify editor access - check if user is an editor
@@ -2106,6 +2106,82 @@ export const sendReviewerInquiry = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Error sending inquiry",
+            error: error.message
+        });
+    }
+};
+
+// Send re-review emails to all reviewers when paper is re-submitted
+export const sendReReviewEmails = async (req, res) => {
+    try {
+        const { paperId } = req.body;
+        const editorEmail = req.user.email;
+
+        if (!paperId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Paper ID is required'
+            });
+        }
+
+        // Get paper details
+        const paper = await PaperSubmission.findById(paperId).populate('assignedReviewers', 'email username');
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Paper not found'
+            });
+        }
+
+        // Check if paper has reviewers
+        if (!paper.assignedReviewers || paper.assignedReviewers.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No reviewers assigned to this paper'
+            });
+        }
+
+        console.log(`📧 Sending re-review emails to ${paper.assignedReviewers.length} reviewers for paper: ${paper.paperTitle}`);
+
+        let emailsSent = 0;
+        const failedEmails = [];
+
+        // Calculate re-review deadline (7 days from now)
+        const deadline = new Date();
+        deadline.setDate(deadline.getDate() + 7);
+
+        // Send email to each reviewer
+        for (const reviewer of paper.assignedReviewers) {
+            try {
+                const paperData = {
+                    submissionId: paper.submissionId,
+                    paperTitle: paper.paperTitle,
+                    category: paper.category,
+                    deadline: deadline,
+                    loginLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reviewer-dashboard`
+                };
+
+                await sendReReviewEmail(reviewer.email, reviewer.username, paperData);
+                emailsSent++;
+                console.log(`✅ Re-review email sent to ${reviewer.email}`);
+            } catch (emailError) {
+                console.error(`❌ Failed to send re-review email to ${reviewer.email}:`, emailError.message);
+                failedEmails.push(reviewer.email);
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: `Re-review emails sent to ${emailsSent} reviewer(s)`,
+            emailsSent,
+            totalReviewers: paper.assignedReviewers.length,
+            failedEmails: failedEmails.length > 0 ? failedEmails : undefined
+        });
+    } catch (error) {
+        console.error('Error sending re-review emails:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error sending re-review emails',
             error: error.message
         });
     }

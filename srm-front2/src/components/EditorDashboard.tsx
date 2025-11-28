@@ -1016,8 +1016,42 @@ const EditorDashboard = () => {
                                             </button>
                                         )}
 
+                                        {/* Re-Review Emails Button - Show when paper is "Revised Submitted" */}
+                                        {viewingPaper.status === 'Revised Submitted' && (
+                                            <button
+                                                onClick={async () => {
+                                                    if (!window.confirm('Send re-review request emails to all reviewers for the revised paper?')) return;
+                                                    
+                                                    try {
+                                                        setDecisionLoading(true);
+                                                        const token = localStorage.getItem('token');
+                                                        const response = await axios.post(
+                                                            `${API_URL}/api/editor/send-re-review-emails`,
+                                                            { paperId: viewingPaper._id },
+                                                            { headers: { Authorization: `Bearer ${token}` } }
+                                                        );
+                                                        
+                                                        if (response.data.success) {
+                                                            alert(`✅ Re-review emails sent to ${response.data.emailsSent} reviewer(s)!`);
+                                                        } else {
+                                                            alert('Error: ' + (response.data.message || 'Failed to send re-review emails'));
+                                                        }
+                                                    } catch (error) {
+                                                        console.error('Error sending re-review emails:', error);
+                                                        alert('Error: ' + ((error as any).response?.data?.message || 'Failed to send re-review emails'));
+                                                    } finally {
+                                                        setDecisionLoading(false);
+                                                    }
+                                                }}
+                                                disabled={decisionLoading}
+                                                className="flex-1 px-3 py-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                            >
+                                                {decisionLoading ? 'Sending...' : '📧 Send Re-Review Emails'}
+                                            </button>
+                                        )}
+
                                         {/* Decision Buttons - Only show if paper is NOT yet decided */}
-                                        {viewingPaper.status !== 'Accepted' && viewingPaper.status !== 'Rejected' && (
+                                        {viewingPaper.status !== 'Accepted' && viewingPaper.status !== 'Rejected' && viewingPaper.status !== 'Revised Submitted' && (
                                             <>
                                                 {/* Accept Button - Only show if ≥3 reviews submitted */}
                                                 {paperReviewers.length >= 3 && paperReviewers.every((r: any) => r.review) && (

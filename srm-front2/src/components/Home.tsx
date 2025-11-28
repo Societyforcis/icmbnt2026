@@ -23,7 +23,7 @@ const Home = () => {
           <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-12">
             <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
               <Calendar className="w-5 h-5 mr-2 text-[#F5A051]" />
-              <span>April 26 & 27, 2026</span>
+              <span>March 13 & 14, 2026</span>
             </div>
             <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
               <MapPin className="w-5 h-5 mr-2 text-[#F5A051]" />
