@@ -1,34 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { MessageSquare, Send, X, Loader } from 'lucide-react';
+import { X } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 interface ReviewDetail {
     _id: string;
-    comments: string;
-    strengths: string;
-    weaknesses: string;
-    overallRating: number;
+    comments?: string;
+    strengths?: string;
+    weaknesses?: string;
+    commentsToAuthor?: string;
+    confidentialCommentsToEditor?: string;
+    overallRating?: number;
     noveltyRating?: number;
     qualityRating?: number;
     clarityRating?: number;
     recommendation: string;
     submittedAt: string;
+    status: string;
+    ratings?: {
+        overall?: string;
+        technicalQuality?: string;
+        significance?: string;
+        presentation?: string;
+        relevance?: string;
+        originality?: string;
+        adequacyOfCitations?: string;
+    };
+    additionalQuestions?: {
+        suggestOwnReferences?: boolean;
+        recommendForBestPaperAward?: boolean;
+        suggestAnotherJournal?: boolean;
+        willingToReviewRevisions?: boolean;
+    };
     reviewer?: {
         username: string;
         email: string;
     };
-}
-
-interface Message {
-    sender: string;
-    senderId: string;
-    senderName: string;
-    senderEmail: string;
-    message: string;
-    createdAt: string;
 }
 
 interface ReviewerDetailsProps {
@@ -43,16 +52,13 @@ const ReviewerDetailsPanel: React.FC<ReviewerDetailsProps> = ({
     onClose
 }) => {
     const [review, setReview] = useState<ReviewDetail | null>(null);
-    const [messageThread, setMessageThread] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [sendingMessage, setSendingMessage] = useState(false);
+    const [activeTab, setActiveTab] = useState<'review' | 'message'>('review');
     const [messageText, setMessageText] = useState('');
-    const [selectedRecipient, setSelectedRecipient] = useState<'reviewer' | 'author'>('reviewer');
-    const [activeTab, setActiveTab] = useState<'review' | 'messages'>('review');
+    const [messageSending, setMessageSending] = useState(false);
 
     useEffect(() => {
         fetchReviewDetails();
-        fetchMessages();
     }, [reviewId, submissionId]);
 
     const fetchReviewDetails = async () => {
@@ -68,63 +74,43 @@ const ReviewerDetailsPanel: React.FC<ReviewerDetailsProps> = ({
         } catch (error: any) {
             console.error('Error fetching review:', error);
             Swal.fire('Error', 'Failed to load review details', 'error');
-        }
-    };
-
-    const fetchMessages = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get(
-                `${API_URL}/api/editor/messages/${submissionId}/${reviewId}`,
-                {
-                    headers: { Authorization: `Bearer ${token}` }
-                }
-            );
-            setMessageThread(response.data.messageThread);
-        } catch (error: any) {
-            console.error('Error fetching messages:', error);
         } finally {
             setLoading(false);
         }
     };
 
     const handleSendMessage = async () => {
-        if (!messageText.trim()) {
-            Swal.fire('Warning', 'Please enter a message', 'warning');
-            return;
-        }
+        if (!messageText.trim() || !review?.reviewer?.email) return;
 
-        setSendingMessage(true);
+        setMessageSending(true);
         try {
             const token = localStorage.getItem('token');
             await axios.post(
-                `${API_URL}/api/editor/send-message`,
+                `${API_URL}/api/editor/send-message-to-reviewer`,
                 {
+                    reviewerEmail: review.reviewer.email,
+                    reviewerName: review.reviewer.username,
                     submissionId,
-                    reviewId,
-                    recipientType: selectedRecipient,
                     message: messageText
                 },
                 {
                     headers: { Authorization: `Bearer ${token}` }
                 }
             );
-
+            Swal.fire('Success', 'Message sent to reviewer', 'success');
             setMessageText('');
-            await fetchMessages(); // Refresh messages
-            Swal.fire('Success', `Message sent to ${selectedRecipient}`, 'success');
         } catch (error: any) {
             console.error('Error sending message:', error);
             Swal.fire('Error', 'Failed to send message', 'error');
         } finally {
-            setSendingMessage(false);
+            setMessageSending(false);
         }
     };
 
     if (loading) {
         return (
             <div className="bg-white rounded-lg shadow-md p-6 flex items-center justify-center h-96">
-                <Loader className="w-8 h-8 animate-spin text-blue-600" />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
         );
     }
@@ -143,28 +129,29 @@ const ReviewerDetailsPanel: React.FC<ReviewerDetailsProps> = ({
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-4 border-b">
-                <button
-                    onClick={() => setActiveTab('review')}
-                    className={`px-4 py-2 font-medium transition ${
-                        activeTab === 'review'
-                            ? 'text-blue-600 border-b-2 border-blue-600'
-                            : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                >
-                    📋 Review Details
-                </button>
-                <button
-                    onClick={() => setActiveTab('messages')}
-                    className={`px-4 py-2 font-medium transition flex items-center gap-2 ${
-                        activeTab === 'messages'
-                            ? 'text-blue-600 border-b-2 border-blue-600'
-                            : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                >
-                    <MessageSquare className="w-4 h-4" />
-                    Messages
-                </button>
+            <div className="flex justify-between items-center border-b pb-4">
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => setActiveTab('review')}
+                        className={`px-4 py-2 font-medium transition ${
+                            activeTab === 'review'
+                                ? 'text-blue-600 border-b-2 border-blue-600'
+                                : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                    >
+                        📋 Review Details
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('message')}
+                        className={`px-4 py-2 font-medium transition ${
+                            activeTab === 'message'
+                                ? 'text-blue-600 border-b-2 border-blue-600'
+                                : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                    >
+                        💬 Message Reviewer
+                    </button>
+                </div>
             </div>
 
             {/* Review Details Tab */}
@@ -201,46 +188,42 @@ const ReviewerDetailsPanel: React.FC<ReviewerDetailsProps> = ({
                         </div>
                     </div>
 
-                    {/* Ratings */}
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200">
-                        <h4 className="font-semibold text-gray-800 mb-3">Ratings</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="text-center">
-                                <p className="text-sm text-gray-600 font-medium mb-2">Overall</p>
-                                <div className="flex justify-center">
-                                    {'⭐'.repeat(review.overallRating || 0)}
-                                </div>
-                                <p className="text-lg font-bold text-gray-800 mt-1">{review.overallRating || 0}/5</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-sm text-gray-600 font-medium mb-2">Novelty</p>
-                                <div className="flex justify-center">
-                                    {'⭐'.repeat(review.noveltyRating || 0)}
-                                </div>
-                                <p className="text-lg font-bold text-gray-800 mt-1">{review.noveltyRating || 0}/5</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-sm text-gray-600 font-medium mb-2">Quality</p>
-                                <div className="flex justify-center">
-                                    {'⭐'.repeat(review.qualityRating || 0)}
-                                </div>
-                                <p className="text-lg font-bold text-gray-800 mt-1">{review.qualityRating || 0}/5</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-sm text-gray-600 font-medium mb-2">Clarity</p>
-                                <div className="flex justify-center">
-                                    {'⭐'.repeat(review.clarityRating || 0)}
-                                </div>
-                                <p className="text-lg font-bold text-gray-800 mt-1">{review.clarityRating || 0}/5</p>
-                            </div>
+                    {/* Ratings - Show individually without header */}
+                    <div className="grid grid-cols-4 gap-2">
+                        {/* Numeric format ratings */}
+                        <div className="text-center bg-purple-100 p-3 rounded border border-purple-200">
+                            <p className="text-sm text-gray-600 font-medium mb-1">Overall</p>
+                            <p className="text-2xl font-bold text-purple-600">{review.overallRating || 0}/5</p>
+                        </div>
+                        <div className="text-center bg-blue-100 p-3 rounded border border-blue-200">
+                            <p className="text-sm text-gray-600 font-medium mb-1">Novelty</p>
+                            <p className="text-2xl font-bold text-blue-600">{review.noveltyRating || 0}/5</p>
+                        </div>
+                        <div className="text-center bg-green-100 p-3 rounded border border-green-200">
+                            <p className="text-sm text-gray-600 font-medium mb-1">Quality</p>
+                            <p className="text-2xl font-bold text-green-600">{review.qualityRating || 0}/5</p>
+                        </div>
+                        <div className="text-center bg-orange-100 p-3 rounded border border-orange-200">
+                            <p className="text-sm text-gray-600 font-medium mb-1">Clarity</p>
+                            <p className="text-2xl font-bold text-orange-600">{review.clarityRating || 0}/5</p>
                         </div>
                     </div>
 
                     {/* Review Comments */}
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
-                        <h4 className="font-semibold text-gray-800 mb-2">Comments</h4>
-                        <p className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border">{review.comments}</p>
-                    </div>
+                    {(review.commentsToAuthor || review.comments) && (
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+                            <h4 className="font-semibold text-gray-800 mb-2">Comments to Author</h4>
+                            <p className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border">{review.commentsToAuthor || review.comments}</p>
+                        </div>
+                    )}
+
+                    {/* Confidential Comments to Editor */}
+                    {review.confidentialCommentsToEditor && (
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+                            <h4 className="font-semibold text-gray-800 mb-2">🔒 Confidential Comments to Editor</h4>
+                            <p className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border">{review.confidentialCommentsToEditor}</p>
+                        </div>
+                    )}
 
                     {/* Strengths */}
                     {review.strengths && (
@@ -260,100 +243,64 @@ const ReviewerDetailsPanel: React.FC<ReviewerDetailsProps> = ({
                 </div>
             )}
 
-            {/* Messages Tab */}
-            {activeTab === 'messages' && (
+            {/* Message Tab */}
+            {activeTab === 'message' && review && (
                 <div className="space-y-4">
-                    {/* Message Thread */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-96 overflow-y-auto space-y-3">
-                        {messageThread?.conversation && messageThread.conversation.length > 0 ? (
-                            messageThread.conversation.map((msg: Message, index: number) => (
-                                <div
-                                    key={index}
-                                    className={`p-3 rounded-lg ${
-                                        msg.sender === 'editor'
-                                            ? 'bg-blue-100 border-l-4 border-blue-600 ml-4'
-                                            : msg.sender === 'reviewer'
-                                            ? 'bg-green-100 border-l-4 border-green-600 mr-4'
-                                            : 'bg-orange-100 border-l-4 border-orange-600 mr-4'
-                                    }`}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <p className="font-semibold text-sm text-gray-800">
-                                            {msg.sender === 'editor' ? '📝 Editor' : msg.sender === 'reviewer' ? '👁️ Reviewer' : '✍️ Author'}
-                                        </p>
-                                        <p className="text-xs text-gray-600">
-                                            {new Date(msg.createdAt).toLocaleTimeString()}
-                                        </p>
-                                    </div>
-                                    <p className="text-xs text-gray-600 mb-2">{msg.senderName} ({msg.senderEmail})</p>
-                                    <p className="text-gray-800">{msg.message}</p>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-center py-8 text-gray-500">
-                                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                <p>No messages yet. Start a conversation!</p>
-                            </div>
-                        )}
+                    {/* Reviewer Header */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+                        <h4 className="font-semibold text-gray-800 mb-2">Send Message to Reviewer</h4>
+                        <p className="text-sm text-gray-600">
+                            <span className="font-medium">{review.reviewer?.username}</span>
+                            <span className="text-gray-500"> ({review.reviewer?.email})</span>
+                        </p>
                     </div>
 
-                    {/* Message Input */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Send Reply To</label>
-                            <div className="flex gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="recipient"
-                                        value="reviewer"
-                                        checked={selectedRecipient === 'reviewer'}
-                                        onChange={(e) => setSelectedRecipient(e.target.value as 'reviewer' | 'author')}
-                                        className="w-4 h-4"
-                                    />
-                                    <span className="text-sm text-gray-700">👁️ Reviewer</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="recipient"
-                                        value="author"
-                                        checked={selectedRecipient === 'author'}
-                                        onChange={(e) => setSelectedRecipient(e.target.value as 'reviewer' | 'author')}
-                                        className="w-4 h-4"
-                                    />
-                                    <span className="text-sm text-gray-700">✍️ Author</span>
-                                </label>
-                            </div>
-                        </div>
+                    {/* Message Compose Area */}
+                    <div className="space-y-3">
+                        <label className="block text-sm font-medium text-gray-700">Your Message</label>
+                        <textarea
+                            value={messageText}
+                            onChange={(e) => setMessageText(e.target.value)}
+                            placeholder="Type your message to the reviewer here..."
+                            rows={8}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        />
+                        <p className="text-xs text-gray-500">
+                            Character count: {messageText.length}
+                        </p>
+                    </div>
 
-                        <div>
-                            <textarea
-                                value={messageText}
-                                onChange={(e) => setMessageText(e.target.value)}
-                                placeholder={`Type your message to ${selectedRecipient}...`}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                                rows={3}
-                            />
-                        </div>
-
+                    {/* Send Button */}
+                    <div className="flex gap-3 justify-end">
+                        <button
+                            onClick={() => {
+                                setMessageText('');
+                            }}
+                            className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-medium transition"
+                        >
+                            Clear
+                        </button>
                         <button
                             onClick={handleSendMessage}
-                            disabled={sendingMessage || !messageText.trim()}
-                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-semibold flex items-center justify-center gap-2"
+                            disabled={!messageText.trim() || messageSending}
+                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition flex items-center gap-2"
                         >
-                            {sendingMessage ? (
+                            {messageSending ? (
                                 <>
-                                    <Loader className="w-4 h-4 animate-spin" />
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                     Sending...
                                 </>
                             ) : (
-                                <>
-                                    <Send className="w-4 h-4" />
-                                    Send to {selectedRecipient === 'reviewer' ? 'Reviewer' : 'Author'}
-                                </>
+                                <>✉️ Send Message</>
                             )}
                         </button>
+                    </div>
+
+                    {/* Message Info */}
+                    <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                        <p className="text-sm text-blue-700">
+                            💡 <span className="font-medium">Note:</span> This message will be sent via email to the reviewer. Keep it professional and constructive.
+                        </p>
                     </div>
                 </div>
             )}

@@ -66,6 +66,8 @@ interface SubmitPaperFormProps {
   onClose: () => void;
   embedded: boolean;
   onSubmissionSuccess: () => void;
+  isRevision?: boolean;
+  revisionData?: any;
 }
 
 interface SubmissionResponse {
@@ -79,7 +81,7 @@ interface SubmissionResponse {
   };
 }
 
-const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embedded = false, onSubmissionSuccess }) => {
+const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embedded = false, onSubmissionSuccess, isRevision = false, revisionData = null }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isStandalone, setIsStandalone] = useState(false);
@@ -141,15 +143,28 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
     // Create FormData object for file upload
     const submissionFormData = new FormData();
 
-    // Append only required fields
-    submissionFormData.append('paperTitle', formData.paperTitle);
-    submissionFormData.append('authorName', formData.authorName);
-    submissionFormData.append('email', formData.email);
-    submissionFormData.append('category', formData.category);
+    // For revision, only require PDF and optionally author response
+    if (isRevision && revisionData) {
+      if (!abstractFile) {
+        toast.error('Please upload the revised paper');
+        setIsSubmitting(false);
+        return;
+      }
 
-    // Append PDF file
-    if (abstractFile) {
+      submissionFormData.append('submissionId', revisionData.submissionId);
       submissionFormData.append('pdf', abstractFile);
+      submissionFormData.append('authorResponse', formData.paperTitle || ''); // Using paperTitle field for response
+    } else {
+      // For regular submission, append all required fields
+      submissionFormData.append('paperTitle', formData.paperTitle);
+      submissionFormData.append('authorName', formData.authorName);
+      submissionFormData.append('email', formData.email);
+      submissionFormData.append('category', formData.category);
+
+      // Append PDF file
+      if (abstractFile) {
+        submissionFormData.append('pdf', abstractFile);
+      }
     }
 
     try {
@@ -157,8 +172,10 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
       const token = localStorage.getItem('token');
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+      const endpoint = isRevision ? `${apiUrl}/submit-revised-paper` : `${apiUrl}/api/papers/submit`;
+
       const response = await axios.post<SubmissionResponse>(
-        `${apiUrl}/api/papers/submit`,
+        endpoint,
         submissionFormData,
         {
           headers: {
@@ -169,7 +186,11 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
       );
 
       if (response.data.success) {
-        toast.success(`Paper submitted successfully! Submission ID: ${response.data.submissionId}`);
+        const successMessage = isRevision 
+          ? 'Revised paper submitted successfully!' 
+          : `Paper submitted successfully! Submission ID: ${response.data.submissionId}`;
+        
+        toast.success(successMessage);
         
         // Store submission ID in localStorage for future reference
         if (response.data.submissionId) {
@@ -189,6 +210,9 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
         // Call success callback or navigate
         if (onSubmissionSuccess) {
           onSubmissionSuccess();
+        } else if (isRevision) {
+          // For revision, just refresh the page
+          window.location.reload();
         } else {
           navigate('/submission-success', {
             state: {
@@ -200,6 +224,7 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
       } else {
         toast.error(response.data.message || "Submission failed");
       }
+
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const errorMessage = error.response?.data?.message || "Error submitting paper";

@@ -10,69 +10,85 @@ const Home = () => {
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900">
       <div className="relative min-h-screen text-white overflow-hidden bg-gradient-to-r from-blue-900 to-[#F5A051] text-white">
-        {/* Blur Background */}
+
         <div className="absolute inset-0 backdrop-blur-md bg-black/20"></div>
 
         <div className="relative z-10 container mx-auto px-4 py-12 min-h-screen flex flex-col justify-center items-center text-center">
-          <h1 className="text-3xl md:text-5xl font-bold mb-2 leading-tight max-w-5xl drop-shadow-lg">
+          <h1 className="text-3xl md:text-5xl font-bold mb-6 leading-tight max-w-5xl drop-shadow-lg">
             International Conference on Multidisciplinary Breakthroughs and NextGen Technologies
           </h1>
-          <h2 className="text-2xl md:text-3xl font-semibold mb-1 text-[#F5A051] drop-shadow-md">(ICMBNT–2026)</h2>
-          <p className="text-2xl md:text-4xl mb-4 text-black drop-shadow-md font-bold animate-pulse">2nd International Conference</p>
+          <h2 className="text-2xl md:text-3xl font-semibold mb-8 text-[#F5A051] drop-shadow-md">(ICMBNT–2026)</h2>
+          {/* <p className="text-2xl md:text-4xl mb-4 text-black drop-shadow-md font-bold animate-pulse">2nd International Conference</p> */}
 
-          <div className="flex flex-col md:flex-row justify-center items-center gap-2 mb-6">
-            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 animate-bounce">
+          <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-12">
+            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
               <Calendar className="w-5 h-5 mr-2 text-[#F5A051]" />
               <span>April 26 & 27, 2026</span>
             </div>
-            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 animate-bounce">
+            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
               <MapPin className="w-5 h-5 mr-2 text-[#F5A051]" />
               <span>Bali, Indonesia</span>
             </div>
-            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 animate-bounce">
+            <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
               <Users className="w-5 h-5 mr-2 text-[#F5A051]" />
               <span>Hybrid Conference (In-person + Virtual)</span>
             </div>
           </div>
 
-          <div className="mb-4">
-            <p className="text-lg text-slate-200 mb-3">
+          {/* Left Logo - ISIUS */}
+          <div className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-20">
+            <div className="flex flex-col items-center ml-[-60px]">
+              <img
+                src={isius}
+                alt="ICSCS Logo"
+                className="h-28 md:h-32 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
+                loading="lazy"
+                decoding="async"
+              />
+              <p className="text-sm text-slate-300 mt-2 font-semibold text-center max-w-[150px]">International Society of Intelligent Unmanned Systems</p>
+              <p className="text-xs text-slate-400 mt-1">(ICSCS)</p>
+            </div>
+          </div>
+
+          {/* Right Logo - Society */}
+          <div className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20">
+            <div className="flex flex-col items-center">
+              <img
+                src={society}
+                alt="Society CIS Logo"
+                className="h-40 md:h-48 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
+                loading="lazy"
+                decoding="async"
+              />
+              <p className="text-sm text-slate-300 mt-2 font-semibold text-center max-w-[150px]">Society for Cyber Intelligent Systems</p>
+              <p className="text-xs text-slate-400 mt-1">Puducherry – India</p>
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <p className="text-lg text-slate-200 mb-4">
               Organized by
               <br />
               <span className="font-bold text-white">Society for Cyber Intelligent Systems</span>
               <br />
               Puducherry – India
+              <br></br>
+              &
+                <br />
+              <span className="font-bold text-white">
+                International Society of Intelligent Unmanned Systems
+              </span>
+              <br />
+           South Korea - Jimbaran Bali
             </p>
-            <div className="flex justify-center items-center gap-6 mb-4">
-              <div className="flex flex-col items-center">
-                <img 
-                  src={isius} 
-                  alt="ICSCS Logo" 
-                  className="h-28 md:h-32 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <p className="text-sm text-slate-300 mt-2 font-semibold">Indian Council for Social Science and Sustainable Systems</p>
-                <p className="text-xs text-slate-400 mt-1">(ICSCS)</p>
-              </div>
-              <div className="flex flex-col items-center">
-                <img 
-                  src={society} 
-                  alt="Society CIS Logo" 
-                  className="h-40 md:h-48 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <p className="text-sm text-slate-300 mt-2 font-semibold">Society for Cyber Intelligent Systems</p>
-                <p className="text-xs text-slate-400 mt-1">Puducherry – India</p>
-              </div>
-            </div>
           </div>
 
+          {/* Register Button - Now in center */}
           <button className="bg-[#F5A051] hover:bg-[#e08c3e] text-white font-bold py-3 px-8 rounded-full transition-all duration-300 text-lg inline-block shadow-lg shadow-[#F5A051]/30 hover:shadow-[#F5A051]/40 hover:scale-105">
             REGISTER NOW
           </button>
         </div>
+
 
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
           <div className="w-6 h-10 border-2 border-white/50 rounded-full flex justify-center">
@@ -80,6 +96,7 @@ const Home = () => {
           </div>
         </div>
       </div>
+
 
       <section id="conference-venue" className="py-16 bg-white scroll-mt-20 relative">
         <div className="relative z-10 container mx-auto px-4">

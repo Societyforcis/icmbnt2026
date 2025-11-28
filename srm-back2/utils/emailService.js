@@ -591,4 +591,113 @@ export const sendEditorCredentialsEmail = async (email, username, password) => {
     }
 };
 
+// Send paper acceptance email to author
+export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, submissionId) => {
+    // Fetch the PDF from the backend public documents folder
+    let attachments = [];
+    try {
+        const fs = (await import('fs')).default;
+        const path = (await import('path')).default;
+        
+        // Try to attach the copyright form PDF
+        const copyrightFormPath = path.join(process.cwd(), 'public', 'documents', 'ICMBNT_Copyright_Form.pdf');
+        
+        if (fs.existsSync(copyrightFormPath)) {
+            attachments.push({
+                filename: 'ICMBNT_Copyright_Form.pdf',
+                path: copyrightFormPath
+            });
+            console.log('📎 Copyright form PDF attached to acceptance email');
+        } else {
+            console.warn('⚠️ Copyright form PDF not found at:', copyrightFormPath);
+        }
+    } catch (attachmentError) {
+        console.warn('⚠️ Could not attach PDF:', attachmentError.message);
+        // Continue without attachment - don't fail
+    }
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: authorEmail,
+        subject: `🎉 Paper Accepted - ICMBNT 2026`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #28a745;">
+                    <h2 style="margin: 0; color: #155724;">🎉 Congratulations!</h2>
+                    <p style="margin: 5px 0 0 0; color: #155724; font-weight: bold;">Your Paper Has Been Accepted</p>
+                </div>
+
+                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear <strong>${authorName}</strong>,
+                </p>
+
+                <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 20px;">
+                    We are delighted to inform you that your paper has been <strong style="color: #28a745;">accepted</strong> 
+                    for presentation at the <strong>ICMBNT 2026</strong> conference.
+                </p>
+
+                <div style="background-color: #cfe2ff; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #0066cc;">📋 Paper Details:</p>
+                    <table style="width: 100%; font-size: 13px;">
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold; width: 130px;">Submission ID:</td>
+                            <td style="padding: 8px 0; color: #333;">${submissionId}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Paper Title:</td>
+                            <td style="padding: 8px 0; color: #333;">${paperTitle}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Author:</td>
+                            <td style="padding: 8px 0; color: #333;">${authorName}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">📅 Conference Schedule:</p>
+                    <div style="font-size: 14px; color: #333;">
+                        <p style="margin: 5px 0;"><strong>📌 Conference Dates:</strong> March 13-14, 2026</p>
+                        <p style="margin: 5px 0;"><strong>🏛️ Venue:</strong> KPR Institute of Technology, Coimbatore</p>
+                    </div>
+                </div>
+
+                <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #2e7d32;">✅ Next Steps:</p>
+                    <ol style="margin: 0; padding-left: 20px; color: #333; font-size: 13px;">
+                        <li style="margin: 5px 0;">Review and sign the attached Copyright Form</li>
+                        <li style="margin: 5px 0;">Prepare your presentation slides</li>
+                        <li style="margin: 5px 0;">Ensure you have a valid travel document for the conference</li>
+                        <li style="margin: 5px 0;"><strong><a href="https://icmbnt2026-yovz.vercel.app/Registrations" style="color: #0066cc; text-decoration: none;">Click here to register for the conference</a></strong></li>
+                        <li style="margin: 5px 0;">Plan your presence for March 13-14, 2026</li>
+                    </ol>
+                </div>
+
+                <p style="font-size: 13px; line-height: 1.6; color: #666; margin-top: 25px; margin-bottom: 10px;">
+                    If you have any questions or need further information, please don't hesitate to contact us.
+                </p>
+
+                <p style="font-size: 13px; color: #999; margin: 15px 0 0 0; border-top: 1px solid #ddd; padding-top: 15px;">
+                    <strong>ICMBNT 2026 Organizing Committee</strong><br>
+                    KPR Institute of Technology, Coimbatore<br>
+                    Email: icmbnt2026@kpriet.ac.in
+                </p>
+            </div>
+        `,
+        attachments: attachments
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log("📧 Acceptance email sent to:", authorEmail, "- Message ID:", info.messageId);
+        if (attachments.length > 0) {
+            console.log("📎 PDF attachment(s) included in email");
+        }
+        return info;
+    } catch (error) {
+        console.error("❌ Error sending acceptance email:", error);
+        throw error;
+    }
+};
+
 export default transporter;

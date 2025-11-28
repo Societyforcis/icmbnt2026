@@ -7,7 +7,7 @@ import { User } from './models/User.js';
 import { PaperSubmission } from './models/Paper.js';
 import { Review } from './models/Review.js';
 
-// Import routes
+
 import authRoutes from './routes/authRoutes.js';
 import paperRoutes from './routes/paperRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
@@ -19,10 +19,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ==================== MIDDLEWARE ====================
+
 app.use(express.json({ limit: '10mb' }));
 
-// CORS Configuration
+// Serve static files from public directory
+app.use('/public', express.static('public'));
+
 const corsOptions = {
   origin: ['https://icmbnt2026-yovz.vercel.app', 'http://localhost:5173'],
   credentials: true,
@@ -30,17 +32,19 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Apply CORS middleware
 app.use(cors(corsOptions));
-// Handle preflight requests
+
+
+
 app.options('*', cors(corsOptions));
 app.use(express.urlencoded({ extended: true }));
 
-// Connect to database
+
+
+
 connectDatabase();
 
-// ==================== UTILITY MIDDLEWARE ====================
-// JWT verification middleware
+
 const verifyJWT = (req, res, next) => {
     const token = req.headers["authorization"]?.replace('Bearer ', '');
     if (!token) {
@@ -61,7 +65,8 @@ const verifyJWT = (req, res, next) => {
     }
 };
 
-// ==================== ROOT & HEALTH ROUTES ====================
+
+
 app.get('/', (req, res) => {
     res.json({
         success: true,
@@ -92,6 +97,135 @@ app.use('/api/papers', paperRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/editor', editorRoutes);
 app.use('/api/reviewer', reviewerRoutes);
+
+// ==================== AUTHOR SUBMISSION ROUTES ====================
+// Get user's paper submission (alias for /api/papers/my-submission)
+app.get('/user-submission', verifyJWT, async (req, res) => {
+    try {
+        const userEmail = req.user.email;
+        const submission = await PaperSubmission.findOne({ email: userEmail });
+        
+        if (!submission) {
+            return res.status(200).json({
+                success: true,
+                hasSubmission: false,
+                submission: null
+            });
+        }
+        
+        return res.status(200).json({
+            success: true,
+            hasSubmission: true,
+            submission: {
+                _id: submission._id,
+                submissionId: submission.submissionId,
+                bookingId: submission._id, // Using MongoDB ID as bookingId
+                paperTitle: submission.paperTitle,
+                authorName: submission.authorName,
+                email: submission.email,
+                category: submission.category,
+                topic: submission.topic,
+                abstractFileUrl: submission.abstractFileUrl,
+                pdfUrl: submission.pdfUrl,
+                status: submission.status,
+                submissionDate: submission.createdAt
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching user submission:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching submission',
+            error: error.message
+        });
+    }
+});
+
+// Get revision status for author
+app.get('/revision-status', verifyJWT, async (req, res) => {
+    try {
+        const { Revision } = await import('./models/Revision.js');
+        const userEmail = req.user.email;
+        
+        const revision = await Revision.findOne({ authorEmail: userEmail })
+            .populate('reviewerComments.reviewerId', 'username email');
+        
+        if (!revision) {
+            return res.status(200).json({
+                success: true,
+                hasRevision: false,
+                revision: null
+            });
+        }
+        
+        return res.status(200).json({
+            success: true,
+            hasRevision: true,
+            revision
+        });
+    } catch (error) {
+        console.error('Error fetching revision status:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching revision status',
+            error: error.message
+        });
+    }
+});
+
+// Submit revised paper endpoint
+app.post('/submit-revised-paper', verifyJWT, async (req, res) => {
+    try {
+        const { submissionId, authorResponse } = req.body;
+        const userEmail = req.user.email;
+
+        if (!submissionId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing submissionId'
+            });
+        }
+
+        // For now, store the PDF URL from the upload (this would come from Cloudinary in real implementation)
+        // In production, you'd handle file upload to Cloudinary here
+        const { Revision } = await import('./models/Revision.js');
+        
+        const revision = await Revision.findOne({ submissionId, authorEmail: userEmail });
+        if (!revision) {
+            return res.status(404).json({
+                success: false,
+                message: 'Revision record not found'
+            });
+        }
+
+        // Update revision with revised paper info
+        revision.authorResponse = authorResponse || '';
+        revision.revisedPaperSubmittedAt = new Date();
+        revision.revisionStatus = 'Resubmitted';
+        await revision.save();
+
+        // Update paper status
+        const paper = await PaperSubmission.findOne({ submissionId });
+        if (paper) {
+            paper.status = 'Revised Submitted';
+            paper.revisionCount = (paper.revisionCount || 0) + 1;
+            await paper.save();
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Revised paper submitted successfully',
+            revision
+        });
+    } catch (error) {
+        console.error('Error submitting revised paper:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error submitting revised paper',
+            error: error.message
+        });
+    }
+});
 
 // ==================== TEST ROUTES ====================
 app.get('/test/paperfetch', async (req, res) => {

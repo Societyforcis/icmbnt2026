@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Document, Page } from 'react-pdf';
-import { pdfjs } from 'react-pdf';
-import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { API_BASE_URL } from '../config/api';
 import {
     LayoutDashboard,
     FileText,
@@ -14,26 +12,18 @@ import {
     X,
     Eye,
     UserPlus,
-    Send,
-    BarChart3,
     TrendingUp,
     AlertCircle,
-    ZoomIn,
-    ZoomOut,
-    Download,
-    MessageSquare,
     Search,
     Filter,
     Check,
-    Cloud
+    Cloud,
+    MessageSquare,
+    Send
 } from 'lucide-react';
-import ReviewerDetailsPanel from './ReviewerDetailsPanel';
-import ConversationMessaging from './ConversationMessaging';
 import ReviewerFilterPanel, { Reviewer } from './ReviewerFilterPanel';
+import ReviewerDetailsPanel from './ReviewerDetailsPanel';
 import PDFManagement from './PDFManagement';
-
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
 interface Paper {
     _id: string;
@@ -102,90 +92,73 @@ const EditorDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Reviewer assignment states (inline - no modal)
-    const [expandedPaperId, setExpandedPaperId] = useState<string | null>(null);
-    const [selectedReviewers, setSelectedReviewers] = useState<Record<string, string[]>>({});
-    const [deadlineDays, setDeadlineDays] = useState<Record<string, number>>({});
-
     // Create reviewer states
     const [showCreateReviewer, setShowCreateReviewer] = useState(false);
     const [newReviewer, setNewReviewer] = useState({ email: '', username: '', password: '' });
 
     // Search and filter states
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>(''); // Status filter state
 
     // Paper details view state (instead of modal)
     const [viewingPaper, setViewingPaper] = useState<Paper | null>(null);
+    const [paperReviewers, setPaperReviewers] = useState<any[]>([]);
+    const [reviewerListLoading, setReviewerListLoading] = useState(false);
+    const [paperDetailsTab, setPaperDetailsTab] = useState<'details' | 'reviewers'>('details');
 
-    // Review viewing state
-    const [allReviews, setAllReviews] = useState<any[]>([]);
-    const [viewingReviewId, setViewingReviewId] = useState<string | null>(null);
-    const [viewingSubmissionId, setViewingSubmissionId] = useState<string | null>(null);
+    // Review viewing state - REMOVED (Reviews tab removed)
+    // const [allReviews, setAllReviews] = useState<any[]>([]);
+    // const [viewingReviewId, setViewingReviewId] = useState<string | null>(null);
+    // const [viewingSubmissionId, setViewingSubmissionId] = useState<string | null>(null);
 
-    // PDF viewer states - Chrome-like continuous scroll
-    const [zoom, setZoom] = useState(100);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [pdfError, setPdfError] = useState<string | null>(null);
-    const [renderedPages, setRenderedPages] = useState<number[]>([1]);
-    const [signedPdfUrl, setSignedPdfUrl] = useState<string>('');
+    // Reviewer message/details state
+    const [selectedReviewForDetails, setSelectedReviewForDetails] = useState<{ reviewId: string; submissionId: string } | null>(null);
+
+    // Author message state for paper cards
+    const [selectedPaperForAuthorMessage, setSelectedPaperForAuthorMessage] = useState<string | null>(null);
 
     // Message and Reviewer Filter states
-    const [messages, setMessages] = useState<any[]>([]);
     const [, setFilteredReviewers] = useState<any[]>([]);
     const [selectedReviewerFilter, setSelectedReviewerFilter] = useState<any | null>(null);
+    const [messageToAuthor, setMessageToAuthor] = useState('');
+    const [showMessageModal, setShowMessageModal] = useState(false);
+    const [messageLoading, setMessageLoading] = useState(false);
+    
+    // Author message states
+    const [authorMessageText, setAuthorMessageText] = useState('');
+    const [authorMessageLoading, setAuthorMessageLoading] = useState(false);
 
-    // Review search state
-    const [reviewSearchTerm, setReviewSearchTerm] = useState('');
+    // Decision-making states
+    const [decisionLoading, setDecisionLoading] = useState(false);
+    const [showDecisionModal, setShowDecisionModal] = useState<'accept' | 'reject' | 'revision' | null>(null);
+    const [revisionMessage, setRevisionMessage] = useState('');
+    
+    // Assign reviewers states
+    const [showAssignModal, setShowAssignModal] = useState(false);
+    const [selectedReviewersForAssignment, setSelectedReviewersForAssignment] = useState<string[]>([]);
+    const [assignmentDeadline, setAssignmentDeadline] = useState('');
+    const [assignmentLoading, setAssignmentLoading] = useState(false);
+
+    // Reviewer management states
+    const [reviewerInquiryModal, setReviewerInquiryModal] = useState<{ reviewerId: string; reviewerName: string } | null>(null);
+    const [inquiryMessage, setInquiryMessage] = useState('');
+    const [inquiryLoading, setInquiryLoading] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+
+    // Review search state - REMOVED (Reviews tab removed)
+    // const [reviewSearchTerm, setReviewSearchTerm] = useState('');
 
     useEffect(() => {
         verifyEditorAccess();
     }, []);
 
-    // Fetch signed PDF URL when viewing paper changes
+    // Fetch reviews and reviewers for the viewing paper
     useEffect(() => {
-        const fetchPdfUrl = async () => {
-            if (!viewingPaper || !viewingPaper.submissionId) {
-                setSignedPdfUrl('');
-                setPdfError(null);
-                return;
-            }
-
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) {
-                    setPdfError('No token found');
-                    return;
-                }
-
-                console.log('Fetching PDF for:', viewingPaper.submissionId);
-                const response = await axios.get(
-                    `${API_URL}/api/editor/pdf/${viewingPaper.submissionId}`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    }
-                );
-                
-                if (response.data.success && response.data.pdfUrl) {
-                    // Use Cloudinary URL directly
-                    console.log('✓ Got PDF URL from Cloudinary:', response.data.pdfUrl);
-                    setSignedPdfUrl(response.data.pdfUrl);
-                    setPdfError(null);
-                } else {
-                    console.error('Failed to get PDF:', response.data);
-                    setPdfError('Could not load PDF');
-                    setSignedPdfUrl('');
-                }
-            } catch (error: any) {
-                console.error('Error fetching PDF:', error);
-                setPdfError(error.response?.data?.message || 'Failed to fetch PDF');
-                setSignedPdfUrl('');
-            }
-        };
-
-        fetchPdfUrl();
-    }, [viewingPaper?.submissionId]);
+        if (viewingPaper) {
+            // Fetch reviews and reviewers for this paper
+            fetchPaperReviewsAndReviewers(viewingPaper._id);
+        }
+    }, [viewingPaper?._id]);
 
     const verifyEditorAccess = async () => {
         try {
@@ -270,7 +243,7 @@ const EditorDashboard = () => {
                 if (err.response?.status === 403) {
                     setError('Access denied. Only editors can view papers.');
                 } else if (err.code === 'ERR_NETWORK') {
-                    setError('Cannot connect to server. Please ensure the backend is running on port 5000.');
+                    setError('Cannot connect to server');
                 } else {
                     setError('Failed to load papers. Server may be offline.');
                 }
@@ -316,83 +289,250 @@ const EditorDashboard = () => {
         }
     };
 
-    const handleAssignReviewers = async (paperId: string) => {
-        const reviewerIds = selectedReviewers[paperId] || [];
-        const days = deadlineDays[paperId] || 3;
 
-        if (reviewerIds.length === 0) {
-            alert('Please select at least one reviewer');
+    // fetchAllReviews removed - Reviews tab removed
+
+    const fetchPaperReviewsAndReviewers = async (paperId: string) => {
+        try {
+            setReviewerListLoading(true);
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            
+            // Fetch reviews for this paper
+            const reviewsRes = await axios.get(
+                `${API_URL}/api/editor/papers/${paperId}/reviews`,
+                { headers }
+            );
+            
+            // Fetch reviewers and their assignments for this paper
+            const paper = papers.find(p => p._id === paperId);
+            if (paper?.assignedReviewers) {
+                const reviewersWithStatus = paper.assignedReviewers.map((reviewer: any) => {
+                    const review = (reviewsRes.data.reviews || []).find(
+                        (r: any) => r.reviewer?._id === reviewer._id || r.reviewer === reviewer._id
+                    );
+                    return {
+                        ...reviewer,
+                        reviewStatus: review ? 'Submitted' : 'Pending',
+                        review: review || null
+                    };
+                });
+                setPaperReviewers(reviewersWithStatus);
+            }
+        } catch (error: any) {
+            console.error('Error fetching paper reviews and reviewers:', error);
+            setPaperReviewers([]);
+        } finally {
+            setReviewerListLoading(false);
+        }
+    };
+
+    // Handle revision request
+    const handleRevisionRequest = async () => {
+        if (!viewingPaper || !revisionMessage.trim()) {
+            alert('Please enter a revision message');
             return;
         }
 
+        setDecisionLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const headers = { Authorization: `Bearer ${token}` };
-            await axios.post(
+            const response = await axios.post(
+                `${API_BASE_URL}/api/editor/request-revision`,
+                {
+                    paperId: viewingPaper._id,
+                    revisionMessage
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                }
+            );
+
+            if (response.data.success) {
+                alert('Revision request sent to author successfully!');
+                setShowDecisionModal(null);
+                setRevisionMessage('');
+                setViewingPaper(null);
+                // Refresh papers list by re-fetching
+                const token = localStorage.getItem('token');
+                const headers = { Authorization: `Bearer ${token}` };
+                const papersRes = await axios.get(`${API_URL}/api/editor/papers`, { headers });
+                setPapers(papersRes.data.papers || []);
+            } else {
+                alert('Error: ' + (response.data.message || 'Failed to request revision'));
+            }
+        } catch (error) {
+            console.error('Error requesting revision:', error);
+            alert('Error requesting revision');
+        } finally {
+            setDecisionLoading(false);
+        }
+    };
+
+    // Handle paper acceptance
+    const handleAcceptPaper = async () => {
+        if (!viewingPaper) return;
+
+        setDecisionLoading(true);
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/editor/accept-paper`,
+                {
+                    paperId: viewingPaper._id
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                }
+            );
+
+            if (response.data.success) {
+                alert('Paper accepted! Acceptance email sent to author.');
+                setViewingPaper(null);
+                // Refresh papers list
+                const token = localStorage.getItem('token');
+                const headers = { Authorization: `Bearer ${token}` };
+                const papersRes = await axios.get(`${API_URL}/api/editor/papers`, { headers });
+                setPapers(papersRes.data.papers || []);
+            } else {
+                alert('Error: ' + (response.data.message || 'Failed to accept paper'));
+            }
+        } catch (error) {
+            console.error('Error accepting paper:', error);
+            alert('Error accepting paper');
+        } finally {
+            setDecisionLoading(false);
+        }
+    };
+
+    // Handle assign reviewers
+    const handleAssignReviewers = async () => {
+        if (!viewingPaper || selectedReviewersForAssignment.length < 1) {
+            alert('Please select at least 1 reviewer');
+            return;
+        }
+
+        if (!assignmentDeadline) {
+            alert('Please set a deadline for reviews');
+            return;
+        }
+
+        setAssignmentLoading(true);
+        try {
+            const response = await axios.post(
                 `${API_URL}/api/editor/assign-reviewers`,
                 {
-                    paperId,
-                    reviewerIds,
-                    deadlineDays: days
+                    paperId: viewingPaper._id,
+                    submissionId: viewingPaper.submissionId,
+                    reviewerIds: selectedReviewersForAssignment,
+                    deadline: assignmentDeadline
                 },
-                { headers }
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                }
             );
 
-            alert(`Reviewers assigned successfully with ${days}-day deadline!`);
-            // Clear selections for this paper
-            setSelectedReviewers(prev => ({ ...prev, [paperId]: [] }));
-            setDeadlineDays(prev => ({ ...prev, [paperId]: 3 }));
-            setExpandedPaperId(null);
-            fetchDashboardData(headers);
-        } catch (error: any) {
-            alert(error.response?.data?.message || 'Failed to assign reviewers');
-        }
-    };
-
-    const fetchAllReviews = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const headers = { Authorization: `Bearer ${token}` };
-            
-            // Fetch reviews for each paper
-            const reviewsPromises = papers.map(paper =>
-                axios.get(`${API_URL}/api/editor/papers/${paper._id}/reviews`, { headers })
-                    .then(res => ({
-                        ...res.data,
-                        paperId: paper._id,
-                        paperTitle: paper.paperTitle,
-                        submissionId: paper.submissionId
-                    }))
-                    .catch(() => ({ paperId: paper._id, reviews: [], paperTitle: paper.paperTitle, submissionId: paper.submissionId }))
-            );
-            const allReviewsData = await Promise.all(reviewsPromises);
-            const flattenedReviews = allReviewsData.flatMap(r => 
-                (r.reviews || []).map((review: any) => ({
-                    ...review,
-                    paperId: r.paperId,
-                    paperTitle: r.paperTitle,
-                    submissionId: r.submissionId
-                }))
-            );
-            
-            setAllReviews(flattenedReviews);
+            if (response.data.success) {
+                alert(`${selectedReviewersForAssignment.length} reviewer(s) assigned successfully!`);
+                setShowAssignModal(false);
+                setSelectedReviewersForAssignment([]);
+                setAssignmentDeadline('');
+                setViewingPaper(null);
+                // Refresh papers list
+                const token = localStorage.getItem('token');
+                const headers = { Authorization: `Bearer ${token}` };
+                const papersRes = await axios.get(`${API_URL}/api/editor/papers`, { headers });
+                setPapers(papersRes.data.papers || []);
+            } else {
+                alert('Error: ' + (response.data.message || 'Failed to assign reviewers'));
+            }
         } catch (error) {
-            console.error('Error fetching reviews:', error);
+            console.error('Error assigning reviewers:', error);
+            alert('Error assigning reviewers');
+        } finally {
+            setAssignmentLoading(false);
         }
     };
 
-    const fetchMessages = async () => {
+    // Handle send inquiry to reviewer
+    const handleSendInquiry = async () => {
+        if (!reviewerInquiryModal || !inquiryMessage.trim() || !viewingPaper) {
+            alert('Please provide a message');
+            return;
+        }
+
+        setInquiryLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const headers = { Authorization: `Bearer ${token}` };
-            
-            const response = await axios.get(`${API_URL}/api/editor/messages`, { headers });
-            const messagesList = response.data.messages || [];
-            setMessages(messagesList);
-        } catch (error: any) {
-            console.error('Error fetching messages:', error);
-            // If endpoint doesn't exist, show empty list
-            setMessages([]);
+            const response = await axios.post(
+                `${API_URL}/api/editor/send-reviewer-inquiry`,
+                {
+                    paperId: viewingPaper._id,
+                    reviewerId: reviewerInquiryModal.reviewerId,
+                    message: inquiryMessage
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                }
+            );
+
+            if (response.data.success) {
+                alert('Inquiry sent successfully to ' + reviewerInquiryModal.reviewerName);
+                setReviewerInquiryModal(null);
+                setInquiryMessage('');
+            } else {
+                alert('Error: ' + (response.data.message || 'Failed to send inquiry'));
+            }
+        } catch (error) {
+            console.error('Error sending inquiry:', error);
+            alert('Error sending inquiry');
+        } finally {
+            setInquiryLoading(false);
+        }
+    };
+
+    // Handle delete reviewer from paper
+    const handleDeleteReviewer = async (reviewerId: string) => {
+        if (!viewingPaper || !window.confirm('Are you sure you want to remove this reviewer? Their review will also be deleted.')) {
+            return;
+        }
+
+        setDeleteLoading(true);
+        try {
+            const response = await axios.post(
+                `${API_URL}/api/editor/remove-reviewer`,
+                {
+                    paperId: viewingPaper._id,
+                    reviewerId: reviewerId
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                }
+            );
+
+            if (response.data.success) {
+                alert('Reviewer removed successfully');
+                setViewingPaper(null);
+                // Refresh papers list
+                const token = localStorage.getItem('token');
+                const headers = { Authorization: `Bearer ${token}` };
+                const papersRes = await axios.get(`${API_URL}/api/editor/papers`, { headers });
+                setPapers(papersRes.data.papers || []);
+            } else {
+                alert('Error: ' + (response.data.message || 'Failed to remove reviewer'));
+            }
+        } catch (error) {
+            console.error('Error removing reviewer:', error);
+            alert('Error removing reviewer');
+        } finally {
+            setDeleteLoading(false);
         }
     };
 
@@ -439,8 +579,8 @@ const EditorDashboard = () => {
                         {error.includes('backend') || error.includes('offline') ? (
                             <>
                                 <p className="text-sm text-gray-500 font-mono bg-gray-100 p-2 rounded">
-                                    Make sure backend is running:<br/>
-                                    <code>npm start</code> in srm-back folder
+                                    Make sure you are connected to internet<br/>
+                                    {/* <code>npm start</code> in srm-back folder */}
                                 </p>
                             </>
                         ) : null}
@@ -484,33 +624,7 @@ const EditorDashboard = () => {
                         onClick={() => setActiveTab('papers')}
                         collapsed={!sidebarOpen}
                     />
-                    <NavItem
-                        icon={Users}
-                        label="Reviewers"
-                        active={activeTab === 'reviewers'}
-                        onClick={() => setActiveTab('reviewers')}
-                        collapsed={!sidebarOpen}
-                    />
-                    <NavItem
-                        icon={MessageSquare}
-                        label="Messages"
-                        active={activeTab === 'messages'}
-                        onClick={() => {
-                            setActiveTab('messages');
-                            fetchMessages();
-                        }}
-                        collapsed={!sidebarOpen}
-                    />
-                    <NavItem
-                        icon={MessageSquare}
-                        label="Reviews"
-                        active={activeTab === 'reviews'}
-                        onClick={() => {
-                            setActiveTab('reviews');
-                            fetchAllReviews();
-                        }}
-                        collapsed={!sidebarOpen}
-                    />
+
                     <NavItem
                         icon={Cloud}
                         label="PDF Management"
@@ -518,11 +632,12 @@ const EditorDashboard = () => {
                         onClick={() => setActiveTab('pdfs')}
                         collapsed={!sidebarOpen}
                     />
+
                     <NavItem
-                        icon={BarChart3}
-                        label="Analytics"
-                        active={activeTab === 'analytics'}
-                        onClick={() => setActiveTab('analytics')}
+                        icon={Users}
+                        label="Create Reviewer"
+                        active={activeTab === 'createReviewer'}
+                        onClick={() => setActiveTab('createReviewer')}
                         collapsed={!sidebarOpen}
                     />
                 </nav>
@@ -549,11 +664,8 @@ const EditorDashboard = () => {
                     <h2 className="text-2xl font-bold text-gray-800">
                         {activeTab === 'dashboard' && 'Dashboard Overview'}
                         {activeTab === 'papers' && 'Manage Papers'}
-                        {activeTab === 'reviewers' && 'Manage Reviewers'}
-                        {activeTab === 'messages' && 'Reviewer Messages'}
-                        {activeTab === 'reviews' && 'Reviews'}
                         {activeTab === 'pdfs' && 'PDF Management'}
-                        {activeTab === 'analytics' && 'Analytics & Reports'}
+                        {activeTab === 'createReviewer' && 'Create New Reviewer'}
                     </h2>
                 </div>
 
@@ -641,33 +753,65 @@ const EditorDashboard = () => {
                                     <h3 className="text-lg font-semibold">All Papers</h3>
                                 </div>
 
-                                {/* Search Bar */}
-                                <div className="mb-6">
-                                    <input
-                                        type="text"
-                                        placeholder="Search by title, author, submission ID, or category..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                                    />
-                                    <p className="text-sm text-gray-500 mt-2">
+                                {/* Enhanced Search Bar with Multiple Options */}
+                                <div className="mb-6 space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-2">
+                                                <Search className="w-4 h-4 inline mr-1" />
+                                                Search by any field
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="Title, author, ID, category, email..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-2">
+                                                <Filter className="w-4 h-4 inline mr-1" />
+                                                Filter by status
+                                            </label>
+                                            <select
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                                value={statusFilter}
+                                                onChange={(e) => setStatusFilter(e.target.value)}
+                                            >
+                                                <option value="">All Statuses</option>
+                                                <option value="Submitted">Submitted</option>
+                                                <option value="Under Review">Under Review</option>
+                                                <option value="Review Received">Review Received</option>
+                                                <option value="Accepted">Accepted</option>
+                                                <option value="Rejected">Rejected</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-gray-500">
                                         {searchTerm ? `Found ${papers.filter(p => 
                                             p.paperTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                             p.authorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                             p.submissionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.category.toLowerCase().includes(searchTerm.toLowerCase())
+                                            p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            p.email.toLowerCase().includes(searchTerm.toLowerCase())
                                         ).length} paper(s)` : `Showing all ${papers.length} paper(s)`}
                                     </p>
                                 </div>
 
                                 <div className="grid gap-4">
-                                    {papers.filter(p => 
-                                        !searchTerm || 
-                                        p.paperTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        p.authorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        p.submissionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        p.category.toLowerCase().includes(searchTerm.toLowerCase())
-                                    ).map((paper) => (
+                                    {papers.filter(p => {
+                                        const matchesSearch = !searchTerm || 
+                                            p.paperTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            p.authorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            p.submissionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            p.email.toLowerCase().includes(searchTerm.toLowerCase());
+                                        
+                                        const matchesStatus = !statusFilter || p.status === statusFilter;
+                                        
+                                        return matchesSearch && matchesStatus;
+                                    }).map((paper) => (
                                         <div key={paper._id}>
                                             <div className="border rounded-lg p-4 hover:shadow-md transition cursor-pointer bg-white hover:bg-gray-50"
                                                  onClick={() => setViewingPaper(paper)}>
@@ -700,103 +844,96 @@ const EditorDashboard = () => {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setExpandedPaperId(expandedPaperId === paper._id ? null : paper._id);
+                                                            setSelectedPaperForAuthorMessage(selectedPaperForAuthorMessage === paper._id ? null : paper._id);
                                                         }}
-                                                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
+                                                        className={`px-4 py-2 rounded flex items-center gap-2 transition ${
+                                                            selectedPaperForAuthorMessage === paper._id
+                                                                ? 'bg-blue-700 text-white'
+                                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                        }`}
+                                                        title="Send message to author"
                                                     >
-                                                        <UserPlus className="w-4 h-4" />
-                                                        {expandedPaperId === paper._id ? 'Close' : 'Assign'}
+                                                        <MessageSquare className="w-4 h-4" />
+                                                        {selectedPaperForAuthorMessage === paper._id ? 'Close' : 'Message Author'}
                                                     </button>
                                                 </div>
-                                            </div>
 
-                                            {/* Inline Reviewer Assignment Section */}
-                                            {expandedPaperId === paper._id && (
-                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-2">
-                                                    <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                                                        <UserPlus className="w-5 h-5 text-blue-600" />
-                                                        Assign Reviewers - {paper.submissionId}
-                                                    </h4>
-
-                                                    {/* Deadline Input */}
-                                                    <div className="mb-4">
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                            Review Deadline (Days)
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            min="1"
-                                                            max="365"
-                                                            value={deadlineDays[paper._id] || 3}
-                                                            onChange={(e) => setDeadlineDays(prev => ({ ...prev, [paper._id]: parseInt(e.target.value) || 3 }))}
-                                                            className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                            placeholder="3"
-                                                        />
-                                                        <span className="text-sm text-gray-500 ml-2">days from now</span>
-                                                    </div>
-
-                                                    {/* Reviewer Selection */}
-                                                    <div className="mb-4">
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                            Select Reviewers
-                                                        </label>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto bg-white p-3 rounded-lg border">
-                                                            {reviewers.map((reviewer) => (
-                                                                <label key={reviewer._id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={(selectedReviewers[paper._id] || []).includes(reviewer._id)}
-                                                                        onChange={(e) => {
-                                                                            const current = selectedReviewers[paper._id] || [];
-                                                                            if (e.target.checked) {
-                                                                                setSelectedReviewers(prev => ({
-                                                                                    ...prev,
-                                                                                    [paper._id]: [...current, reviewer._id]
-                                                                                }));
-                                                                            } else {
-                                                                                setSelectedReviewers(prev => ({
-                                                                                    ...prev,
-                                                                                    [paper._id]: current.filter(id => id !== reviewer._id)
-                                                                                }));
+                                                {/* Inline Author Message Form */}
+                                                {selectedPaperForAuthorMessage === paper._id && (
+                                                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                                        <h5 className="font-semibold text-blue-900 mb-3">Send Message to {paper.authorName}</h5>
+                                                        <div className="space-y-3">
+                                                            <textarea
+                                                                value={authorMessageText}
+                                                                onChange={(e) => setAuthorMessageText(e.target.value)}
+                                                                placeholder="Type your message here... (Professional tone recommended)"
+                                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                                                rows={5}
+                                                            />
+                                                            <div className="flex justify-between items-center text-sm text-gray-600">
+                                                                <span>{authorMessageText.length} characters</span>
+                                                                <div className="flex gap-2">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setAuthorMessageText('');
+                                                                            setSelectedPaperForAuthorMessage(null);
+                                                                        }}
+                                                                        className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 transition"
+                                                                        disabled={authorMessageLoading}
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            if (!authorMessageText.trim()) {
+                                                                                alert('Please enter a message');
+                                                                                return;
+                                                                            }
+                                                                            
+                                                                            setAuthorMessageLoading(true);
+                                                                            try {
+                                                                                const response = await axios.post(
+                                                                                    `${API_BASE_URL}/api/editor/send-message-to-author`,
+                                                                                    {
+                                                                                        authorEmail: paper.email,
+                                                                                        authorName: paper.authorName,
+                                                                                        submissionId: paper.submissionId,
+                                                                                        message: authorMessageText
+                                                                                    },
+                                                                                    {
+                                                                                        headers: {
+                                                                                            Authorization: `Bearer ${localStorage.getItem('token')}`
+                                                                                        }
+                                                                                    }
+                                                                                );
+                                                                                
+                                                                                if (response.data.success) {
+                                                                                    alert('Message sent to author successfully!');
+                                                                                    setAuthorMessageText('');
+                                                                                    setSelectedPaperForAuthorMessage(null);
+                                                                                } else {
+                                                                                    alert('Failed to send message: ' + (response.data.message || 'Unknown error'));
+                                                                                }
+                                                                            } catch (error) {
+                                                                                console.error('Error sending message:', error);
+                                                                                alert('Error sending message. Please try again.');
+                                                                            } finally {
+                                                                                setAuthorMessageLoading(false);
                                                                             }
                                                                         }}
-                                                                        className="w-4 h-4 text-blue-600"
-                                                                    />
-                                                                    <span className="text-sm">
-                                                                        {reviewer.name} ({reviewer.email})
-                                                                    </span>
-                                                                </label>
-                                                            ))}
+                                                                        disabled={authorMessageLoading || !authorMessageText.trim()}
+                                                                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 transition flex items-center gap-2"
+                                                                    >
+                                                                        <Send className="w-4 h-4" />
+                                                                        {authorMessageLoading ? 'Sending...' : 'Send Message'}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        {(selectedReviewers[paper._id] || []).length > 0 && (
-                                                            <p className="text-sm text-blue-600 mt-2">
-                                                                Selected: {(selectedReviewers[paper._id] || []).length} reviewer(s)
-                                                            </p>
-                                                        )}
                                                     </div>
+                                                )}
+                                            </div>
 
-                                                    {/* Action Buttons */}
-                                                    <div className="flex gap-3">
-                                                        <button
-                                                            onClick={() => handleAssignReviewers(paper._id)}
-                                                            disabled={(selectedReviewers[paper._id] || []).length === 0}
-                                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                                        >
-                                                            <Send className="w-4 h-4" />
-                                                            Assign & Send Emails
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                setExpandedPaperId(null);
-                                                                setSelectedReviewers(prev => ({ ...prev, [paper._id]: [] }));
-                                                            }}
-                                                            className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -827,403 +964,717 @@ const EditorDashboard = () => {
                             </button>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Left Column - Paper Details */}
-                                <div className="lg:col-span-1 bg-white rounded-lg shadow-md p-6 max-h-[85vh] overflow-y-auto">
-                                    <div className="border-b pb-4 mb-4">
-                                        <h3 className="text-xl font-semibold text-gray-800">{viewingPaper.paperTitle}</h3>
+                                {/* Left Column - Paper Details & Reviewers */}
+                                <div className="lg:col-span-3 bg-white rounded-lg shadow-md p-6">
+                                    {/* Paper Header Tabs */}
+                                    <div className="flex gap-2 border-b mb-4 pb-2">
+                                        <button
+                                            onClick={() => setPaperDetailsTab('details')}
+                                            className={`px-4 py-2 font-medium text-sm transition ${
+                                                paperDetailsTab === 'details' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-800'
+                                            }`}
+                                        >
+                                            Paper Details
+                                        </button>
+                                        <button
+                                            onClick={() => setPaperDetailsTab('reviewers')}
+                                            className={`px-4 py-2 font-medium text-sm transition ${
+                                                paperDetailsTab === 'reviewers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-800'
+                                            }`}
+                                        >
+                                            Reviewers ({paperReviewers.length})
+                                        </button>
+                                    </div>
+
+                                    {/* Paper Details Tab */}
+                                    {paperDetailsTab === 'details' && (
+                                    <div>
+                                    {/* Action Buttons - MOVED TO TOP */}
+                                    <div className="flex gap-2 mb-6 flex-wrap">
+                                        {/* View PDF Button */}
+                                        <button
+                                            onClick={() => {
+                                                // Open PDF in new tab/modal
+                                                if (viewingPaper.pdfUrl) {
+                                                    window.open(viewingPaper.pdfUrl, '_blank');
+                                                } else {
+                                                    alert('PDF not available');
+                                                }
+                                            }}
+                                            className="flex-1 px-3 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                        >
+                                            📄 View PDF
+                                        </button>
+
+                                        {/* Assign Reviewers Button - Show if < 3 reviewers assigned and not decided */}
+                                        {paperReviewers.length < 3 && viewingPaper.status !== 'Accepted' && viewingPaper.status !== 'Rejected' && (
+                                            <button
+                                                onClick={() => setShowAssignModal(true)}
+                                                className="flex-1 px-3 py-3 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                            >
+                                                👥 Assign Reviewers
+                                            </button>
+                                        )}
+
+                                        {/* Decision Buttons - Only show if paper is NOT yet decided */}
+                                        {viewingPaper.status !== 'Accepted' && viewingPaper.status !== 'Rejected' && (
+                                            <>
+                                                {/* Accept Button - Only show if ≥3 reviews submitted */}
+                                                {paperReviewers.length >= 3 && paperReviewers.every((r: any) => r.review) && (
+                                                    <button
+                                                        onClick={handleAcceptPaper}
+                                                        disabled={decisionLoading}
+                                                        className="flex-1 px-3 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                    >
+                                                        {decisionLoading ? 'Processing...' : '✓ Accept'}
+                                                    </button>
+                                                )}
+
+                                                {/* Reject Button */}
+                                                <button
+                                                    onClick={() => {
+                                                        // Handle reject decision
+                                                        alert(`Rejected: ${viewingPaper.paperTitle}`);
+                                                    }}
+                                                    className="flex-1 px-3 py-3 bg-red-600 text-white rounded hover:bg-red-700 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                >
+                                                    ✗ Reject
+                                                </button>
+
+                                                {/* Revision Button */}
+                                                <button
+                                                    onClick={() => setShowDecisionModal('revision')}
+                                                    className="flex-1 px-3 py-3 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                >
+                                                    ↻ Revision
+                                                </button>
+                                            </>
+                                        )}
+
+                                        {/* Status Badge - Show when decision is made */}
+                                        {(viewingPaper.status === 'Accepted' || viewingPaper.status === 'Rejected') && (
+                                            <div className="flex-1 px-3 py-3 bg-gray-100 text-gray-800 rounded text-sm flex items-center justify-center gap-2 font-medium border-2 border-gray-300">
+                                                {viewingPaper.status === 'Accepted' ? (
+                                                    <>
+                                                        <Check className="w-5 h-5 text-green-600" />
+                                                        <span className="text-green-700 font-bold">Paper Accepted</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <X className="w-5 h-5 text-red-600" />
+                                                        <span className="text-red-700 font-bold">Paper Rejected</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="border-b pb-6 mb-6">
+                                        <h3 className="text-2xl font-bold text-gray-800">{viewingPaper.paperTitle}</h3>
                                         <div className="mt-3 flex items-center gap-2">
                                             <StatusBadge status={viewingPaper.status} />
                                             <span className="text-xs text-gray-500">Last updated: {new Date(viewingPaper.createdAt || '').toLocaleDateString()}</span>
                                         </div>
                                     </div>
 
-                                    {/* Author Information */}
-                                    <div className="space-y-3 mb-4">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">Author Name</label>
-                                            <p className="text-gray-800 bg-gray-50 p-2 rounded text-sm">{viewingPaper.authorName}</p>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-                                            <p className="text-gray-800 bg-gray-50 p-2 rounded text-sm break-all">{viewingPaper.email}</p>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">Submission ID</label>
-                                            <p className="text-gray-800 bg-gray-50 p-2 rounded text-sm font-mono">{viewingPaper.submissionId}</p>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
-                                            <p className="text-gray-800 bg-gray-50 p-2 rounded text-sm">{viewingPaper.category}</p>
+                                    {/* Author Information - 3 columns */}
+                                    <div className="mb-6">
+                                        <p className="text-sm font-semibold text-gray-700 mb-3">Author Information</p>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-2">Author Name</label>
+                                                <p className="text-gray-800 bg-gray-50 p-3 rounded text-sm font-medium border border-gray-200">{viewingPaper.authorName}</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-2">Email</label>
+                                                <p className="text-gray-800 bg-gray-50 p-3 rounded text-sm break-all border border-gray-200">{viewingPaper.email}</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-2">Submission ID</label>
+                                                <p className="text-gray-800 bg-gray-50 p-3 rounded text-sm font-mono font-medium border border-gray-200">{viewingPaper.submissionId}</p>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Database Information */}
-                                    <div className="border-t pt-4">
-                                        <label className="block text-xs font-medium text-gray-600 mb-3">Database Information</label>
-                                        <div className="space-y-2">
-                                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded border border-blue-200">
-                                                <p className="text-xs text-gray-600 mb-1">Database ID</p>
-                                                <p className="text-sm font-mono text-gray-800 break-all">{viewingPaper._id}</p>
+                                    {/* Paper Information - 3 columns */}
+                                    <div className="mb-6">
+                                        <p className="text-sm font-semibold text-gray-700 mb-3">Paper Information</p>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-2">Category</label>
+                                                <p className="text-gray-800 bg-gray-50 p-3 rounded text-sm border border-gray-200">{viewingPaper.category}</p>
                                             </div>
-                                            <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-3 rounded border border-purple-200">
-                                                <p className="text-xs text-gray-600 mb-1">Submission ID</p>
-                                                <p className="text-sm font-semibold text-gray-800">{viewingPaper.submissionId}</p>
-                                            </div>
-                                            <div className="bg-gradient-to-r from-green-50 to-teal-50 p-3 rounded border border-green-200">
-                                                <p className="text-xs text-gray-600 mb-1">Paper Title</p>
-                                                <p className="text-sm font-medium text-gray-800">{viewingPaper.paperTitle}</p>
-                                            </div>
-                                            <div className="bg-gradient-to-r from-orange-50 to-yellow-50 p-3 rounded border border-orange-200">
-                                                <p className="text-xs text-gray-600 mb-1">Status</p>
-                                                <p className="text-sm font-semibold">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-2">Status</label>
+                                                <div className="bg-gray-50 p-3 rounded border border-gray-200">
                                                     <StatusBadge status={viewingPaper.status} />
-                                                </p>
+                                                </div>
                                             </div>
-                                            <div className="bg-gradient-to-r from-red-50 to-rose-50 p-3 rounded border border-red-200">
-                                                <p className="text-xs text-gray-600 mb-1">Author Name</p>
-                                                <p className="text-sm text-gray-800">{viewingPaper.authorName}</p>
-                                            </div>
-                                            <div className="bg-gradient-to-r from-cyan-50 to-blue-50 p-3 rounded border border-cyan-200">
-                                                <p className="text-xs text-gray-600 mb-1">Author Email</p>
-                                                <p className="text-sm text-gray-800 break-all">{viewingPaper.email}</p>
-                                            </div>
-                                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded border border-indigo-200">
-                                                <p className="text-xs text-gray-600 mb-1">Category</p>
-                                                <p className="text-sm text-gray-800">{viewingPaper.category}</p>
-                                            </div>
-                                            <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-3 rounded border border-slate-200">
-                                                <p className="text-xs text-gray-600 mb-1">Submission Date</p>
-                                                <p className="text-sm text-gray-800">{new Date(viewingPaper.createdAt || '').toLocaleString()}</p>
-                                            </div>
-                                            <div className="bg-gradient-to-r from-lime-50 to-green-50 p-3 rounded border border-lime-200">
-                                                <p className="text-xs text-gray-600 mb-1">Assigned Reviewers Count</p>
-                                                <p className="text-sm font-semibold text-gray-800">{viewingPaper.assignedReviewers?.length || 0}</p>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-2">Assigned Reviewers</label>
+                                                <p className="text-gray-800 bg-blue-50 p-3 rounded text-sm font-bold text-blue-600 border border-blue-200">{viewingPaper.assignedReviewers?.length || 0} Reviewers</p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Reviewer Assignments Section */}
-                                    {viewingPaper.assignedReviewers && viewingPaper.assignedReviewers.length > 0 && (
-                                        <div className="mt-6 pt-6 border-t">
-                                            <h4 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                                                <Users className="w-4 h-4 text-blue-600" />
-                                                Assigned Reviewers ({viewingPaper.assignedReviewers.length})
-                                            </h4>
-                                            <div className="space-y-2">
-                                                {viewingPaper.assignedReviewers.map((reviewer: any, idx: number) => {
-                                                    const assignment = viewingPaper.reviewAssignments?.find((a: any) => a.reviewer === reviewer._id);
-                                                    const hasResponded = assignment?.review ? true : false;
-                                                    
-                                                    return (
-                                                        <div key={idx} className={`p-3 rounded-lg border-l-4 ${
-                                                            hasResponded 
-                                                                ? 'bg-green-50 border-green-500' 
-                                                                : assignment?.status === 'Overdue'
-                                                                ? 'bg-red-50 border-red-500'
-                                                                : 'bg-yellow-50 border-yellow-500'
-                                                        }`}>
-                                                            <div className="flex items-start justify-between">
-                                                                <div className="flex-1">
-                                                                    <p className="font-medium text-sm text-gray-800">
-                                                                        {reviewer.username || reviewer.email}
-                                                                    </p>
-                                                                    <p className="text-xs text-gray-600">{reviewer.email}</p>
-                                                                </div>
-                                                                <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                                                                    hasResponded
-                                                                        ? 'bg-green-200 text-green-800'
-                                                                        : assignment?.status === 'Overdue'
-                                                                        ? 'bg-red-200 text-red-800'
-                                                                        : 'bg-yellow-200 text-yellow-800'
-                                                                }`}>
-                                                                    {hasResponded ? '✓ Responded' : assignment?.status || 'Pending'}
+                                    {/* Database Information - 3 columns */}
+                                    <div className="mb-6 border-t pt-6">
+                                        <p className="text-sm font-semibold text-gray-700 mb-3">Database Information</p>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                                                <p className="text-xs text-gray-600 mb-2 font-medium">Database ID</p>
+                                                <p className="text-sm font-mono text-gray-800 break-all line-clamp-2">{viewingPaper._id}</p>
+                                            </div>
+                                            <div className="bg-purple-50 p-4 rounded border border-purple-200">
+                                                <p className="text-xs text-gray-600 mb-2 font-medium">Paper Title</p>
+                                                <p className="text-sm font-medium text-gray-800 line-clamp-2">{viewingPaper.paperTitle}</p>
+                                            </div>
+                                            <div className="bg-green-50 p-4 rounded border border-green-200">
+                                                <p className="text-xs text-gray-600 mb-2 font-medium">Submission Date</p>
+                                                <p className="text-sm text-gray-800">{new Date(viewingPaper.createdAt || '').toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Reviewers & Reviews Tab */}
+                            {paperDetailsTab === 'reviewers' && (
+                                <div>
+                                        {reviewerListLoading ? (
+                                            <div className="flex justify-center items-center py-8">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                            </div>
+                                        ) : paperReviewers.length > 0 ? (
+                                            <div>
+                                                {/* Reviewers Header */}
+                                                <div className="border-b pb-4 mb-6">
+                                                    <h3 className="text-xl font-bold text-gray-900">Assigned Reviewers ({paperReviewers.length})</h3>
+                                                </div>
+
+                                                {/* Reviewer Details Panel - Show inline if selected */}
+                                                {selectedReviewForDetails && viewingPaper?.submissionId === selectedReviewForDetails.submissionId && (
+                                                    <div className="mb-6 bg-white rounded-lg shadow-md p-6 border-2 border-blue-300">
+                                                        <ReviewerDetailsPanel
+                                                            reviewId={selectedReviewForDetails.reviewId}
+                                                            submissionId={selectedReviewForDetails.submissionId}
+                                                            onClose={() => setSelectedReviewForDetails(null)}
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {/* Reviewers Grid - 3 columns max */}
+                                                <div className="grid grid-cols-3 gap-4 mb-6">
+                                                    {paperReviewers.map((reviewer, idx) => {
+                                                        // Determine reviewer status with enhanced details
+                                                        let statusBg = 'bg-yellow-200 text-yellow-800';
+                                                        let statusText = 'Not Submitted';
+                                                        let borderColor = 'border-yellow-200 bg-yellow-50';
+                                                        
+                                                        if (reviewer.reviewStatus === 'Submitted') {
+                                                            statusBg = 'bg-green-200 text-green-800';
+                                                            statusText = 'Submitted';
+                                                            borderColor = 'border-green-200 bg-green-50';
+                                                        } else if (reviewer.reviewStatus === 'Overtime') {
+                                                            statusBg = 'bg-red-200 text-red-800';
+                                                            statusText = 'Overtime';
+                                                            borderColor = 'border-red-200 bg-red-50';
+                                                        }
+                                                        
+                                                        return (
+                                                        <div 
+                                                            key={idx} 
+                                                            className={`border rounded-lg p-4 flex flex-col h-full ${borderColor}`}
+                                                        >
+                                                            {/* Reviewer Name & Email */}
+                                                            <div className="mb-3 pb-3 border-b">
+                                                                <h4 className="font-bold text-gray-900 text-sm truncate">{reviewer.username || reviewer.email}</h4>
+                                                                <p className="text-xs text-gray-600 truncate">{reviewer.email}</p>
+                                                            </div>
+
+                                                            {/* Status Badge with Enhanced Details */}
+                                                            <div className="mb-3 flex items-center justify-between">
+                                                                <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${statusBg}`}>
+                                                                    {statusText}
                                                                 </span>
                                                             </div>
-                                                            {assignment && (
-                                                                <div className="text-xs text-gray-600 mt-2">
-                                                                    Deadline: {new Date(assignment.deadline).toLocaleDateString()}
-                                                                    {assignment.emailSent && ' • Email sent'}
+
+                                                            {/* Review Details or Awaiting Message */}
+                                                            {reviewer.review ? (
+                                                                <div className="flex-1 bg-white rounded border-l-4 border-green-500 p-3 space-y-2 mb-3">
+                                                                    <div>
+                                                                        <label className="text-xs font-semibold text-gray-700">Recommendation</label>
+                                                                        <p className={`font-bold text-sm mt-0.5 ${
+                                                                            reviewer.review.recommendation === 'Accept' ? 'text-green-600' :
+                                                                            reviewer.review.recommendation === 'Reject' ? 'text-red-600' : 'text-yellow-600'
+                                                                        }`}>
+                                                                            {reviewer.review.recommendation || 'N/A'}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs font-semibold text-gray-700">Overall Rating</label>
+                                                                        <p className="font-bold text-sm text-blue-600 mt-0.5">
+                                                                            {reviewer.review.ratings?.overall || reviewer.review.overallRating || 'N/A'}
+                                                                            {reviewer.review.overallRating && !reviewer.review.ratings?.overall ? '/5' : ''}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs font-semibold text-gray-700">Comments</label>
+                                                                        <p className="text-xs text-gray-600 mt-0.5 bg-gray-50 p-2 rounded max-h-16 overflow-y-auto line-clamp-3">
+                                                                            {reviewer.review.commentsToAuthor || reviewer.review.comments || 'No comments'}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-500 pt-2 border-t">
+                                                                        {new Date(reviewer.review.submittedAt).toLocaleDateString()}
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex-1 bg-white rounded p-3 text-center mb-3">
+                                                                    <p className="text-xs text-gray-500 italic">Awaiting review submission...</p>
                                                                 </div>
                                                             )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
 
-                                            {/* Summary Stats */}
-                                            <div className="mt-4 grid grid-cols-3 gap-2">
-                                                <div className="bg-blue-50 p-2 rounded text-center border border-blue-200">
-                                                    <p className="text-xs text-gray-600">Total</p>
-                                                    <p className="text-lg font-bold text-blue-600">{viewingPaper.assignedReviewers?.length || 0}</p>
-                                                </div>
-                                                <div className="bg-green-50 p-2 rounded text-center border border-green-200">
-                                                    <p className="text-xs text-gray-600">Responded</p>
-                                                    <p className="text-lg font-bold text-green-600">
-                                                        {viewingPaper.assignedReviewers?.filter((r: any) => 
-                                                            viewingPaper.reviewAssignments?.find((a: any) => a.reviewer === r._id && a.review)
-                                                        ).length || 0}
-                                                    </p>
-                                                </div>
-                                                <div className="bg-yellow-50 p-2 rounded text-center border border-yellow-200">
-                                                    <p className="text-xs text-gray-600">Pending</p>
-                                                    <p className="text-lg font-bold text-yellow-600">
-                                                        {viewingPaper.assignedReviewers?.filter((r: any) => 
-                                                            !viewingPaper.reviewAssignments?.find((a: any) => a.reviewer === r._id && a.review)
-                                                        ).length || 0}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Action Buttons */}
-                                    <div className="flex gap-2 mt-4 pt-4 border-t">
-                                        <button
-                                            onClick={() => {
-                                                setExpandedPaperId(expandedPaperId === viewingPaper._id ? null : viewingPaper._id);
-                                            }}
-                                            className="flex-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center justify-center gap-2"
-                                        >
-                                            <UserPlus className="w-4 h-4" />
-                                            {expandedPaperId === viewingPaper._id ? 'Close Assignment' : 'Assign Reviewers'}
-                                        </button>
-                                    </div>
-
-                                    {/* Inline Assignment Section in Paper Details */}
-                                    {expandedPaperId === viewingPaper._id && (
-                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
-                                            <h5 className="font-semibold text-gray-800 mb-3 text-sm">Assign Reviewers</h5>
-
-                                            {/* Deadline Input */}
-                                            <div className="mb-3">
-                                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                    Review Deadline (Days)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    max="365"
-                                                    value={deadlineDays[viewingPaper._id] || 3}
-                                                    onChange={(e) => setDeadlineDays(prev => ({ ...prev, [viewingPaper._id]: parseInt(e.target.value) || 3 }))}
-                                                    className="w-28 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    placeholder="3"
-                                                />
-                                                <span className="text-xs text-gray-500 ml-2">days</span>
-                                            </div>
-
-                                            {/* Reviewer Selection */}
-                                            <div className="mb-3">
-                                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                    Select Reviewers
-                                                </label>
-                                                <div className="space-y-1 max-h-40 overflow-y-auto bg-white p-2 rounded border">
-                                                    {reviewers.map((reviewer) => (
-                                                        <label key={reviewer._id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer text-xs">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={(selectedReviewers[viewingPaper._id] || []).includes(reviewer._id)}
-                                                                onChange={(e) => {
-                                                                    const current = selectedReviewers[viewingPaper._id] || [];
-                                                                    if (e.target.checked) {
-                                                                        setSelectedReviewers(prev => ({
-                                                                            ...prev,
-                                                                            [viewingPaper._id]: [...current, reviewer._id]
-                                                                        }));
-                                                                    } else {
-                                                                        setSelectedReviewers(prev => ({
-                                                                            ...prev,
-                                                                            [viewingPaper._id]: current.filter(id => id !== reviewer._id)
-                                                                        }));
+                                                            {/* Message Button */}
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (reviewer.review?._id && viewingPaper?.submissionId) {
+                                                                        setSelectedReviewForDetails({
+                                                                            reviewId: reviewer.review._id,
+                                                                            submissionId: viewingPaper.submissionId
+                                                                        });
                                                                     }
                                                                 }}
-                                                                className="w-3 h-3 text-blue-600"
-                                                            />
-                                                            <span className="truncate">{reviewer.name} ({reviewer.email})</span>
-                                                        </label>
-                                                    ))}
+                                                                className={`w-full px-3 py-2 rounded text-xs flex items-center justify-center gap-2 font-medium transition ${
+                                                                    selectedReviewForDetails?.reviewId === reviewer.review?._id
+                                                                        ? 'bg-blue-700 text-white'
+                                                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                                }`}
+                                                                title="Send message to this reviewer"
+                                                            >
+                                                                <MessageSquare className="w-3.5 h-3.5" />
+                                                                {selectedReviewForDetails?.reviewId === reviewer.review?._id ? 'Close' : 'Message'}
+                                                            </button>
+                                                        </div>
+                                                        );
+                                                    })}
                                                 </div>
-                                                {(selectedReviewers[viewingPaper._id] || []).length > 0 && (
-                                                    <p className="text-xs text-blue-600 mt-1">
-                                                        Selected: {(selectedReviewers[viewingPaper._id] || []).length} reviewer(s)
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {/* Action Buttons */}
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleAssignReviewers(viewingPaper._id)}
-                                                    disabled={(selectedReviewers[viewingPaper._id] || []).length === 0}
-                                                    className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs flex items-center gap-1 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                                >
-                                                    <Send className="w-3 h-3" />
-                                                    Assign & Send Emails
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setExpandedPaperId(null);
-                                                        setSelectedReviewers(prev => ({ ...prev, [viewingPaper._id]: [] }));
-                                                    }}
-                                                    className="px-3 py-1.5 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 text-xs"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Right Column - Chrome-like PDF Viewer */}
-                                <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-0 max-h-[85vh] flex flex-col overflow-hidden">
-                                    {/* PDF Toolbar */}
-                                    <div className="bg-gray-50 border-b px-4 py-3 flex justify-between items-center gap-3 flex-shrink-0">
-                                        <h4 className="font-semibold text-gray-800">PDF Viewer</h4>
-                                        <div className="flex items-center gap-2">
-                                            {/* Zoom Controls */}
-                                            <div className="flex items-center gap-1 bg-white border rounded">
-                                                <button 
-                                                    onClick={() => setZoom(Math.max(50, zoom - 10))}
-                                                    className="p-2 hover:bg-gray-100 transition"
-                                                    title="Zoom Out"
-                                                >
-                                                    <ZoomOut className="w-4 h-4 text-gray-700" />
-                                                </button>
-                                                <input 
-                                                    type="number" 
-                                                    min="50" 
-                                                    max="200" 
-                                                    step="10"
-                                                    value={zoom}
-                                                    onChange={(e) => setZoom(Number(e.target.value))}
-                                                    className="w-14 text-center text-sm border-l border-r px-1 py-1"
-                                                />
-                                                <span className="text-xs text-gray-600 px-1">%</span>
-                                                <button 
-                                                    onClick={() => setZoom(Math.min(200, zoom + 10))}
-                                                    className="p-2 hover:bg-gray-100 transition"
-                                                    title="Zoom In"
-                                                >
-                                                    <ZoomIn className="w-4 h-4 text-gray-700" />
-                                                </button>
-                                            </div>
-
-                                            {/* Fullscreen Button */}
-                                            <button 
-                                                onClick={() => {
-                                                    const element = document.getElementById('pdf-viewer-fullscreen');
-                                                    if (!isFullscreen && element) {
-                                                        element.requestFullscreen?.().catch(() => {});
-                                                        setIsFullscreen(true);
-                                                    } else {
-                                                        document.exitFullscreen?.().catch(() => {});
-                                                        setIsFullscreen(false);
-                                                    }
-                                                }}
-                                                className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-medium flex items-center gap-1"
-                                                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-                                            >
-                                                {isFullscreen ? '⛶ Exit' : '⛶ Full'}
-                                            </button>
-
-                                            {/* Download Button */}
-                                            {signedPdfUrl && (
-                                                <button 
-                                                    onClick={() => {
-                                                        const link = document.createElement('a');
-                                                        link.href = signedPdfUrl;
-                                                        link.download = `${viewingPaper?.submissionId || 'paper'}.pdf`;
-                                                        document.body.appendChild(link);
-                                                        link.click();
-                                                        document.body.removeChild(link);
-                                                    }}
-                                                    className="p-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition"
-                                                    title="Download PDF"
-                                                >
-                                                    <Download className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* PDF Continuous Scroll Viewer */}
-                                    <div 
-                                        id="pdf-viewer-fullscreen"
-                                        className={`flex-1 overflow-y-auto bg-gray-100 flex items-center justify-center ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''}`}
-                                        style={{
-                                            background: isFullscreen ? '#000' : '#f3f4f6'
-                                        }}
-                                    >
-                                        {signedPdfUrl ? (
-                                            <div className="flex flex-col items-center gap-2 py-4 w-full">
-                                                <Document
-                                                    file={signedPdfUrl}
-                                                    onLoadSuccess={({ numPages }) => {
-                                                        setPdfError(null);
-                                                        // Render all pages for continuous scroll
-                                                        setRenderedPages(Array.from({ length: numPages }, (_, i) => i + 1));
-                                                        console.log('✓ PDF loaded successfully:', numPages, 'pages');
-                                                    }}
-                                                    onError={(error) => {
-                                                        console.error('PDF Load Error:', error);
-                                                        setPdfError(`Failed to load PDF: ${error.message}`);
-                                                    }}
-                                                    loading={
-                                                        <div className="flex items-center justify-center h-96 bg-gray-50 rounded">
-                                                            <div className="text-center">
-                                                                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mx-auto mb-3"></div>
-                                                                <p className="text-gray-600">Loading PDF...</p>
-                                                                <p className="text-xs text-gray-500 mt-2">Reading from database</p>
-                                                            </div>
-                                                        </div>
-                                                    }
-                                                    error={
-                                                        <div className="flex items-center justify-center h-96 bg-gray-50 rounded">
-                                                            <div className="text-center">
-                                                                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                                                                <p className="text-red-600 font-medium">Failed to load PDF</p>
-                                                                <p className="text-sm text-gray-600 mt-1">{pdfError}</p>
-                                            </div>
-                                        </div>
-                                                    }
-                                                >
-                                                    {/* Render all pages continuously */}
-                                                    {renderedPages.map((pageNum) => (
-                                                        <div 
-                                                            key={pageNum} 
-                                                            className="mb-2 bg-white shadow-md rounded overflow-hidden"
-                                                            style={{
-                                                                transform: `scale(${zoom / 100})`,
-                                                                transformOrigin: 'top center',
-                                                                width: 'fit-content'
-                                                            }}
-                                                        >
-                                                            <Page 
-                                                                pageNumber={pageNum}
-                                                                renderTextLayer={true}
-                                                                renderAnnotationLayer={true}
-                                                                width={600}
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </Document>
                                             </div>
                                         ) : (
-                                            <div className="text-center text-gray-500">
-                                                <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                                                <p>No PDF available for this paper</p>
+                                            <div className="text-center py-8 text-gray-500">
+                                                <Users className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                                                <p>No reviewers assigned yet</p>
                                             </div>
                                         )}
                                     </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {activeTab === 'messages' && (
-                        <ConversationMessaging 
-                            messages={messages}
-                            onRefresh={fetchMessages}
-                        />
+                    {/* Message Author Modal */}
+                    {showMessageModal && viewingPaper && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-semibold text-gray-800">Send Message to Author</h3>
+                                    <button
+                                        onClick={() => {
+                                            setShowMessageModal(false);
+                                            setMessageToAuthor('');
+                                        }}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                
+                                <div className="mb-4">
+                                    <p className="text-sm text-gray-600 mb-2"><strong>To:</strong> {viewingPaper.authorName} ({viewingPaper.email})</p>
+                                    <p className="text-sm text-gray-600"><strong>Paper:</strong> {viewingPaper.paperTitle}</p>
+                                </div>
+
+                                <textarea
+                                    value={messageToAuthor}
+                                    onChange={(e) => setMessageToAuthor(e.target.value)}
+                                    placeholder="Type your message here..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                                    rows={5}
+                                />
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setShowMessageModal(false);
+                                            setMessageToAuthor('');
+                                        }}
+                                        className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            if (!messageToAuthor.trim()) {
+                                                alert('Please enter a message');
+                                                return;
+                                            }
+                                            
+                                            setMessageLoading(true);
+                                            try {
+                                                const token = localStorage.getItem('token');
+                                                await axios.post(
+                                                    `${API_URL}/api/editor/send-message-to-author`,
+                                                    {
+                                                        submissionId: viewingPaper.submissionId,
+                                                        authorEmail: viewingPaper.email,
+                                                        authorName: viewingPaper.authorName,
+                                                        paperTitle: viewingPaper.paperTitle,
+                                                        message: messageToAuthor
+                                                    },
+                                                    { headers: { Authorization: `Bearer ${token}` } }
+                                                );
+                                                
+                                                alert('Message sent successfully!');
+                                                setShowMessageModal(false);
+                                                setMessageToAuthor('');
+                                            } catch (error) {
+                                                console.error('Error sending message:', error);
+                                                alert('Failed to send message');
+                                            } finally {
+                                                setMessageLoading(false);
+                                            }
+                                        }}
+                                        disabled={messageLoading || !messageToAuthor.trim()}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 transition"
+                                    >
+                                        {messageLoading ? 'Sending...' : 'Send'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Assign Reviewers Inline Panel */}
+                    {showAssignModal && viewingPaper && (
+                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6 border-2 border-purple-300">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-semibold text-gray-800">Assign & Manage Reviewers</h3>
+                                    <button
+                                        onClick={() => {
+                                            setShowAssignModal(false);
+                                            setSelectedReviewersForAssignment([]);
+                                        }}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+                                    <p className="text-blue-800 text-sm">
+                                        <strong>Paper:</strong> {viewingPaper.paperTitle}
+                                    </p>
+                                    <p className="text-blue-800 text-sm">
+                                        <strong>Status:</strong> {paperReviewers.length < 3 ? `${paperReviewers.length} of 3 reviewers assigned` : `✅ ${paperReviewers.length} reviewers assigned`}
+                                    </p>
+                                </div>
+
+                                {/* Already Assigned Reviewers Section */}
+                                {paperReviewers.length > 0 && (
+                                    <div className="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+                                        <h4 className="font-semibold text-gray-800 mb-3">Currently Assigned Reviewers ({paperReviewers.length})</h4>
+                                        <div className="space-y-2">
+                                            {paperReviewers.map((reviewer: any) => {
+                                                const deadline = viewingPaper.reviewAssignments?.find((a: any) => 
+                                                    a.reviewer === reviewer._id || a.reviewer?.toString() === reviewer._id?.toString()
+                                                )?.deadline;
+                                                const isOverdue = deadline && new Date(deadline) < new Date();
+                                                const hasReview = reviewer.review;
+                                                const status = hasReview ? 'Submitted' : isOverdue ? 'Overdue' : 'Pending';
+                                                
+                                                return (
+                                                    <div key={reviewer._id} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded hover:shadow-md transition">
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium text-gray-800">{reviewer.username || reviewer.name}</p>
+                                                            <p className="text-xs text-gray-500">{reviewer.email}</p>
+                                                            <div className="flex gap-2 mt-1">
+                                                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                                                    hasReview ? 'bg-green-100 text-green-800' :
+                                                                    isOverdue ? 'bg-red-100 text-red-800' :
+                                                                    'bg-yellow-100 text-yellow-800'
+                                                                }`}>
+                                                                    {status}
+                                                                </span>
+                                                                {isOverdue && !hasReview && (
+                                                                    <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-800 font-medium">⚠️ Past Deadline</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => setReviewerInquiryModal({ reviewerId: reviewer._id, reviewerName: reviewer.username || reviewer.name })}
+                                                                className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                                                                title="Send status inquiry"
+                                                            >
+                                                                ❓ Query
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteReviewer(reviewer._id)}
+                                                                disabled={deleteLoading}
+                                                                className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-400 transition"
+                                                                title="Remove reviewer"
+                                                            >
+                                                                🗑️ Delete
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Add New Reviewers Section - Only show if < 3 */}
+                                {paperReviewers.length < 3 && (
+                                    <>
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Review Deadline *
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={assignmentDeadline}
+                                                onChange={(e) => setAssignmentDeadline(e.target.value)}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            />
+                                        </div>
+
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                                                Select Reviewers (add {3 - paperReviewers.length} to reach 3 total) *
+                                            </label>
+                                            <div className="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto">
+                                                {reviewers.length === 0 ? (
+                                                    <p className="text-gray-500 text-sm">No reviewers available</p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {reviewers.map((reviewer: any) => {
+                                                            // Hide reviewers already assigned to this paper
+                                                            const alreadyAssigned = paperReviewers.some((pr: any) => 
+                                                                pr._id === reviewer._id || pr.reviewer === reviewer._id
+                                                            );
+                                                            
+                                                            if (alreadyAssigned) return null;
+
+                                                            const isSelected = selectedReviewersForAssignment.includes(reviewer._id);
+                                                            
+                                                            return (
+                                                                <label key={reviewer._id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isSelected}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setSelectedReviewersForAssignment([...selectedReviewersForAssignment, reviewer._id]);
+                                                                            } else {
+                                                                                setSelectedReviewersForAssignment(
+                                                                                    selectedReviewersForAssignment.filter(id => id !== reviewer._id)
+                                                                                );
+                                                                            }
+                                                                        }}
+                                                                        className="w-4 h-4 text-purple-600 rounded cursor-pointer"
+                                                                    />
+                                                                    <span className="ml-3 text-sm">
+                                                                        <strong>{reviewer.username}</strong> - {reviewer.email}
+                                                                    </span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                New selection: {selectedReviewersForAssignment.length} reviewers
+                                            </p>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    setShowAssignModal(false);
+                                                    setSelectedReviewersForAssignment([]);
+                                                }}
+                                                className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleAssignReviewers}
+                                                disabled={assignmentLoading || selectedReviewersForAssignment.length < 1 || !assignmentDeadline}
+                                                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 transition font-medium"
+                                            >
+                                                {assignmentLoading ? 'Assigning...' : `Add ${selectedReviewersForAssignment.length} More Reviewers`}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                        </div>
+                    )}
+
+                    {/* Reviewer Inquiry Inline Panel */}
+                    {reviewerInquiryModal && (
+                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6 border-2 border-blue-300">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-semibold text-gray-800">Send Review Status Inquiry</h3>
+                                    <button
+                                        onClick={() => {
+                                            setReviewerInquiryModal(null);
+                                            setInquiryMessage('');
+                                        }}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                <div className="mb-4">
+                                    <p className="text-sm text-gray-700 mb-3">
+                                        <strong>Reviewer:</strong> {reviewerInquiryModal.reviewerName}
+                                    </p>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Your Message *
+                                    </label>
+                                    <textarea
+                                        value={inquiryMessage}
+                                        onChange={(e) => setInquiryMessage(e.target.value)}
+                                        placeholder="e.g., 'Hi, have you had a chance to review the paper? The deadline is approaching...'"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        rows={4}
+                                    />
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setReviewerInquiryModal(null);
+                                            setInquiryMessage('');
+                                        }}
+                                        className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSendInquiry}
+                                        disabled={inquiryLoading || !inquiryMessage.trim()}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 transition font-medium"
+                                    >
+                                        {inquiryLoading ? 'Sending...' : 'Send Inquiry'}
+                                    </button>
+                                </div>
+                        </div>
+                    )}
+
+                    {/* Revision Request Inline Panel */}
+                    {showDecisionModal === 'revision' && viewingPaper && (
+                        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-orange-300 rounded-lg shadow-md p-6 mb-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-orange-600" />
+                                    Request Revision
+                                </h3>
+                                <button
+                                    onClick={() => {
+                                        setShowDecisionModal(null);
+                                        setRevisionMessage('');
+                                    }}
+                                    className="text-gray-500 hover:text-gray-700 transition"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            
+                            {paperReviewers.length >= 3 ? (
+                                <>
+                                    <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+                                        <p className="text-blue-800 text-sm">
+                                            <strong>ℹ️ Note:</strong> The author will receive all reviewer comments along with your message.
+                                        </p>
+                                    </div>
+
+                                    <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white rounded border border-gray-200">
+                                        <div>
+                                            <p className="text-sm text-gray-600"><strong>📄 Paper:</strong></p>
+                                            <p className="text-sm text-gray-800">{viewingPaper.paperTitle}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600"><strong>👤 Author:</strong></p>
+                                            <p className="text-sm text-gray-800">{viewingPaper.authorName} ({viewingPaper.email})</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600"><strong>👥 Reviewers:</strong></p>
+                                            <p className="text-sm text-green-700 font-medium">{paperReviewers.length} reviewers assigned</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Revision Message *
+                                        </label>
+                                        <textarea
+                                            value={revisionMessage}
+                                            onChange={(e) => setRevisionMessage(e.target.value)}
+                                            placeholder="Provide feedback and guidance for revision..."
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 mb-2"
+                                            rows={5}
+                                        />
+                                        <p className="text-xs text-gray-500">{revisionMessage.length} characters</p>
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => {
+                                                setShowDecisionModal(null);
+                                                setRevisionMessage('');
+                                            }}
+                                            className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleRevisionRequest}
+                                            disabled={decisionLoading || !revisionMessage.trim()}
+                                            className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 transition font-medium"
+                                        >
+                                            {decisionLoading ? 'Sending...' : 'Send Revision Request'}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="p-6 bg-white rounded border-l-4 border-red-500">
+                                    <div className="flex items-start gap-3">
+                                        <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-red-800 mb-2">Cannot Request Revision</h4>
+                                            <p className="text-gray-700 mb-4">
+                                                This paper needs at least <strong>3 reviewer responses</strong> before you can request revision.
+                                            </p>
+                                            <p className="text-gray-600 mb-4">
+                                                Currently has <strong className="text-orange-600">{paperReviewers.length}</strong> reviewer(s) assigned.
+                                            </p>
+                                            <button
+                                                onClick={() => {
+                                                    setShowDecisionModal(null);
+                                                    setRevisionMessage('');
+                                                }}
+                                                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium"
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     {activeTab === 'reviewers' && (
@@ -1411,170 +1862,7 @@ const EditorDashboard = () => {
                         </div>
                     )}
 
-                    {/* Reviews Tab */}
-                    {activeTab === 'reviews' && (
-                        <div className="bg-white rounded-lg shadow-md p-6">
-                            <div className="space-y-6">
-                                {/* Reviews List */}
-                                {viewingReviewId ? (
-                                    <ReviewerDetailsPanel
-                                        reviewId={viewingReviewId}
-                                        submissionId={viewingSubmissionId || ''}
-                                        onClose={() => {
-                                            setViewingReviewId(null);
-                                            setViewingSubmissionId(null);
-                                        }}
-                                    />
-                                ) : (
-                                    <div className="bg-white rounded-lg shadow-md p-6">
-                                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                            <MessageSquare className="w-6 h-6 text-blue-600" />
-                                            All Submitted Reviews ({allReviews.length})
-                                        </h3>
-
-                                        {/* Search Bar */}
-                                        <div className="mb-6">
-                                            <div className="relative">
-                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search by reviewer name, email, paper title, or submission ID..."
-                                                    value={reviewSearchTerm}
-                                                    onChange={(e) => setReviewSearchTerm(e.target.value)}
-                                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                                                />
-                                                {reviewSearchTerm && (
-                                                    <button
-                                                        onClick={() => setReviewSearchTerm('')}
-                                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                    >
-                                                        <X className="w-5 h-5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <p className="text-sm text-gray-500 mt-2 flex items-center gap-2">
-                                                <Filter className="w-4 h-4" />
-                                                {reviewSearchTerm ? (
-                                                    <>
-                                                        Found {allReviews.filter(review => {
-                                                            const searchLower = reviewSearchTerm.toLowerCase();
-                                                            const reviewerName = review.reviewer?.username?.toLowerCase() || '';
-                                                            const reviewerEmail = review.reviewer?.email?.toLowerCase() || '';
-                                                            const paperTitle = review.paperTitle?.toLowerCase() || '';
-                                                            const submissionId = review.submissionId?.toLowerCase() || '';
-                                                            return reviewerName.includes(searchLower) ||
-                                                                   reviewerEmail.includes(searchLower) ||
-                                                                   paperTitle.includes(searchLower) ||
-                                                                   submissionId.includes(searchLower);
-                                                        }).length} review(s) matching "{reviewSearchTerm}"
-                                                    </>
-                                                ) : (
-                                                    `Showing all ${allReviews.length} review(s)`
-                                                )}
-                                            </p>
-                                        </div>
-
-                                        {allReviews.filter(review => {
-                                            if (!reviewSearchTerm) return true;
-                                            const searchLower = reviewSearchTerm.toLowerCase();
-                                            const reviewerName = review.reviewer?.username?.toLowerCase() || '';
-                                            const reviewerEmail = review.reviewer?.email?.toLowerCase() || '';
-                                            const paperTitle = review.paperTitle?.toLowerCase() || '';
-                                            const submissionId = review.submissionId?.toLowerCase() || '';
-                                            return reviewerName.includes(searchLower) ||
-                                                   reviewerEmail.includes(searchLower) ||
-                                                   paperTitle.includes(searchLower) ||
-                                                   submissionId.includes(searchLower);
-                                        }).length > 0 ? (
-                                            <div className="space-y-3">
-                                                {allReviews.filter(review => {
-                                                    if (!reviewSearchTerm) return true;
-                                                    const searchLower = reviewSearchTerm.toLowerCase();
-                                                    const reviewerName = review.reviewer?.username?.toLowerCase() || '';
-                                                    const reviewerEmail = review.reviewer?.email?.toLowerCase() || '';
-                                                    const paperTitle = review.paperTitle?.toLowerCase() || '';
-                                                    const submissionId = review.submissionId?.toLowerCase() || '';
-                                                    return reviewerName.includes(searchLower) ||
-                                                           reviewerEmail.includes(searchLower) ||
-                                                           paperTitle.includes(searchLower) ||
-                                                           submissionId.includes(searchLower);
-                                                }).map((review, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="border rounded-lg p-4 hover:shadow-md transition bg-gradient-to-r from-blue-50 to-indigo-50 cursor-pointer"
-                                                        onClick={() => {
-                                                            setViewingReviewId(review._id);
-                                                            setViewingSubmissionId(review.submissionId);
-                                                        }}
-                                                    >
-                                                        <div className="flex items-start justify-between">
-                                                            <div className="flex-1">
-                                                                <h4 className="font-semibold text-gray-800">
-                                                                    Paper: {review.paperTitle || 'Unknown'}
-                                                                </h4>
-                                                                <p className="text-sm text-gray-600 mt-1">
-                                                                    Submission ID: {review.submissionId}
-                                                                </p>
-                                                                <div className="flex items-center gap-4 mt-3 flex-wrap">
-                                                                    <span className="text-sm">
-                                                                        <strong>Reviewer:</strong> {review.reviewer?.username || 'Unknown'}
-                                                                    </span>
-                                                                    {review.reviewer?.email && (
-                                                                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                                                            📧 {review.reviewer.email}
-                                                                        </span>
-                                                                    )}
-                                                                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                                                        review.recommendation === 'Accept' ? 'bg-green-200 text-green-800' :
-                                                                        review.recommendation === 'Reject' ? 'bg-red-200 text-red-800' :
-                                                                        review.recommendation === 'Major Revision' ? 'bg-yellow-200 text-yellow-800' :
-                                                                        review.recommendation === 'Minor Revision' ? 'bg-orange-200 text-orange-800' :
-                                                                        'bg-blue-200 text-blue-800'
-                                                                    }`}>
-                                                                        {review.recommendation}
-                                                                    </span>
-                                                                    <span className="text-sm">
-                                                                        Rating: {'⭐'.repeat(review.overallRating || 0)} ({review.overallRating || 0}/5)
-                                                                    </span>
-                                                                </div>
-                                                                <p className="text-xs text-gray-500 mt-2">
-                                                                    Submitted: {new Date(review.submittedAt).toLocaleString()}
-                                                                </p>
-                                                            </div>
-                                                            <button
-                                                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center gap-2 flex-shrink-0 ml-4"
-                                                            >
-                                                                <Eye className="w-4 h-4" />
-                                                                Show
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="text-center py-8 text-gray-500">
-                                                <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                                                <p>
-                                                    {reviewSearchTerm 
-                                                        ? `No reviews found matching "${reviewSearchTerm}"`
-                                                        : 'No reviews submitted yet'
-                                                    }
-                                                </p>
-                                                {reviewSearchTerm && (
-                                                    <button
-                                                        onClick={() => setReviewSearchTerm('')}
-                                                        className="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-                                                    >
-                                                        Clear Search
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    {/* Reviews Tab - REMOVED */}
 
                     {activeTab === 'pdfs' && (
                         <div className="h-full flex flex-col">
@@ -1582,9 +1870,112 @@ const EditorDashboard = () => {
                         </div>
                     )}
 
+                    {/* Create Reviewer Tab */}
+                    {activeTab === 'createReviewer' && (
+                        <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl">
+                            <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+                                <h3 className="font-semibold text-blue-900 mb-2">📧 Add New Reviewer Account</h3>
+                                <p className="text-blue-800 text-sm">
+                                    Create a new reviewer account with email, username, and password. Credentials will be used for sending review assignment emails.
+                                </p>
+                            </div>
+
+                            <form onSubmit={(e) => { e.preventDefault(); handleCreateReviewer(); }} className="space-y-4">
+                                {/* Email Input */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Gmail Address *
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={newReviewer.email}
+                                        onChange={(e) => setNewReviewer({ ...newReviewer, email: e.target.value })}
+                                        placeholder="reviewer@gmail.com"
+                                        required
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                {/* Username Input */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Username *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newReviewer.username}
+                                        onChange={(e) => setNewReviewer({ ...newReviewer, username: e.target.value })}
+                                        placeholder="john_doe"
+                                        required
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                {/* Password Input */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Password *
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={newReviewer.password}
+                                        onChange={(e) => setNewReviewer({ ...newReviewer, password: e.target.value })}
+                                        placeholder="Min 6 characters"
+                                        required
+                                        minLength={6}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Password will be used in email credentials</p>
+                                </div>
+
+                                {/* Error Message */}
+                                {/* Success Message */}
+                                {showCreateReviewer && (
+                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                        <p className="text-green-800 text-sm font-medium">
+                                            ✅ Reviewer created successfully! Credentials have been sent to their email.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Submit Button */}
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        type="submit"
+                                        disabled={showCreateReviewer}
+                                        className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition font-medium flex items-center justify-center gap-2"
+                                    >
+                                        <UserPlus className="w-5 h-5" />
+                                        {showCreateReviewer ? 'Creating...' : 'Create Reviewer Account'}
+                                    </button>
+                                </div>
+                            </form>
+
+                            {/* Recently Created Reviewers */}
+                            {reviewers.length > 0 && (
+                                <div className="mt-8 pt-6 border-t">
+                                    <h4 className="font-semibold text-gray-800 mb-4">📋 All Reviewers ({reviewers.length})</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                                        {reviewers.map((reviewer: any) => (
+                                            <div key={reviewer._id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                                <p className="font-medium text-gray-900">{reviewer.username}</p>
+                                                <p className="text-sm text-gray-600">{reviewer.email}</p>
+                                                <p className="text-xs text-gray-500 mt-2">
+                                                    Joined: {new Date(reviewer.createdAt).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
             {/* Paper Details Modal - Removed (now using side-by-side view instead) */}
                 </div>
             </div>
+
+            {/* Message to Reviewer Modal - REMOVED (showing inline in Reviewers tab instead) */}
         </div>
     );
 };

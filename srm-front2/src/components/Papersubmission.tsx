@@ -38,6 +38,9 @@ const PaperSubmission = () => {
   const [loading, setLoading] = useState(true);
   const [hasExistingSubmission, setHasExistingSubmission] = useState(false);
   const [existingSubmission, setExistingSubmission] = useState<Submission | null>(null);
+  const [revisionStatus, setRevisionStatus] = useState<any>(null);
+  const [hasRevision, setHasRevision] = useState(false);
+  const [showRevisionUpload, setShowRevisionUpload] = useState(false);
   const navigate = useNavigate();
   
   // Check for authentication and existing submission when component mounts
@@ -69,6 +72,18 @@ const PaperSubmission = () => {
         if (response.data.hasSubmission) {
           setHasExistingSubmission(true);
           setExistingSubmission(response.data.submission);
+        }
+
+        // Check for revision status
+        const revisionResponse = await axios.get(`${apiUrl}/revision-status`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (revisionResponse.data.hasRevision) {
+          setHasRevision(true);
+          setRevisionStatus(revisionResponse.data.revision);
         }
       } catch (error) {
         console.error("Error fetching user submission:", error);
@@ -296,8 +311,112 @@ const PaperSubmission = () => {
               </section>
             )}
 
-            {/* Paper Submission Form Section - Only show if no existing submission */}
-            {!loading && !hasExistingSubmission && !submitSuccess && (
+            {/* Revision Section - Show if paper is under revision */}
+            {!loading && hasRevision && revisionStatus && !submitSuccess && (
+              <section className="bg-white p-6 sm:p-8 md:p-10 rounded-lg shadow-lg sm:shadow-xl border-t-4 border-red-600 mb-8">
+                <div className="bg-red-50 p-4 rounded-md mb-6">
+                  <div className="flex items-center">
+                    <FaExclamationTriangle className="text-red-600 mr-3 flex-shrink-0" />
+                    <p className="text-red-700">
+                      <strong>Your paper requires revision.</strong> Please review the comments below and resubmit your revised paper before the deadline.
+                    </p>
+                  </div>
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex items-center">
+                  <FaFileAlt className="text-red-600 mr-3" />
+                  Revision Required
+                </h2>
+
+                {/* Revision Deadline */}
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md mb-6">
+                  <p className="text-yellow-800">
+                    <strong>Revision Deadline:</strong> {formatDate(revisionStatus.revisionDeadline)}
+                  </p>
+                </div>
+
+                {/* Editor's Message */}
+                <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-600 rounded-md">
+                  <h3 className="font-bold text-blue-900 mb-2">Editor's Message:</h3>
+                  <p className="text-blue-800 whitespace-pre-wrap">{revisionStatus.revisionMessage}</p>
+                </div>
+
+                {/* Reviewer Comments */}
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-gray-800 mb-4">Comments from Reviewers:</h3>
+                  <div className="space-y-4">
+                    {revisionStatus.reviewerComments && revisionStatus.reviewerComments.map((comment: any, index: number) => (
+                      <div key={index} className="p-4 bg-gray-50 border-l-4 border-orange-400 rounded-md">
+                        <h4 className="font-bold text-orange-700 mb-3">Reviewer {index + 1}</h4>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
+                          <div>
+                            <span className="font-semibold text-gray-600">Recommendation:</span>
+                            <p className="text-gray-800">{comment.recommendation || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-gray-600">Overall Rating:</span>
+                            <p className="text-gray-800">{comment.overallRating || 'N/A'} / 5</p>
+                          </div>
+                        </div>
+
+                        <div className="mb-3">
+                          <span className="font-semibold text-gray-600">Strengths:</span>
+                          <p className="text-gray-800 whitespace-pre-wrap mt-1">{comment.strengths || 'N/A'}</p>
+                        </div>
+
+                        <div className="mb-3">
+                          <span className="font-semibold text-gray-600">Weaknesses:</span>
+                          <p className="text-gray-800 whitespace-pre-wrap mt-1">{comment.weaknesses || 'N/A'}</p>
+                        </div>
+
+                        <div>
+                          <span className="font-semibold text-gray-600">Comments:</span>
+                          <p className="text-gray-800 whitespace-pre-wrap mt-1">{comment.comments || 'N/A'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Show Revision Upload Form or Button */}
+                {revisionStatus.revisionStatus === 'Pending' || revisionStatus.revisionStatus === 'Submitted' ? (
+                  <>
+                    {!showRevisionUpload ? (
+                      <button
+                        onClick={() => setShowRevisionUpload(true)}
+                        className="bg-red-600 text-white px-6 py-3 rounded-md hover:bg-red-700 transition-all duration-300 flex items-center"
+                      >
+                        <FaEdit className="mr-2" />
+                        Upload Revised Paper
+                      </button>
+                    ) : (
+                      <div className="p-6 bg-blue-50 border-2 border-blue-300 rounded-md mt-6">
+                        <h3 className="text-lg font-bold text-blue-900 mb-4">Upload Your Revised Paper</h3>
+                        <SubmitPaperForm
+                          isOpen={true}
+                          onClose={() => setShowRevisionUpload(false)}
+                          embedded={true}
+                          isRevision={true}
+                          revisionData={revisionStatus}
+                          onSubmissionSuccess={handleSubmissionSuccess}
+                        />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="p-4 bg-green-50 border-l-4 border-green-600 rounded-md">
+                    <p className="text-green-800">
+                      <strong>Revised Paper Received:</strong> Your revised paper was received on {formatDate(revisionStatus.revisedPaperSubmittedAt || new Date())}.
+                      Our editorial team will review it and provide further updates.
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Paper Submission Form Section - Only show if no existing submission and no revision */}
+            {!loading && !hasExistingSubmission && !hasRevision && !submitSuccess && (
               <>
                 {/* Important Note before Form */}
                 <div className="mb-8 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">

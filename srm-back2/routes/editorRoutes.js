@@ -19,7 +19,15 @@ import {
     sendReviewerReminder,
     sendBulkReminders,
     getAllPdfs,
-    deletePdf
+    deletePdf,
+    sendMessageToReviewer,
+    sendMessageToAuthor,
+    requestRevision,
+    acceptPaper,
+    getRevisionStatus,
+    submitRevisedPaper,
+    removeReviewerFromPaper,
+    sendReviewerInquiry
 } from '../controllers/editorController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireEditor } from '../middleware/roleCheck.js';
@@ -41,6 +49,8 @@ router.get('/papers/:paperId/reviews', getPaperReviews);
 router.post('/reviewers', createReviewer);
 router.get('/reviewers', getAllReviewers);
 router.post('/assign-reviewers', assignReviewers);
+router.post('/remove-reviewer', removeReviewerFromPaper);
+router.post('/send-reviewer-inquiry', sendReviewerInquiry);
 
 // Reviewer details and messaging
 router.get('/review/:reviewId', getReviewerDetails);
@@ -48,9 +58,13 @@ router.get('/messages', getAllMessages);
 router.get('/papers/:paperId/messages', getPaperMessages);
 router.get('/messages/:submissionId/:reviewId', getMessageThread);
 router.post('/send-message', sendMessage);
+router.post('/send-message-to-reviewer', sendMessageToReviewer);
+router.post('/send-message-to-author', sendMessageToAuthor);
 
 // Decision making
 router.post('/make-decision', makeFinalDecision);
+router.post('/request-revision', requestRevision);
+router.post('/accept-paper', acceptPaper);
 
 // Reviewer reminders
 router.get('/non-responding-reviewers', getNonRespondingReviewers);
