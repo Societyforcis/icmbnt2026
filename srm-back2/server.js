@@ -26,7 +26,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/public', express.static('public'));
 
 const corsOptions = {
-  origin: ['https://icmbnt2026-yovz.vercel.app', 'http://localhost:5173'],
+  origin: ['https://icmbnt2026-yovz.vercel.app', 'http://localhost:5173','https://icmbnt2026.societycis.org'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
