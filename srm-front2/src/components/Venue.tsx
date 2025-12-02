@@ -13,7 +13,7 @@ const Venue = () => {
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Conference Venue</h1>
             <p className="text-xl md:text-2xl opacity-90 max-w-3xl">
               International Conference on Multidisciplinary Breakthroughs and NextGen Technologies - ICMBNT 2026<br/>
-              <span className="text-lg">13-14 March 2026 | Bali, Indonesia</span>
+              <span className="text-lg">27-28 March 2026 | Bali, Indonesia</span>
             </p>
           </div>
         </div>
@@ -42,13 +42,13 @@ const Venue = () => {
               <div className="relative overflow-hidden rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 group">
                 <img 
                   src={MadrasHighCourt} 
-                  alt="Conference Dates - 13-14 March 2026" 
+                  alt="Conference Dates - 27-28 March 2026" 
                   className="w-full object-cover h-80 group-hover:scale-105 transition-transform duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent group-hover:opacity-75 transition-opacity duration-300"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white transform group-hover:-translate-y-2 transition-transform duration-300">
                   <h3 className="text-2xl font-bold mb-1">Conference Dates</h3>
-                  <p>13-14 March 2026</p>
+                  <p>27-28 March 2026</p>
                 </div>
               </div>
             </div>
@@ -68,7 +68,7 @@ const Venue = () => {
                   
                   <div className="flex items-start mb-4">
                     <Calendar className="w-5 h-5 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
-                    <p className="text-gray-700"><strong>13-14 March 2026</strong></p>
+                    <p className="text-gray-700"><strong>27-28 March 2026</strong></p>
                   </div>
                 </div>
                 
@@ -102,7 +102,7 @@ const Venue = () => {
                     <h4 className="text-lg font-semibold text-gray-800 mb-3">Event Details</h4>
                     <ul className="space-y-3 text-gray-700">
                       <li><strong>Location:</strong> Bali, Indonesia</li>
-                      <li><strong>Dates:</strong> 13-14 March 2026</li>
+                      <li><strong>Dates:</strong> 27-28 March 2026</li>
                       <li><strong>Conference Type:</strong> International Multi-disciplinary Conference</li>
                       <li><strong>Format:</strong> In-person + Virtual Hybrid</li>
                     </ul>
@@ -114,7 +114,7 @@ const Venue = () => {
                       <li><strong>Paper Submission:</strong> 15 February 2026</li>
                       <li><strong>Acceptance Notification:</strong> 28 February 2026</li>
                       <li><strong>Registration Deadline:</strong> 10 March 2026</li>
-                      <li><strong>Conference Days:</strong> 13-14 March 2026</li>
+                      <li><strong>Conference Days:</strong> 27-28 March 2026</li>
                     </ul>
                   </div>
                 </div>

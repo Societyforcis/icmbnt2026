@@ -23,7 +23,7 @@ const timelineData = [
     description: "Last date for conference registration"
   },
   {
-    date: "13-14 March 2026",
+    date: "27-28 March 2026",
     title: "Conference Dates",
     description: "Main conference days"
   }

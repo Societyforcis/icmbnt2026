@@ -92,7 +92,7 @@ const CallForPapers = () => {
             />
             <DateCard
               title="Date of Conference"
-              date="13 March 2026 & 14 March 2026"
+              date="27 March 2026 & 28 March 2026"
             />
           </div>
         </section>

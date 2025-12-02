@@ -47,9 +47,9 @@ const RegistrationCountdown = () => {
       },
       {
         name: 'Conference Dates',
-        date: new Date('2026-03-13T09:00:00'), // Updated to Mar 13
+        date: new Date('2026-03-27T09:00:00'), // Updated to Mar 27
         icon: <Calendar className="text-red-600" />,
-        description: 'ICMBNT-2026 Conference (March 13-14)',
+        description: 'ICMBNT-2026 Conference (March 27-28)',
         status: 'upcoming'
       }
     ];
