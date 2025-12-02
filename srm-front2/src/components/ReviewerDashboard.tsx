@@ -21,6 +21,8 @@ interface Paper {
 
 interface ReviewFormData {
     comments: string;
+    commentsToReviewer: string;  // Internal comments (shown only in system)
+    commentsToEditor: string;     // Comments sent to author in decision email
     strengths: string;
     weaknesses: string;
     overallRating: number;
@@ -44,6 +46,8 @@ const ReviewerDashboard = () => {
     
     const [formData, setFormData] = useState<ReviewFormData>({
         comments: '',
+        commentsToReviewer: '',
+        commentsToEditor: '',
         strengths: '',
         weaknesses: '',
         overallRating: 3,
@@ -144,6 +148,8 @@ const ReviewerDashboard = () => {
                     const draft = draftResponse.data.review;
                     setFormData({
                         comments: draft.comments || '',
+                        commentsToReviewer: draft.commentsToReviewer || '',
+                        commentsToEditor: draft.commentsToEditor || '',
                         strengths: draft.strengths || '',
                         weaknesses: draft.weaknesses || '',
                         overallRating: draft.overallRating || 3,
@@ -176,7 +182,12 @@ const ReviewerDashboard = () => {
         if (!selectedPaper) return;
 
         if (!formData.comments.trim()) {
-            alert('Please provide review comments');
+            alert('Please provide internal review comments');
+            return;
+        }
+
+        if (!formData.commentsToEditor.trim()) {
+            alert('Please provide comments for the editor/author decision');
             return;
         }
 
@@ -203,6 +214,8 @@ const ReviewerDashboard = () => {
                 // Reset form
                 setFormData({
                     comments: '',
+                    commentsToReviewer: '',
+                    commentsToEditor: '',
                     strengths: '',
                     weaknesses: '',
                     overallRating: 3,
@@ -425,16 +438,33 @@ const ReviewerDashboard = () => {
                             {/* Comments */}
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Review Comments <span className="text-red-500">*</span>
+                                    Review Comments (Internal - Not Sent to Author) <span className="text-red-500">*</span>
                                 </label>
                                 <textarea
                                     value={formData.comments}
                                     onChange={(e) => setFormData({ ...formData, comments: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    rows={4}
-                                    placeholder="Provide detailed review comments..."
+                                    rows={3}
+                                    placeholder="Internal comments for your records..."
                                     required
                                 />
+                                <p className="text-xs text-gray-500 mt-1">These comments are for system tracking only and won't be sent to the author.</p>
+                            </div>
+
+                            {/* Comments to Editor */}
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Comments for Editor / Author Decision <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={formData.commentsToEditor}
+                                    onChange={(e) => setFormData({ ...formData, commentsToEditor: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    rows={3}
+                                    placeholder="Comments to be included in the editor's decision email to the author..."
+                                    required
+                                />
+                                <p className="text-xs text-green-600 mt-1">These comments will be sent to the author in the decision email.</p>
                             </div>
 
                             {/* Strengths */}
@@ -564,7 +594,7 @@ const ReviewerDashboard = () => {
                             {/* Submit Button */}
                             <button
                                 onClick={handleSubmitReview}
-                                disabled={submitting || !formData.comments.trim()}
+                                disabled={submitting || !formData.comments.trim() || !formData.commentsToEditor.trim()}
                                 className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
                             >
                                 {submitting ? (

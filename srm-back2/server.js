@@ -8,11 +8,13 @@ import { PaperSubmission } from './models/Paper.js';
 import { Review } from './models/Review.js';
 
 
+
 import authRoutes from './routes/authRoutes.js';
 import paperRoutes from './routes/paperRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import editorRoutes from './routes/editorRoutes.js';
 import reviewerRoutes from './routes/reviewerRoutes.js';
+
 
 dotenv.config();
 
@@ -22,7 +24,7 @@ const PORT = process.env.PORT || 5000;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Serve static files from public directory
+
 app.use('/public', express.static('public'));
 
 const corsOptions = {

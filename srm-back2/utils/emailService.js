@@ -163,7 +163,94 @@ export const sendEditorAssignmentEmail = async (editorEmail, editorName, paperDa
     return transporter.sendMail(mailOptions);
 };
 
-// Send reviewer assignment notification
+// Send reviewer assignment confirmation request (Step 1 - before credentials)
+export const sendReviewerConfirmationEmail = async (reviewerEmail, reviewerName, paperData, assignmentId) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const confirmationLink = `${frontendUrl}/reviewer/confirm?assignmentId=${assignmentId}&email=${encodeURIComponent(reviewerEmail)}`;
+    
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: reviewerEmail,
+        subject: `Paper Review Invitation - ${paperData.submissionId} - ICMBNT 2026`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h2 style="margin: 0 0 10px 0; color: #1a5490; font-size: 20px;">Paper Review Invitation</h2>
+                    <p style="margin: 0; color: #666; font-size: 14px;">ICMBNT 2026 Conference</p>
+                </div>
+
+                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear <strong>${reviewerName}</strong>,
+                </p>
+
+                <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 20px;">
+                    We would like to invite you to review a manuscript submitted to ICMBNT 2026. Your expertise in this area would be valuable to our conference. Please review the paper details below and confirm whether you can review this paper.
+                </p>
+
+                <div style="background-color: #ecf0f6; border-left: 4px solid #1a5490; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #1a5490;">📄 Paper Information</p>
+                    <table style="width: 100%; font-size: 14px;">
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold; width: 120px;">Submission ID:</td>
+                            <td style="padding: 5px 0;">${paperData.submissionId}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold;">Paper Title:</td>
+                            <td style="padding: 5px 0;">${paperData.paperTitle}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold;">Category:</td>
+                            <td style="padding: 5px 0;">${paperData.category}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 15px 0; font-weight: bold; color: #856404; font-size: 15px;">⚠️ Next Step Required</p>
+                    <p style="margin: 0 0 15px 0; font-size: 14px; color: #856404; line-height: 1.6;">
+                        Please click the button below to confirm whether you can review this paper. You can either:
+                    </p>
+                    <ul style="margin: 0 0 15px 0; padding-left: 20px; font-size: 14px; color: #856404;">
+                        <li><strong>✓ Accept</strong> - Confirm that you will review this paper</li>
+                        <li><strong>✗ Reject</strong> - Decline and optionally suggest another reviewer</li>
+                    </ul>
+                </div>
+
+                <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 15px 0; font-weight: bold; color: #155724; font-size: 15px;">Confirm Your Availability</p>
+                    <p style="margin: 0 0 15px 0; text-align: center;">
+                        <a href="${confirmationLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;">Respond to Invitation</a>
+                    </p>
+                    <p style="margin: 0; font-size: 12px; color: #155724; border-top: 1px solid #c3e6cb; padding-top: 10px;">
+                        Direct link: <a href="${confirmationLink}" style="color: #28a745; word-break: break-all;">${confirmationLink}</a>
+                    </p>
+                </div>
+
+                <p style="font-size: 13px; color: #888; line-height: 1.5; margin: 20px 0;">
+                    Once you confirm your availability, you will receive login credentials and full paper details.
+                </p>
+
+                <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-top: 20px; text-align: center;">
+                    <p style="margin: 0; font-size: 12px; color: #999;">
+                        ICMBNT 2026 Editorial Team<br>
+                        This is an automated message. Please do not reply to this email.
+                    </p>
+                </div>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Reviewer confirmation email sent to ${reviewerEmail} - Message ID:`, info.messageId);
+        return info;
+    } catch (error) {
+        console.error(`❌ Error sending confirmation email to ${reviewerEmail}:`, error);
+        throw error;
+    }
+};
+
+// Send reviewer assignment notification (Step 2 - after acceptance)
 export const sendReviewerAssignmentEmail = async (reviewerEmail, reviewerName, paperData) => {
     const deadline = new Date(paperData.deadline);
     const deadlineStr = deadline.toLocaleDateString('en-US', { 
@@ -669,7 +756,7 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
                         <li style="margin: 5px 0;">Review and sign the attached Copyright Form</li>
                         <li style="margin: 5px 0;">Prepare your presentation slides for March 13-14, 2026</li>
                         <li style="margin: 5px 0;">Arrange your travel to Bali, Indonesia</li>
-                        <li style="margin: 5px 0;"><strong><a href="https://icmbnt2026-yovz.vercel.app/Registrations" style="color: #0066cc; text-decoration: none;">Click here to register for the conference</a></strong></li>
+                        <li style="margin: 5px 0;"><strong><a href="http://localhost:5173/Registrations" style="color: #0066cc; text-decoration: none;">Click here to register for the conference</a></strong></li>
                         <li style="margin: 5px 0;">Join us for this exciting hybrid conference experience!</li>
                     </ol>
                 </div>
@@ -813,6 +900,248 @@ export const sendReReviewEmail = async (reviewerEmail, reviewerName, paperData) 
         return info;
     } catch (error) {
         console.error(`❌ Error sending re-review email to ${reviewerEmail}:`, error);
+        throw error;
+    }
+};
+
+// Send reviewer assignment with acceptance/rejection links
+export const sendReviewerAssignmentWithAcceptance = async (reviewerEmail, reviewerName, paperData, acceptanceToken) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const acceptLink = `${frontendUrl}/reviewer-accept?token=${acceptanceToken}`;
+    const rejectLink = `${frontendUrl}/reviewer-reject?token=${acceptanceToken}`;
+    const deadline = new Date(paperData.deadline);
+    const deadlineStr = deadline.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric'
+    });
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: reviewerEmail,
+        subject: `[ACTION REQUIRED] Paper Review Assignment - ${paperData.submissionId}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+                    <h2 style="margin: 0 0 10px 0; color: #856404; font-size: 20px;">⚠️ ACTION REQUIRED</h2>
+                    <p style="margin: 0; color: #856404; font-size: 14px;">Please accept or decline this review assignment within 2 days</p>
+                </div>
+
+                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear <strong>${reviewerName}</strong>,
+                </p>
+
+                <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 20px;">
+                    We are pleased to invite you to review a manuscript submitted to ICMBNT 2026. Your expertise is valuable to ensure the quality of the conference.
+                </p>
+
+                <div style="background-color: #ecf0f6; border-left: 4px solid #1a5490; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #1a5490;">📄 Paper Information</p>
+                    <table style="width: 100%; font-size: 14px;">
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold; width: 120px;">Submission ID:</td>
+                            <td style="padding: 5px 0;">${paperData.submissionId}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold;">Paper Title:</td>
+                            <td style="padding: 5px 0;">${paperData.paperTitle}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold;">Category:</td>
+                            <td style="padding: 5px 0;">${paperData.category}</td>
+                        </tr>
+                        <tr style="background-color: #fff3cd;">
+                            <td style="padding: 8px; font-weight: bold; color: #856404;">Review Deadline:</td>
+                            <td style="padding: 8px; font-weight: bold; color: #856404;">${deadlineStr}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="background-color: #fff0f5; border-left: 4px solid #c41e3a; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 15px 0; font-weight: bold; color: #c41e3a; font-size: 15px;">📋 NEXT STEP: Please Accept or Decline</p>
+                    <p style="margin: 0 0 15px 0; font-size: 14px; color: #333;">
+                        Please review the paper details above and click one of the buttons below:
+                    </p>
+                    <div style="text-align: center; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 15px 0;">
+                        <a href="${acceptLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;">✓ Accept Assignment</a>
+                        <a href="${rejectLink}" style="display: inline-block; background-color: #dc3545; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;">✗ Decline Assignment</a>
+                    </div>
+                </div>
+
+                <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #155724;">✓ If You Accept:</p>
+                    <ul style="margin: 5px 0 0 0; padding-left: 20px; font-size: 14px; color: #155724;">
+                        <li>You will receive login credentials via email</li>
+                        <li>Access the review portal with your email and password</li>
+                        <li>Download and review the paper</li>
+                        <li>Submit your review before the deadline</li>
+                    </ul>
+                </div>
+
+                <div style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #721c24;">✗ If You Decline:</p>
+                    <p style="margin: 0; font-size: 14px; color: #721c24;">
+                        Click the "Decline Assignment" button above and provide a brief reason for your decision. The editor will find an alternative reviewer.
+                    </p>
+                </div>
+
+                <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0; border-radius: 4px; font-size: 13px; color: #666; line-height: 1.6;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold;">Review Guidelines:</p>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li>Evaluate the paper on originality, quality, and clarity</li>
+                        <li>Provide constructive feedback</li>
+                        <li>Rate the paper on a scale of 1-5</li>
+                        <li>Submit a recommendation (Accept / Minor Revision / Major Revision / Reject)</li>
+                    </ul>
+                </div>
+
+                <p style="font-size: 13px; color: #888; line-height: 1.5; margin: 20px 0;">
+                    If you have any questions, please contact the conference organizers. Thank you for contributing to ICMBNT 2026.
+                </p>
+
+                <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-top: 20px; text-align: center;">
+                    <p style="margin: 0; font-size: 12px; color: #999;">
+                        ICMBNT 2026 Editorial Team<br>
+                        This is an automated message. Please do not reply to this email.
+                    </p>
+                </div>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Review assignment email with acceptance link sent to ${reviewerEmail}`);
+        return info;
+    } catch (error) {
+        console.error(`❌ Error sending assignment email to ${reviewerEmail}:`, error);
+        throw error;
+    }
+};
+
+// Send confirmation that reviewer accepted
+export const sendReviewerAcceptanceEmail = async (reviewerEmail, reviewerName, paperData) => {
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: reviewerEmail,
+        subject: `✓ Assignment Accepted - ${paperData.submissionId}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #28a745;">
+                    <h2 style="margin: 0 0 10px 0; color: #155724; font-size: 20px;">✓ Assignment Accepted</h2>
+                    <p style="margin: 0; color: #155724;">Your login credentials are below. You can now access the review portal.</p>
+                </div>
+
+                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear <strong>${reviewerName}</strong>,
+                </p>
+
+                <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 20px;">
+                    Thank you for accepting the review assignment! Your credentials are ready below.
+                </p>
+
+                <div style="background-color: #cfe9f3; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 15px 0; font-weight: bold; color: #004499;">📋 Paper Details</p>
+                    <table style="width: 100%; font-size: 14px;">
+                        <tr>
+                            <td style="padding: 5px 0; font-weight: bold; width: 100px;">Submission ID:</td>
+                            <td style="padding: 5px 0;">${paperData.submissionId}</td>
+                        </tr>
+                        <tr style="background-color: #ffffff;">
+                            <td style="padding: 5px 0; font-weight: bold;">Paper Title:</td>
+                            <td style="padding: 5px 0;">${paperData.paperTitle}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="background-color: #fff9e6; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">🔐 Login Credentials</p>
+                    <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px; font-weight: bold; color: #856404; border: 1px solid #ffe0b2; background-color: #fffbf0;">Email:</td>
+                            <td style="padding: 8px; color: #333; border: 1px solid #ffe0b2; background-color: #fffbf0; font-family: 'Courier New', monospace;">${reviewerEmail}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; font-weight: bold; color: #856404; border: 1px solid #ffe0b2; background-color: #fffbf0;">Password:</td>
+                            <td style="padding: 8px; color: #333; border: 1px solid #ffe0b2; background-color: #fffbf0; font-family: 'Courier New', monospace;">${paperData.reviewerPassword}</td>
+                        </tr>
+                    </table>
+                    <p style="margin: 10px 0 0 0; font-size: 12px; color: #856404;">
+                        🔒 Keep these credentials safe. Change your password after first login.
+                    </p>
+                </div>
+
+                <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 15px 0; font-weight: bold; color: #155724;">✓ Next Steps:</p>
+                    <ol style="margin: 0; padding-left: 20px; font-size: 14px; color: #155724;">
+                        <li>Click the button below to access the review portal</li>
+                        <li>Login with the email and password provided above</li>
+                        <li>Download and review the paper</li>
+                        <li>Submit your review before the deadline</li>
+                    </ol>
+                </div>
+
+                <p style="text-align: center; margin: 20px 0;">
+                    <a href="${paperData.loginLink}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">Login to Review Portal</a>
+                </p>
+
+                <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-top: 20px; text-align: center;">
+                    <p style="margin: 0; font-size: 12px; color: #999;">
+                        ICMBNT 2026 Editorial Team<br>
+                        This is an automated message.
+                    </p>
+                </div>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Acceptance confirmation sent to ${reviewerEmail}`);
+        return info;
+    } catch (error) {
+        console.error(`❌ Error sending acceptance email:`, error);
+        throw error;
+    }
+};
+
+// Send notification that reviewer declined
+export const sendReviewerRejectionNotification = async (reviewerEmail, reviewerName, paperData, reason) => {
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: process.env.EMAIL_USER, // Send to admin
+        subject: `Reviewer Declined Assignment - ${paperData.submissionId}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #f8d7da; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc3545;">
+                    <h2 style="margin: 0 0 10px 0; color: #721c24; font-size: 20px;">✗ Reviewer Declined Assignment</h2>
+                    <p style="margin: 0; color: #721c24;">A reviewer has declined a review assignment and provided a reason.</p>
+                </div>
+
+                <p style="font-size: 14px; line-height: 1.6;">
+                    <strong>Reviewer:</strong> ${reviewerName} (${reviewerEmail})<br>
+                    <strong>Paper:</strong> ${paperData.paperTitle}<br>
+                    <strong>Submission ID:</strong> ${paperData.submissionId}
+                </p>
+
+                <div style="background-color: #ffe0e0; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #721c24;">Reason for Decline:</p>
+                    <p style="margin: 0; color: #721c24; font-style: italic; line-height: 1.6;">${reason}</p>
+                </div>
+
+                <p style="font-size: 13px; color: #666; margin-top: 20px;">
+                    Please contact the reviewer if needed or assign another reviewer to this paper.
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Rejection notification sent to admin`);
+        return info;
+    } catch (error) {
+        console.error(`❌ Error sending rejection notification:`, error);
         throw error;
     }
 };

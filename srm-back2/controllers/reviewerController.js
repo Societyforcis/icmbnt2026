@@ -1,6 +1,9 @@
 import { PaperSubmission } from '../models/Paper.js';
 import { ReviewerReview } from '../models/ReviewerReview.js';
 import { User } from '../models/User.js';
+import { ReviewerAssignment } from '../models/ReviewerAssignment.js';
+import { sendReviewerAcceptanceEmail, sendReviewerRejectionNotification, sendReviewerAssignmentEmail } from '../utils/emailService.js';
+import { generateRandomPassword } from '../utils/helpers.js';
 
 // Get reviewer's assigned papers with deadline tracking
 export const getAssignedPapers = async (req, res) => {
@@ -344,3 +347,371 @@ export const getReviewerDashboardStats = async (req, res) => {
         });
     }
 };
+
+// Accept reviewer assignment
+export const acceptReviewerAssignment = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Acceptance token is required'
+            });
+        }
+
+        // Find the assignment by token
+        const assignment = await ReviewerAssignment.findOne({
+            acceptanceToken: token,
+            acceptanceTokenExpires: { $gt: Date.now() },
+            status: 'Pending'
+        });
+
+        if (!assignment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Invalid or expired acceptance token'
+            });
+        }
+
+        // Update assignment status to Accepted
+        assignment.status = 'Accepted';
+        assignment.acceptedAt = new Date();
+        assignment.acceptanceToken = null;
+        assignment.acceptanceTokenExpires = null;
+        await assignment.save();
+
+        console.log(`✅ Reviewer ${assignment.reviewerEmail} accepted assignment for paper ${assignment.submissionId}`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Assignment accepted successfully',
+            assignment: {
+                submissionId: assignment.submissionId,
+                paperTitle: assignment.paperTitle,
+                reviewDeadline: assignment.reviewDeadline
+            }
+        });
+    } catch (error) {
+        console.error('Error accepting reviewer assignment:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error accepting assignment',
+            error: error.message
+        });
+    }
+};
+
+// Reject reviewer assignment
+export const rejectReviewerAssignment = async (req, res) => {
+    try {
+        const { token, reason } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Rejection token is required'
+            });
+        }
+
+        if (!reason || reason.trim().length < 10) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide a reason for rejection (at least 10 characters)'
+            });
+        }
+
+        // Find the assignment by token
+        const assignment = await ReviewerAssignment.findOne({
+            acceptanceToken: token,
+            acceptanceTokenExpires: { $gt: Date.now() },
+            status: 'Pending'
+        });
+
+        if (!assignment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Invalid or expired rejection token'
+            });
+        }
+
+        // Update assignment status to Rejected
+        assignment.status = 'Rejected';
+        assignment.rejectionReason = reason;
+        assignment.rejectedAt = new Date();
+        assignment.acceptanceToken = null;
+        assignment.acceptanceTokenExpires = null;
+        await assignment.save();
+
+        console.log(`❌ Reviewer ${assignment.reviewerEmail} rejected assignment for paper ${assignment.submissionId}`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Assignment rejection recorded successfully'
+        });
+    } catch (error) {
+        console.error('Error rejecting reviewer assignment:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error rejecting assignment',
+            error: error.message
+        });
+    }
+};
+
+// Get rejection form data
+export const getRejectionForm = async (req, res) => {
+    try {
+        const { token } = req.query;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token is required'
+            });
+        }
+
+        // Find the assignment by token
+        const assignment = await ReviewerAssignment.findOne({
+            acceptanceToken: token,
+            acceptanceTokenExpires: { $gt: Date.now() },
+            status: 'Pending'
+        });
+
+        if (!assignment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Invalid or expired token'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                token,
+                reviewerName: assignment.reviewerName,
+                paperTitle: assignment.paperTitle,
+                submissionId: assignment.submissionId
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching rejection form:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching form data',
+            error: error.message
+        });
+    }
+};
+
+// Get assignment details for confirmation page
+export const getAssignmentDetails = async (req, res) => {
+    try {
+        const { assignmentId } = req.params;
+        const { email } = req.query;
+
+        console.log(`Fetching assignment: ID=${assignmentId}, Email=${email}`);
+
+        if (!assignmentId || !email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Assignment ID and email are required'
+            });
+        }
+
+        // Check if assignmentId is a valid ObjectId
+        if (!assignmentId.match(/^[0-9a-fA-F]{24}$/)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid assignment ID format'
+            });
+        }
+
+        const assignment = await ReviewerAssignment.findOne({
+            _id: assignmentId,
+            reviewerEmail: email,
+            status: 'Pending'
+        }).populate('paperId', 'submissionId paperTitle category authorName deadline');
+
+        if (!assignment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Assignment not found or already responded'
+            });
+        }
+
+        const paper = assignment.paperId;
+        return res.status(200).json({
+            success: true,
+            assignment: {
+                _id: assignment._id,
+                paperId: paper._id,
+                paperTitle: paper.paperTitle,
+                submissionId: paper.submissionId,
+                category: paper.category,
+                authorName: paper.authorName,
+                reviewerEmail: assignment.reviewerEmail,
+                reviewerName: assignment.reviewerName,
+                status: assignment.status,
+                deadline: assignment.deadline || assignment.reviewDeadline || paper.deadline
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching assignment details:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching assignment details',
+            error: error.message
+        });
+    }
+};
+
+// Accept assignment
+export const acceptAssignment = async (req, res) => {
+    try {
+        const { assignmentId, reviewerEmail, paperId } = req.body;
+
+        console.log(`Accepting assignment: ID=${assignmentId}, Email=${reviewerEmail}, PaperId=${paperId}`);
+
+        if (!assignmentId || !reviewerEmail) {
+            return res.status(400).json({
+                success: false,
+                message: 'Assignment ID and reviewer email are required'
+            });
+        }
+
+        // Update assignment status to "Accepted"
+        const assignment = await ReviewerAssignment.findByIdAndUpdate(
+            assignmentId,
+            { status: 'Accepted', respondedAt: Date.now() },
+            { new: true }
+        );
+
+        if (!assignment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Assignment not found'
+            });
+        }
+
+        // Get the paper from the assignment (use paperId from body or from assignment.paperId)
+        const finalPaperId = paperId || assignment.paperId;
+        const paper = await PaperSubmission.findById(finalPaperId);
+        const reviewer = await User.findById(assignment.reviewerId);
+
+        if (paper && reviewer) {
+            // Generate temp password for reviewer if needed
+            const reviewerPassword = reviewer.tempPassword || generateRandomPassword();
+            
+            const paperData = {
+                submissionId: paper.submissionId,
+                paperTitle: paper.paperTitle,
+                category: paper.category,
+                deadline: assignment.reviewDeadline || paper.deadline,
+                reviewerPassword: reviewerPassword,
+                loginLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reviewer-dashboard`
+            };
+
+            try {
+                // Send assignment email with credentials
+                await sendReviewerAssignmentEmail(
+                    reviewerEmail,
+                    assignment.reviewerName,
+                    paperData
+                );
+                console.log(`✅ Assignment credentials email sent to ${reviewerEmail}`);
+            } catch (emailError) {
+                console.error('Error sending credentials email:', emailError);
+                // Don't fail the request, just log the error
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Assignment accepted successfully. Login credentials have been sent to your email.',
+            assignment
+        });
+    } catch (error) {
+        console.error('Error accepting assignment:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error accepting assignment',
+            error: error.message
+        });
+    }
+};
+
+// Reject assignment
+export const rejectAssignment = async (req, res) => {
+    try {
+        const { assignmentId, reviewerEmail, paperId, rejectionReason, alternativeReviewerEmail, alternativeReviewerName } = req.body;
+
+        console.log(`Rejecting assignment: ID=${assignmentId}, Email=${reviewerEmail}, Reason=${rejectionReason}`);
+
+        if (!assignmentId || !reviewerEmail || !rejectionReason) {
+            return res.status(400).json({
+                success: false,
+                message: 'Assignment ID, email, and rejection reason are required'
+            });
+        }
+
+        // Update assignment status to "Rejected"
+        const assignment = await ReviewerAssignment.findByIdAndUpdate(
+            assignmentId,
+            {
+                status: 'Rejected',
+                rejectionReason,
+                alternativeReviewerEmail: alternativeReviewerEmail || null,
+                alternativeReviewerName: alternativeReviewerName || null,
+                respondedAt: Date.now()
+            },
+            { new: true }
+        );
+
+        if (!assignment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Assignment not found'
+            });
+        }
+
+        // Send rejection notification to editor
+        const finalPaperId = paperId || assignment.paperId;
+        const paper = await PaperSubmission.findById(finalPaperId);
+        if (paper) {
+            const editor = await User.findById(paper.assignedEditor);
+            if (editor && editor.email) {
+                try {
+                    const { sendReviewerRejectionNotification } = await import('../utils/emailService.js');
+                    const rejectionData = {
+                        submissionId: paper.submissionId,
+                        paperTitle: paper.paperTitle,
+                        reviewerName: assignment.reviewerName,
+                        reviewerEmail: reviewerEmail,
+                        rejectionReason,
+                        alternativeReviewerEmail,
+                        alternativeReviewerName
+                    };
+                    await sendReviewerRejectionNotification(editor.email, rejectionData);
+                    console.log(`✅ Rejection notification sent to editor ${editor.email}`);
+                } catch (emailError) {
+                    console.error('Error sending rejection notification:', emailError);
+                }
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Rejection submitted successfully. The editor will find an alternative reviewer.',
+            assignment
+        });
+    } catch (error) {
+        console.error('Error rejecting assignment:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error rejecting assignment',
+            error: error.message
+        });
+    }
+};
+

@@ -145,6 +145,11 @@ const EditorDashboard = () => {
     const [inquiryLoading, setInquiryLoading] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
+    // All Reviewers tab states
+    const [allReviewersSearchTerm, setAllReviewersSearchTerm] = useState('');
+    const [expandedReviewerId, setExpandedReviewerId] = useState<string | null>(null);
+    const [reviewerAssignedPapers, setReviewerAssignedPapers] = useState<{ [key: string]: Paper[] }>({});
+
     // Review search state - REMOVED (Reviews tab removed)
     // const [reviewSearchTerm, setReviewSearchTerm] = useState('');
 
@@ -640,6 +645,14 @@ const EditorDashboard = () => {
                         onClick={() => setActiveTab('createReviewer')}
                         collapsed={!sidebarOpen}
                     />
+
+                    <NavItem
+                        icon={Users}
+                        label="All Reviewers"
+                        active={activeTab === 'allReviewers'}
+                        onClick={() => setActiveTab('allReviewers')}
+                        collapsed={!sidebarOpen}
+                    />
                 </nav>
 
                 {/* Logout */}
@@ -666,6 +679,7 @@ const EditorDashboard = () => {
                         {activeTab === 'papers' && 'Manage Papers'}
                         {activeTab === 'pdfs' && 'PDF Management'}
                         {activeTab === 'createReviewer' && 'Create New Reviewer'}
+                        {activeTab === 'allReviewers' && 'All Reviewers'}
                     </h2>
                 </div>
 
@@ -1053,35 +1067,64 @@ const EditorDashboard = () => {
                                         {/* Decision Buttons - Only show if paper is NOT yet decided */}
                                         {viewingPaper.status !== 'Accepted' && viewingPaper.status !== 'Rejected' && viewingPaper.status !== 'Revised Submitted' && (
                                             <>
-                                                {/* Accept Button - Only show if ≥3 reviews submitted */}
-                                                {paperReviewers.length >= 3 && paperReviewers.every((r: any) => r.review) && (
-                                                    <button
-                                                        onClick={handleAcceptPaper}
-                                                        disabled={decisionLoading}
-                                                        className="flex-1 px-3 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
-                                                    >
-                                                        {decisionLoading ? 'Processing...' : '✓ Accept'}
-                                                    </button>
+                                                {/* For "Revision Required" status - show Re-Review and Assign Reviewers buttons */}
+                                                {viewingPaper.status === 'Revision Required' ? (
+                                                    <>
+                                                        {/* Send Re-Review Emails Button */}
+                                                        <button
+                                                            onClick={() => handleSendReReviewEmails()}
+                                                            disabled={decisionLoading}
+                                                            className="flex-1 px-3 py-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                        >
+                                                            {decisionLoading ? 'Sending...' : '📧 Send Re-Review Emails'}
+                                                        </button>
+
+                                                        {/* Assign More Reviewers Button */}
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowDecisionModal('assignReviewers');
+                                                                setSelectedReviewersForAssignment([]);
+                                                            }}
+                                                            disabled={!viewingPaper}
+                                                            className="flex-1 px-3 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                        >
+                                                            👥 Assign Reviewers
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {/* Original decision buttons for initial review */}
+                                                        {/* Accept Button - Only show if ≥3 reviews submitted */}
+                                                        {paperReviewers.length >= 3 && paperReviewers.every((r: any) => r.review) && (
+                                                            <button
+                                                                onClick={handleAcceptPaper}
+                                                                disabled={decisionLoading}
+                                                                className="flex-1 px-3 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                            >
+                                                                {decisionLoading ? 'Processing...' : '✓ Accept'}
+                                                            </button>
+                                                        )}
+
+                                                        {/* Reject Button */}
+                                                        <button
+                                                            onClick={() => {
+                                                                // Handle reject decision
+                                                                alert(`Rejected: ${viewingPaper.paperTitle}`);
+                                                            }}
+                                                            className="flex-1 px-3 py-3 bg-red-600 text-white rounded hover:bg-red-700 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                        >
+                                                            ✗ Reject
+                                                        </button>
+
+                                                        {/* Revision Button */}
+                                                        <button
+                                                            onClick={() => setShowDecisionModal('revision')}
+                                                            className="flex-1 px-3 py-3 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                        >
+                                                            ↻ Revision
+                                                        </button>
+                                                    </>
                                                 )}
-
-                                                {/* Reject Button */}
-                                                <button
-                                                    onClick={() => {
-                                                        // Handle reject decision
-                                                        alert(`Rejected: ${viewingPaper.paperTitle}`);
-                                                    }}
-                                                    className="flex-1 px-3 py-3 bg-red-600 text-white rounded hover:bg-red-700 text-sm flex items-center justify-center gap-2 font-medium transition"
-                                                >
-                                                    ✗ Reject
-                                                </button>
-
-                                                {/* Revision Button */}
-                                                <button
-                                                    onClick={() => setShowDecisionModal('revision')}
-                                                    className="flex-1 px-3 py-3 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm flex items-center justify-center gap-2 font-medium transition"
-                                                >
-                                                    ↻ Revision
-                                                </button>
                                             </>
                                         )}
 
@@ -1627,7 +1670,7 @@ const EditorDashboard = () => {
                                 </button>
                             </div>
                             
-                            {paperReviewers.length >= 3 ? (
+                            {paperReviewers.length >= 3 && paperReviewers.every((r: any) => r.review) ? (
                                 <>
                                     <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
                                         <p className="text-blue-800 text-sm">
@@ -1690,10 +1733,13 @@ const EditorDashboard = () => {
                                         <div>
                                             <h4 className="text-lg font-semibold text-red-800 mb-2">Cannot Request Revision</h4>
                                             <p className="text-gray-700 mb-4">
-                                                This paper needs at least <strong>3 reviewer responses</strong> before you can request revision.
+                                                This paper needs at least <strong>3 reviewers with submitted reviews</strong> before you can request revision.
+                                            </p>
+                                            <p className="text-gray-600 mb-2">
+                                                Currently has <strong className="text-orange-600">{paperReviewers.length}</strong> reviewer(s) assigned.
                                             </p>
                                             <p className="text-gray-600 mb-4">
-                                                Currently has <strong className="text-orange-600">{paperReviewers.length}</strong> reviewer(s) assigned.
+                                                Reviews submitted: <strong className="text-orange-600">{paperReviewers.filter((r: any) => r.review).length}</strong> / {paperReviewers.length}
                                             </p>
                                             <button
                                                 onClick={() => {
@@ -1729,169 +1775,172 @@ const EditorDashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Create Reviewer Form - Inline */}
-                            {showCreateReviewer && (
-                                <div className="border-b border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-6 flex-shrink-0">
-                                    <div className="max-w-2xl">
-                                        <div className="flex justify-between items-center mb-6">
-                                            <h4 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                                                <UserPlus className="w-5 h-5 text-green-600" />
-                                                Create New Reviewer
-                                            </h4>
-                                            <button
-                                                onClick={() => {
-                                                    setShowCreateReviewer(false);
-                                                    setNewReviewer({ email: '', username: '', password: '' });
-                                                }}
-                                                className="text-gray-500 hover:text-gray-700"
-                                            >
-                                                <X className="w-5 h-5" />
-                                            </button>
-                                        </div>
-
-                                        <div className="grid grid-cols-3 gap-4 mb-6">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                                <input
-                                                    type="email"
-                                                    value={newReviewer.email}
-                                                    onChange={(e) => setNewReviewer({ ...newReviewer, email: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
-                                                    placeholder="reviewer@example.com"
-                                                    required
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Username (Optional)</label>
-                                                <input
-                                                    type="text"
-                                                    value={newReviewer.username}
-                                                    onChange={(e) => setNewReviewer({ ...newReviewer, username: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
-                                                    placeholder="Auto-generated from email"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
-                                                <input
-                                                    type="password"
-                                                    value={newReviewer.password}
-                                                    onChange={(e) => setNewReviewer({ ...newReviewer, password: e.target.value })}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
-                                                    placeholder="Strong password"
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <p className="text-xs text-gray-600 mb-4 bg-white p-3 rounded border-l-4 border-blue-400">
-                                            💡 The email address and password will be sent to the reviewer's email for login.
-                                        </p>
-
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={handleCreateReviewer}
-                                                disabled={!newReviewer.email || !newReviewer.password}
-                                                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2 font-medium shadow-md"
-                                            >
-                                                <Check className="w-4 h-4" />
-                                                Create & Send Credentials
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setShowCreateReviewer(false);
-                                                    setNewReviewer({ email: '', username: '', password: '' });
-                                                }}
-                                                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition flex items-center gap-2 font-medium"
-                                            >
-                                                <X className="w-4 h-4" />
-                                                Cancel
-                                            </button>
+                            {/* Main Layout - List on Left, Form on Right */}
+                            <div className="flex flex-1 overflow-hidden gap-4 p-6">
+                                {/* Left Side - Reviewers List */}
+                                <div className={`${showCreateReviewer ? 'flex-1' : 'flex-1'} overflow-hidden`}>
+                                    <div className="border border-gray-200 rounded-lg overflow-hidden h-full flex flex-col">
+                                        {/* Reviewers Filter Sidebar */}
+                                        <div className="flex-1 overflow-hidden">
+                                            <ReviewerFilterPanel
+                                                reviewers={reviewers}
+                                                selectedReviewer={selectedReviewerFilter}
+                                                onFilterChange={setFilteredReviewers}
+                                                onSelectReviewer={setSelectedReviewerFilter}
+                                                onClearSearch={() => setFilteredReviewers(reviewers)}
+                                            />
                                         </div>
                                     </div>
                                 </div>
-                            )}
 
-                            {/* Main Content */}
-                            <div className="flex flex-1 overflow-hidden">
-                                {/* Reviewers Filter Sidebar */}
-                                <div className="w-1/3 border-r border-gray-200 overflow-hidden">
-                                    <ReviewerFilterPanel
-                                        reviewers={reviewers}
-                                        selectedReviewer={selectedReviewerFilter}
-                                        onFilterChange={setFilteredReviewers}
-                                        onSelectReviewer={setSelectedReviewerFilter}
-                                        onClearSearch={() => setFilteredReviewers(reviewers)}
-                                    />
-                                </div>
+                                {/* Right Side - Reviewer Details or Create Form */}
+                                {showCreateReviewer ? (
+                                    <div className="w-96 flex-shrink-0">
+                                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 h-full overflow-y-auto shadow-lg">
+                                            <div className="flex justify-between items-center mb-6">
+                                                <h4 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                                    <UserPlus className="w-5 h-5 text-green-600" />
+                                                    Create Reviewer
+                                                </h4>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowCreateReviewer(false);
+                                                        setNewReviewer({ email: '', username: '', password: '' });
+                                                    }}
+                                                    className="text-gray-500 hover:text-gray-700 transition"
+                                                >
+                                                    <X className="w-5 h-5" />
+                                                </button>
+                                            </div>
 
-                            {/* Reviewers Content */}
-                            <div className="w-2/3 p-6 overflow-y-auto space-y-6">
-                                {selectedReviewerFilter ? (
-                                    <div>
-                                        <div className="mb-6">
-                                            <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                                                {selectedReviewerFilter.name}
-                                            </h3>
-                                            <p className="text-gray-600">{selectedReviewerFilter.email}</p>
-                                        </div>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                                                    <input
+                                                        type="email"
+                                                        value={newReviewer.email}
+                                                        onChange={(e) => setNewReviewer({ ...newReviewer, email: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
+                                                        placeholder="reviewer@example.com"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Username (Optional)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={newReviewer.username}
+                                                        onChange={(e) => setNewReviewer({ ...newReviewer, username: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
+                                                        placeholder="Auto-generated from email"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
+                                                    <input
+                                                        type="password"
+                                                        value={newReviewer.password}
+                                                        onChange={(e) => setNewReviewer({ ...newReviewer, password: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
+                                                        placeholder="Min 6 characters"
+                                                        required
+                                                    />
+                                                </div>
 
-                                        {/* Reviewer Stats */}
-                                        <div className="grid grid-cols-2 gap-4 mb-6">
-                                            <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400 shadow-sm">
-                                                <p className="text-sm text-gray-600 font-medium">Assigned Papers</p>
-                                                <p className="text-3xl font-bold text-blue-600 mt-1">{selectedReviewerFilter.assignedPapers || 0}</p>
-                                            </div>
-                                            <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-400 shadow-sm">
-                                                <p className="text-sm text-gray-600 font-medium">Completed</p>
-                                                <p className="text-3xl font-bold text-green-600 mt-1">{selectedReviewerFilter.completedReviews || 0}</p>
-                                            </div>
-                                            <div className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-400 shadow-sm">
-                                                <p className="text-sm text-gray-600 font-medium">Pending</p>
-                                                <p className="text-3xl font-bold text-orange-600 mt-1">{selectedReviewerFilter.pendingReviews || 0}</p>
-                                            </div>
-                                            <div className="bg-red-50 p-4 rounded-lg border-l-4 border-red-400 shadow-sm">
-                                                <p className="text-sm text-gray-600 font-medium">Overdue</p>
-                                                <p className="text-3xl font-bold text-red-600 mt-1">{selectedReviewerFilter.overdueReviews || 0}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Rating */}
-                                        {selectedReviewerFilter.averageRating && (
-                                            <div className="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400 shadow-sm">
-                                                <p className="text-sm text-gray-600 font-medium">Average Rating</p>
-                                                <p className="text-2xl font-bold text-yellow-600 mt-1">
-                                                    {selectedReviewerFilter.averageRating.toFixed(1)} ⭐
+                                                <p className="text-xs text-gray-600 bg-white p-3 rounded border-l-4 border-blue-400">
+                                                    💡 Credentials will be sent to reviewer's email
                                                 </p>
-                                            </div>
-                                        )}
 
-                                        {/* Expertise */}
-                                        {selectedReviewerFilter.expertise && selectedReviewerFilter.expertise.length > 0 && (
-                                            <div>
-                                                <h4 className="font-semibold text-gray-800 mb-3">Areas of Expertise</h4>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {selectedReviewerFilter.expertise.map((exp: string, idx: number) => (
-                                                        <span
-                                                            key={idx}
-                                                            className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium"
-                                                        >
-                                                            {exp}
-                                                        </span>
-                                                    ))}
+                                                <div className="flex flex-col gap-2 pt-4">
+                                                    <button
+                                                        onClick={handleCreateReviewer}
+                                                        disabled={!newReviewer.email || !newReviewer.password}
+                                                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 font-medium"
+                                                    >
+                                                        <Check className="w-4 h-4" />
+                                                        Create Account
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowCreateReviewer(false);
+                                                            setNewReviewer({ email: '', username: '', password: '' });
+                                                        }}
+                                                        className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                                                    >
+                                                        Cancel
+                                                    </button>
                                                 </div>
                                             </div>
-                                        )}
+                                        </div>
+                                    </div>
+                                ) : selectedReviewerFilter ? (
+                                    <div className="w-96 flex-shrink-0">
+                                        <div className="bg-white border border-gray-300 rounded-lg p-6 h-full overflow-y-auto shadow-lg space-y-6">
+                                            <div>
+                                                <h3 className="text-xl font-bold text-gray-800 mb-1">
+                                                    {selectedReviewerFilter.name}
+                                                </h3>
+                                                <p className="text-sm text-gray-600">{selectedReviewerFilter.email}</p>
+                                            </div>
+
+                                            {/* Reviewer Stats */}
+                                            <div className="space-y-3">
+                                                <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-400">
+                                                    <p className="text-xs text-gray-600 font-medium">Assigned Papers</p>
+                                                    <p className="text-2xl font-bold text-blue-600 mt-1">{selectedReviewerFilter.assignedPapers || 0}</p>
+                                                </div>
+                                                <div className="bg-green-50 p-3 rounded-lg border-l-4 border-green-400">
+                                                    <p className="text-xs text-gray-600 font-medium">Completed</p>
+                                                    <p className="text-2xl font-bold text-green-600 mt-1">{selectedReviewerFilter.completedReviews || 0}</p>
+                                                </div>
+                                                <div className="bg-orange-50 p-3 rounded-lg border-l-4 border-orange-400">
+                                                    <p className="text-xs text-gray-600 font-medium">Pending</p>
+                                                    <p className="text-2xl font-bold text-orange-600 mt-1">{selectedReviewerFilter.pendingReviews || 0}</p>
+                                                </div>
+                                                <div className="bg-red-50 p-3 rounded-lg border-l-4 border-red-400">
+                                                    <p className="text-xs text-gray-600 font-medium">Overdue</p>
+                                                    <p className="text-2xl font-bold text-red-600 mt-1">{selectedReviewerFilter.overdueReviews || 0}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Rating */}
+                                            {selectedReviewerFilter.averageRating && (
+                                                <div className="bg-yellow-50 p-3 rounded-lg border-l-4 border-yellow-400">
+                                                    <p className="text-xs text-gray-600 font-medium">Average Rating</p>
+                                                    <p className="text-2xl font-bold text-yellow-600 mt-1">
+                                                        {selectedReviewerFilter.averageRating.toFixed(1)} ⭐
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Expertise */}
+                                            {selectedReviewerFilter.expertise && selectedReviewerFilter.expertise.length > 0 && (
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800 text-sm mb-2">Areas of Expertise</h4>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {selectedReviewerFilter.expertise.map((exp: string, idx: number) => (
+                                                            <span
+                                                                key={idx}
+                                                                className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium"
+                                                            >
+                                                                {exp}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center h-full">
-                                        <div className="text-center text-gray-500">
-                                            <Users className="w-16 h-16 mx-auto mb-3 opacity-50" />
-                                            <p>Select a reviewer to view details</p>
+                                    <div className="w-96 flex-shrink-0">
+                                        <div className="bg-gray-50 border border-gray-300 rounded-lg p-6 h-full flex items-center justify-center">
+                                            <div className="text-center text-gray-500">
+                                                <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                <p className="text-sm">Select a reviewer</p>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
-                            </div>
                             </div>
                         </div>
                     )}
@@ -2000,6 +2049,121 @@ const EditorDashboard = () => {
                                             </div>
                                         ))}
                                     </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* All Reviewers Tab */}
+                    {activeTab === 'allReviewers' && (
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                            <div className="mb-6">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search by email or name..."
+                                        value={allReviewersSearchTerm}
+                                        onChange={(e) => setAllReviewersSearchTerm(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {reviewers.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <Users className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                                    <p>No reviewers created yet</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {reviewers.filter(r => 
+                                        !allReviewersSearchTerm || 
+                                        r.email.toLowerCase().includes(allReviewersSearchTerm.toLowerCase()) ||
+                                        (r.username && r.username.toLowerCase().includes(allReviewersSearchTerm.toLowerCase()))
+                                    ).map((reviewer: any) => {
+                                        const assignedPapersList = papers.filter(p => 
+                                            p.assignedReviewers && 
+                                            p.assignedReviewers.some(ar => ar._id === reviewer._id || ar === reviewer._id)
+                                        );
+                                        
+                                        return (
+                                            <div key={reviewer._id} className="border border-gray-200 rounded-lg">
+                                                {/* Reviewer Header */}
+                                                <button
+                                                    onClick={() => setExpandedReviewerId(
+                                                        expandedReviewerId === reviewer._id ? null : reviewer._id
+                                                    )}
+                                                    className="w-full px-6 py-4 flex items-center justify-between hover:bg-blue-50 transition"
+                                                >
+                                                    <div className="flex items-center gap-4 flex-1 text-left">
+                                                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                                            <Users className="w-6 h-6 text-blue-600" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <p className="font-semibold text-gray-900">{reviewer.username}</p>
+                                                            <p className="text-sm text-gray-600">{reviewer.email}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                                                                {assignedPapersList.length} paper{assignedPapersList.length !== 1 ? 's' : ''}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="ml-2">
+                                                        {expandedReviewerId === reviewer._id ? (
+                                                            <X className="w-5 h-5 text-gray-400" />
+                                                        ) : (
+                                                            <FileText className="w-5 h-5 text-gray-400" />
+                                                        )}
+                                                    </div>
+                                                </button>
+
+                                                {/* Assigned Papers Dropdown */}
+                                                {expandedReviewerId === reviewer._id && (
+                                                    <div className="border-t border-gray-200 bg-gray-50 p-6">
+                                                        {assignedPapersList.length === 0 ? (
+                                                            <p className="text-gray-500 text-center py-4">No papers assigned to this reviewer</p>
+                                                        ) : (
+                                                            <div className="space-y-3">
+                                                                <h4 className="font-semibold text-gray-900 mb-4">
+                                                                    Assigned Papers ({assignedPapersList.length})
+                                                                </h4>
+                                                                {assignedPapersList.map((paper) => (
+                                                                    <div 
+                                                                        key={paper._id}
+                                                                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                                                                        onClick={() => {
+                                                                            setViewingPaper(paper);
+                                                                            setActiveTab('papers');
+                                                                        }}
+                                                                    >
+                                                                        <div className="flex items-start justify-between gap-4">
+                                                                            <div className="flex-1">
+                                                                                <p className="font-semibold text-gray-900 line-clamp-2">
+                                                                                    {paper.paperTitle}
+                                                                                </p>
+                                                                                <p className="text-sm text-gray-600 mt-1">
+                                                                                    <strong>ID:</strong> {paper.submissionId}
+                                                                                </p>
+                                                                                <p className="text-sm text-gray-600">
+                                                                                    <strong>Author:</strong> {paper.authorName}
+                                                                                </p>
+                                                                                <p className="text-sm text-gray-600">
+                                                                                    <strong>Category:</strong> {paper.category}
+                                                                                </p>
+                                                                            </div>
+                                                                            <StatusBadge status={paper.status} />
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

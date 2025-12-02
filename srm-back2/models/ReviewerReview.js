@@ -16,6 +16,14 @@ const reviewSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  commentsToReviewer: {
+    type: String,
+    default: ''  // Internal comments not sent to author
+  },
+  commentsToEditor: {
+    type: String,
+    default: ''  // Comments sent to author in decision email
+  },
   strengths: String,
   weaknesses: String,
   

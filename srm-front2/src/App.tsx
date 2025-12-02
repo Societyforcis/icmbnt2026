@@ -22,6 +22,7 @@ import Venue from './components/Venue';
 import KeynoteSpeakers from './components/KeynoteSpeakers';
 import SpeakerProfile from './components/SpeakerProfile';
 import AdminPanel from './components/AdminPanel';
+import ReviewerConfirmation from './components/ReviewerConfirmation';
 // import SubmitPaperForm from "./components/SubmitPaperForm";
 // The App component should contain BrowserRouter
 const App = () => {
@@ -103,6 +104,9 @@ const AppRoutes = () => {
         <Route path="/signin" element={<Signin />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify" element={<VerifyEmail />} />
+        
+        {/* Reviewer Confirmation - Accept/Reject assignment */}
+        <Route path="/reviewer/confirm" element={<ReviewerConfirmation />} />
         
         <Route path="/commitee" element={
           <RouteWithLoading element={<Commitee />} />

@@ -4,14 +4,30 @@ import {
     getPaperForReview,
     submitReview,
     getReviewDraft,
-    getReviewerDashboardStats
+    getReviewerDashboardStats,
+    acceptReviewerAssignment,
+    rejectReviewerAssignment,
+    getRejectionForm,
+    getAssignmentDetails,
+    acceptAssignment,
+    rejectAssignment
 } from '../controllers/reviewerController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireReviewer } from '../middleware/roleCheck.js';
 
 const router = express.Router();
 
-// All reviewer routes require authentication and reviewer role
+// Public routes (no authentication required for confirmation page)
+router.get('/assignment/:assignmentId', getAssignmentDetails); // Get assignment details for confirmation page
+router.post('/accept-assignment', acceptAssignment); // Accept assignment via confirmation page (no auth)
+router.post('/reject-assignment', rejectAssignment); // Reject assignment via confirmation page (no auth)
+
+// Legacy token-based acceptance/rejection (for backward compatibility)
+router.post('/accept-with-token', acceptReviewerAssignment);
+router.post('/reject-with-token', rejectReviewerAssignment);
+router.get('/rejection-form', getRejectionForm);
+
+// All reviewer routes below require authentication and reviewer role
 router.use(verifyJWT, requireReviewer);
 
 // Paper review

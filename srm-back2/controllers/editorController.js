@@ -4,8 +4,9 @@ import { PaperSubmission } from '../models/Paper.js';
 import { ReviewerReview } from '../models/ReviewerReview.js';
 import { ReviewerMessage } from '../models/ReviewerMessage.js';
 import { Revision } from '../models/Revision.js';
+import { ReviewerAssignment } from '../models/ReviewerAssignment.js';
 import { generateRandomPassword } from '../utils/helpers.js';
-import { sendReviewerAssignmentEmail, sendDecisionEmail, sendReviewerCredentialsEmail, sendReviewerReminderEmail, sendAcceptanceEmail, sendReReviewEmail } from '../utils/emailService.js';
+import { sendReviewerConfirmationEmail, sendReviewerAssignmentEmail, sendDecisionEmail, sendReviewerCredentialsEmail, sendReviewerReminderEmail, sendAcceptanceEmail, sendReReviewEmail } from '../utils/emailService.js';
 import { listPdfsFromCloudinary, deletePdfFromCloudinary } from '../config/cloudinary-pdf.js';
 
 // Verify editor access - check if user is an editor
@@ -320,30 +321,43 @@ export const assignReviewers = async (req, res) => {
             { new: true }
         );
 
-        // Send emails to reviewers AFTER successful database update
-        const emailPromises = reviewers.map(reviewer => {
-            const loginLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?email=${encodeURIComponent(reviewer.email)}`;
+        // Create separate ReviewerAssignment documents for confirmation workflow
+        const assignmentDocs = await Promise.all(
+            reviewers.map(reviewer => {
+                const assignment = new ReviewerAssignment({
+                    paperId: paperId,
+                    submissionId: paper.submissionId,
+                    reviewerId: reviewer._id,
+                    reviewerEmail: reviewer.email,
+                    reviewerName: reviewer.username,
+                    paperTitle: paper.paperTitle,
+                    status: 'Pending',
+                    reviewDeadline: deadline
+                });
+                return assignment.save();
+            })
+        );
 
-            return sendReviewerAssignmentEmail(
-                reviewer.email,
-                reviewer.username,
+        // Send emails to reviewers AFTER successful database update
+        const emailPromises = assignmentDocs.map(assignment => {
+            const reviewer = reviewers.find(r => r._id.toString() === assignment.reviewerId.toString());
+            return sendReviewerConfirmationEmail(
+                assignment.reviewerEmail,
+                assignment.reviewerName,
                 {
                     submissionId: paper.submissionId,
                     paperTitle: paper.paperTitle,
                     category: paper.category,
-                    deadline,
-                    deadlineDays: Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24)), // Calculate days from deadline
-                    loginLink,
-                    reviewerName: reviewer.username,
-                    reviewerPassword: reviewer.tempPassword || 'Password will be sent separately'
-                }
+                    deadline: assignment.reviewDeadline
+                },
+                assignment._id.toString()  // Pass the ReviewerAssignment _id
             );
         });
 
         // Send emails (don't wait for them to complete the request)
         Promise.all(emailPromises)
-            .then(() => console.log('Confirmation emails sent successfully'))
-            .catch(emailError => console.error("Error sending reviewer assignment emails:", emailError));
+            .then(() => console.log('Reviewer confirmation emails sent successfully'))
+            .catch(emailError => console.error("Error sending reviewer confirmation emails:", emailError));
 
         return res.status(200).json({
             success: true,

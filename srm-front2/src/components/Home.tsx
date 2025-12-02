@@ -35,13 +35,13 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Left Logo - ISIUS */}
-          <div className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-20">
+          {/* Left Logo - ISIUS - Hidden on mobile and tablet, visible only on desktop */}
+          <div className="hidden lg:absolute lg:left-4 lg:top-1/2 lg:-translate-y-1/2 lg:z-20">
             <div className="flex flex-col items-center ml-[-60px]">
               <img
                 src={isius}
                 alt="ICSCS Logo"
-                className="h-28 md:h-32 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
+                className="h-28 lg:h-32 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
                 loading="lazy"
                 decoding="async"
               />
@@ -50,13 +50,13 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Right Logo - Society */}
-          <div className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20">
+          {/* Right Logo - Society - Hidden on mobile and tablet, visible only on desktop */}
+          <div className="hidden lg:absolute lg:right-4 lg:top-1/2 lg:-translate-y-1/2 lg:z-20">
             <div className="flex flex-col items-center">
               <img
                 src={society}
                 alt="Society CIS Logo"
-                className="h-40 md:h-48 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
+                className="h-40 lg:h-48 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
                 loading="lazy"
                 decoding="async"
               />
