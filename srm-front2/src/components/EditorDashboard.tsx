@@ -103,6 +103,7 @@ const EditorDashboard = () => {
     // Paper details view state (instead of modal)
     const [viewingPaper, setViewingPaper] = useState<Paper | null>(null);
     const [paperReviewers, setPaperReviewers] = useState<any[]>([]);
+    const [paperReReviews, setPaperReReviews] = useState<any[]>([]); // Re-reviews (Round 2)
     const [reviewerListLoading, setReviewerListLoading] = useState(false);
     const [paperDetailsTab, setPaperDetailsTab] = useState<'details' | 'reviewers'>('details');
 
@@ -309,6 +310,19 @@ const EditorDashboard = () => {
                 { headers }
             );
             
+            // Fetch re-reviews (Round 2) for this paper if status is "Revision Required"
+            let reReviewsData: any[] = [];
+            try {
+                const reReviewsRes = await axios.get(
+                    `${API_URL}/api/editor/papers/${paperId}/re-reviews`,
+                    { headers }
+                );
+                reReviewsData = reReviewsRes.data.reReviews || [];
+            } catch (reReviewError) {
+                console.log('No re-reviews found yet:', reReviewError);
+            }
+            setPaperReReviews(reReviewsData);
+            
             // Fetch reviewers and their assignments for this paper
             const paper = papers.find(p => p._id === paperId);
             if (paper?.assignedReviewers) {
@@ -316,10 +330,15 @@ const EditorDashboard = () => {
                     const review = (reviewsRes.data.reviews || []).find(
                         (r: any) => r.reviewer?._id === reviewer._id || r.reviewer === reviewer._id
                     );
+                    // Check if reviewer has submitted re-review
+                    const reReview = reReviewsData.find(
+                        (rr: any) => rr.reviewerId === reviewer._id || rr.reviewerId?._id === reviewer._id
+                    );
                     return {
                         ...reviewer,
                         reviewStatus: review ? 'Submitted' : 'Pending',
-                        review: review || null
+                        review: review || null,
+                        reReview: reReview || null
                     };
                 });
                 setPaperReviewers(reviewersWithStatus);
@@ -327,6 +346,7 @@ const EditorDashboard = () => {
         } catch (error: any) {
             console.error('Error fetching paper reviews and reviewers:', error);
             setPaperReviewers([]);
+            setPaperReReviews([]);
         } finally {
             setReviewerListLoading(false);
         }
@@ -1065,7 +1085,7 @@ const EditorDashboard = () => {
                                         )}
 
                                         {/* Decision Buttons - Only show if paper is NOT yet decided */}
-                                        {viewingPaper.status !== 'Accepted' && viewingPaper.status !== 'Rejected' && viewingPaper.status !== 'Revised Submitted' && (
+                                        {viewingPaper.status !== 'Accepted' && viewingPaper.status !== 'Rejected' && (
                                             <>
                                                 {/* For "Revision Required" status - show Re-Review and Assign Reviewers buttons */}
                                                 {viewingPaper.status === 'Revision Required' ? (
@@ -1093,36 +1113,64 @@ const EditorDashboard = () => {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        {/* Original decision buttons for initial review */}
-                                                        {/* Accept Button - Only show if ≥3 reviews submitted */}
-                                                        {paperReviewers.length >= 3 && paperReviewers.every((r: any) => r.review) && (
-                                                            <button
-                                                                onClick={handleAcceptPaper}
-                                                                disabled={decisionLoading}
-                                                                className="flex-1 px-3 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
-                                                            >
-                                                                {decisionLoading ? 'Processing...' : '✓ Accept'}
-                                                            </button>
-                                                        )}
+                                                        {/* Decision buttons for initial review and revised submission */}
+                                                        {/* Check if all reviewers have submitted reviews (for initial review) OR paper is "Revised Submitted" (has revised PDF and re-reviews) */}
+                                                        {(() => {
+                                                            const isRevisedSubmitted = viewingPaper.status === 'Revised Submitted';
+                                                            const allReviewsSubmitted = paperReviewers.length >= 3 && paperReviewers.every((r: any) => r.review);
+                                                            const acceptButtonMessage = !allReviewsSubmitted && !isRevisedSubmitted
+                                                                ? `${paperReviewers.filter((r: any) => r.review).length}/3 reviews submitted`
+                                                                : isRevisedSubmitted 
+                                                                ? 'Accept revised version'
+                                                                : 'All reviews received';
+                                                            
+                                                            return (
+                                                                <>
+                                                                    {/* Accept Button - Show if ≥3 reviews submitted OR paper is "Revised Submitted" */}
+                                                                    <div className="relative group">
+                                                                        <button
+                                                                            onClick={handleAcceptPaper}
+                                                                            disabled={(!allReviewsSubmitted && !isRevisedSubmitted) || decisionLoading}
+                                                                            className="flex-1 px-3 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                                        >
+                                                                            {decisionLoading ? 'Processing...' : '✓ Accept'}
+                                                                        </button>
+                                                                        {!allReviewsSubmitted && !isRevisedSubmitted && (
+                                                                            <div className="invisible group-hover:visible absolute z-10 bg-gray-800 text-white text-xs rounded py-2 px-3 bottom-full mb-2 whitespace-nowrap">
+                                                                                {acceptButtonMessage}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
 
-                                                        {/* Reject Button */}
-                                                        <button
-                                                            onClick={() => {
-                                                                // Handle reject decision
-                                                                alert(`Rejected: ${viewingPaper.paperTitle}`);
-                                                            }}
-                                                            className="flex-1 px-3 py-3 bg-red-600 text-white rounded hover:bg-red-700 text-sm flex items-center justify-center gap-2 font-medium transition"
-                                                        >
-                                                            ✗ Reject
-                                                        </button>
+                                                                    {/* Reject Button */}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            // Handle reject decision
+                                                                            alert(`Rejected: ${viewingPaper.paperTitle}`);
+                                                                        }}
+                                                                        className="flex-1 px-3 py-3 bg-red-600 text-white rounded hover:bg-red-700 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                                    >
+                                                                        ✗ Reject
+                                                                    </button>
 
-                                                        {/* Revision Button */}
-                                                        <button
-                                                            onClick={() => setShowDecisionModal('revision')}
-                                                            className="flex-1 px-3 py-3 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm flex items-center justify-center gap-2 font-medium transition"
-                                                        >
-                                                            ↻ Revision
-                                                        </button>
+                                                                    {/* Revision Button */}
+                                                                    <button
+                                                                        onClick={() => setShowDecisionModal('revision')}
+                                                                        className="flex-1 px-3 py-3 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                                    >
+                                                                        ↻ Revision
+                                                                    </button>
+
+                                                                    {/* Status Indicator */}
+                                                                    {!allReviewsSubmitted && (
+                                                                        <div className="col-span-3 flex items-center justify-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-xs font-medium">
+                                                                            <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                                                                            Waiting for reviews: {paperReviewers.filter((r: any) => r.review).length}/{paperReviewers.length}
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
                                                     </>
                                                 )}
                                             </>
@@ -1278,32 +1326,76 @@ const EditorDashboard = () => {
 
                                                             {/* Review Details or Awaiting Message */}
                                                             {reviewer.review ? (
-                                                                <div className="flex-1 bg-white rounded border-l-4 border-green-500 p-3 space-y-2 mb-3">
-                                                                    <div>
-                                                                        <label className="text-xs font-semibold text-gray-700">Recommendation</label>
-                                                                        <p className={`font-bold text-sm mt-0.5 ${
-                                                                            reviewer.review.recommendation === 'Accept' ? 'text-green-600' :
-                                                                            reviewer.review.recommendation === 'Reject' ? 'text-red-600' : 'text-yellow-600'
-                                                                        }`}>
-                                                                            {reviewer.review.recommendation || 'N/A'}
-                                                                        </p>
+                                                                <div className="flex-1 space-y-3 mb-3">
+                                                                    {/* Initial Review (Round 1) */}
+                                                                    <div className="bg-white rounded border-l-4 border-green-500 p-3 space-y-2">
+                                                                        {/* Review Round Indicator */}
+                                                                        <div className="mb-2 pb-2 border-b">
+                                                                            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">
+                                                                                Review 1 (Initial)
+                                                                            </span>
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-xs font-semibold text-gray-700">Recommendation</label>
+                                                                            <p className={`font-bold text-sm mt-0.5 ${
+                                                                                reviewer.review.recommendation === 'Accept' ? 'text-green-600' :
+                                                                                reviewer.review.recommendation === 'Reject' ? 'text-red-600' : 'text-yellow-600'
+                                                                            }`}>
+                                                                                {reviewer.review.recommendation || 'N/A'}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-xs font-semibold text-gray-700">Overall Rating</label>
+                                                                            <p className="font-bold text-sm text-blue-600 mt-0.5">
+                                                                                {reviewer.review.ratings?.overall || reviewer.review.overallRating || 'N/A'}
+                                                                                {reviewer.review.overallRating && !reviewer.review.ratings?.overall ? '/5' : ''}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-xs font-semibold text-gray-700">Comments</label>
+                                                                            <p className="text-xs text-gray-600 mt-0.5 bg-gray-50 p-2 rounded max-h-12 overflow-y-auto line-clamp-2">
+                                                                                {reviewer.review.commentsToEditor || reviewer.review.comments || 'No comments'}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-500 pt-1">
+                                                                            {new Date(reviewer.review.submittedAt).toLocaleDateString()}
+                                                                        </div>
                                                                     </div>
-                                                                    <div>
-                                                                        <label className="text-xs font-semibold text-gray-700">Overall Rating</label>
-                                                                        <p className="font-bold text-sm text-blue-600 mt-0.5">
-                                                                            {reviewer.review.ratings?.overall || reviewer.review.overallRating || 'N/A'}
-                                                                            {reviewer.review.overallRating && !reviewer.review.ratings?.overall ? '/5' : ''}
-                                                                        </p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-xs font-semibold text-gray-700">Comments</label>
-                                                                        <p className="text-xs text-gray-600 mt-0.5 bg-gray-50 p-2 rounded max-h-16 overflow-y-auto line-clamp-3">
-                                                                            {reviewer.review.commentsToAuthor || reviewer.review.comments || 'No comments'}
-                                                                        </p>
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-500 pt-2 border-t">
-                                                                        {new Date(reviewer.review.submittedAt).toLocaleDateString()}
-                                                                    </div>
+
+                                                                    {/* Re-Review (Round 2) if exists */}
+                                                                    {reviewer.reReview && (
+                                                                        <div className="bg-purple-50 rounded border-l-4 border-purple-500 p-3 space-y-2">
+                                                                            <div className="mb-2 pb-2 border-b">
+                                                                                <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-800">
+                                                                                    Review 2 (Re-review)
+                                                                                </span>
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="text-xs font-semibold text-gray-700">Recommendation</label>
+                                                                                <p className={`font-bold text-sm mt-0.5 ${
+                                                                                    reviewer.reReview.recommendation === 'Accept' ? 'text-green-600' :
+                                                                                    reviewer.reReview.recommendation === 'Reject' ? 'text-red-600' : 'text-yellow-600'
+                                                                                }`}>
+                                                                                    {reviewer.reReview.recommendation || 'N/A'}
+                                                                                </p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="text-xs font-semibold text-gray-700">Rating</label>
+                                                                                <p className="font-bold text-sm text-purple-600 mt-0.5">
+                                                                                    {reviewer.reReview.overallRating || 'N/A'}/5
+                                                                                </p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="text-xs font-semibold text-gray-700">Comments</label>
+                                                                                <p className="text-xs text-gray-600 mt-0.5 bg-white p-2 rounded max-h-12 overflow-y-auto line-clamp-2">
+                                                                                    {reviewer.reReview.commentsToEditor || 'No comments'}
+                                                                                </p>
+                                                                            </div>
+                                                                            <div className="text-xs text-gray-500 pt-1">
+                                                                                {new Date(reviewer.reReview.submittedAt).toLocaleDateString()}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex-1 bg-white rounded p-3 text-center mb-3">
@@ -1311,26 +1403,70 @@ const EditorDashboard = () => {
                                                                 </div>
                                                             )}
 
-                                                            {/* Message Button */}
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (reviewer.review?._id && viewingPaper?.submissionId) {
-                                                                        setSelectedReviewForDetails({
-                                                                            reviewId: reviewer.review._id,
-                                                                            submissionId: viewingPaper.submissionId
-                                                                        });
-                                                                    }
-                                                                }}
-                                                                className={`w-full px-3 py-2 rounded text-xs flex items-center justify-center gap-2 font-medium transition ${
-                                                                    selectedReviewForDetails?.reviewId === reviewer.review?._id
-                                                                        ? 'bg-blue-700 text-white'
-                                                                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                                                                }`}
-                                                                title="Send message to this reviewer"
-                                                            >
-                                                                <MessageSquare className="w-3.5 h-3.5" />
-                                                                {selectedReviewForDetails?.reviewId === reviewer.review?._id ? 'Close' : 'Message'}
-                                                            </button>
+                                                            {/* Action Buttons - Message, Edit, Delete */}
+                                                            <div className="flex gap-2">
+                                                                {/* Message Button */}
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (reviewer.review?._id && viewingPaper?.submissionId) {
+                                                                            setSelectedReviewForDetails({
+                                                                                reviewId: reviewer.review._id,
+                                                                                submissionId: viewingPaper.submissionId
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    className={`flex-1 px-3 py-2 rounded text-xs flex items-center justify-center gap-2 font-medium transition ${
+                                                                        selectedReviewForDetails?.reviewId === reviewer.review?._id
+                                                                            ? 'bg-blue-700 text-white'
+                                                                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                                    }`}
+                                                                    title="Send message to this reviewer"
+                                                                >
+                                                                    <MessageSquare className="w-3.5 h-3.5" />
+                                                                    {selectedReviewForDetails?.reviewId === reviewer.review?._id ? 'Close' : 'Message'}
+                                                                </button>
+
+                                                                {/* Edit Button - Allow editing if review exists */}
+                                                                {reviewer.review && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            // Will implement in ReviewerDashboard to allow editing existing review
+                                                                            alert(`Edit button will allow reviewer to update their submission. Review ID: ${reviewer.review._id}`);
+                                                                        }}
+                                                                        className="px-3 py-2 rounded text-xs bg-indigo-600 text-white hover:bg-indigo-700 font-medium transition"
+                                                                        title="Allow reviewer to edit this review"
+                                                                    >
+                                                                        ✎ Edit
+                                                                    </button>
+                                                                )}
+
+                                                                {/* Delete Button - Allow removing review if not yet used for decision */}
+                                                                {reviewer.review && viewingPaper?.status !== 'Accepted' && viewingPaper?.status !== 'Rejected' && (
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            if (confirm('Are you sure you want to delete this review? This action cannot be undone.')) {
+                                                                                try {
+                                                                                    const token = localStorage.getItem('token');
+                                                                                    await axios.delete(
+                                                                                        `${API_URL}/api/editor/reviews/${reviewer.review._id}`,
+                                                                                        { headers: { Authorization: `Bearer ${token}` } }
+                                                                                    );
+                                                                                    alert('Review deleted successfully');
+                                                                                    // Refresh the paper view
+                                                                                    await loadPaperDetails(viewingPaper.submissionId);
+                                                                                } catch (error: any) {
+                                                                                    console.error('Error deleting review:', error);
+                                                                                    alert(error.response?.data?.message || 'Failed to delete review');
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        className="px-3 py-2 rounded text-xs bg-red-600 text-white hover:bg-red-700 font-medium transition"
+                                                                        title="Delete this review"
+                                                                    >
+                                                                        🗑 Delete
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                         );
                                                     })}

@@ -1536,7 +1536,7 @@ export const requestRevision = async (req, res) => {
                     reviewerId: review.reviewer._id,
                     reviewerName: review.reviewer.username || 'Reviewer',
                     reviewerEmail: review.reviewer.email,
-                    comments: review.comments || '',
+                    comments: review.commentsToEditor || review.comments || '',
                     strengths: review.strengths || '',
                     weaknesses: review.weaknesses || '',
                     overallRating: review.overallRating || 0,
@@ -1553,7 +1553,7 @@ export const requestRevision = async (req, res) => {
                 reviewerId: review.reviewer._id,
                 reviewerName: review.reviewer.username || 'Reviewer',
                 reviewerEmail: review.reviewer.email,
-                comments: review.comments || '',
+                comments: review.commentsToEditor || review.comments || '',
                 strengths: review.strengths || '',
                 weaknesses: review.weaknesses || '',
                 overallRating: review.overallRating || 0,
@@ -2196,6 +2196,192 @@ export const sendReReviewEmails = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Error sending re-review emails',
+            error: error.message
+        });
+    }
+};
+
+// Delete a review (editor can remove reviews if paper decision not yet made)
+export const deleteReview = async (req, res) => {
+    try {
+        const { reviewId } = req.params;
+        const editorUserId = req.user.userId;
+
+        if (!reviewId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Review ID is required'
+            });
+        }
+
+        // Find and delete the review
+        const review = await ReviewerReview.findById(reviewId);
+        if (!review) {
+            return res.status(404).json({
+                success: false,
+                message: 'Review not found'
+            });
+        }
+
+        // Get paper to check if decision already made
+        const paper = await PaperSubmission.findById(review.paperId);
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Paper not found'
+            });
+        }
+
+        // Don't allow deletion if paper is already decided
+        if (paper.status === 'Accepted' || paper.status === 'Rejected') {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot delete review for papers that already have a decision'
+            });
+        }
+
+        // Delete the review
+        await ReviewerReview.findByIdAndDelete(reviewId);
+
+        // Remove review reference from paper submission
+        if (paper.reviewAssignments && paper.reviewAssignments.length > 0) {
+            paper.reviewAssignments = paper.reviewAssignments.map(assignment => {
+                if (assignment.review && assignment.review.toString() === reviewId) {
+                    assignment.review = null;
+                }
+                return assignment;
+            });
+            await paper.save();
+        }
+
+        console.log(`✅ Review ${reviewId} deleted successfully by editor ${editorUserId}`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Review deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting review:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error deleting review',
+            error: error.message
+        });
+    }
+};
+
+// Update/edit a review submitted by a reviewer
+export const updateReview = async (req, res) => {
+    try {
+        const { reviewId } = req.params;
+        const { 
+            recommendation, 
+            overallRating, 
+            noveltyRating, 
+            qualityRating, 
+            clarityRating,
+            commentsToEditor, 
+            commentsToReviewer, 
+            strengths, 
+            weaknesses 
+        } = req.body;
+
+        if (!reviewId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Review ID is required'
+            });
+        }
+
+        // Find the review
+        const review = await ReviewerReview.findById(reviewId);
+        if (!review) {
+            return res.status(404).json({
+                success: false,
+                message: 'Review not found'
+            });
+        }
+
+        // Get paper to check status
+        const paper = await PaperSubmission.findById(review.paperId);
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Paper not found'
+            });
+        }
+
+        // Allow edit only if paper is not decided
+        if (paper.status === 'Accepted' || paper.status === 'Rejected') {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot edit review for papers that already have a decision'
+            });
+        }
+
+        // Update review fields
+        if (recommendation) review.recommendation = recommendation;
+        if (overallRating !== undefined) review.overallRating = overallRating;
+        if (noveltyRating !== undefined) review.noveltyRating = noveltyRating;
+        if (qualityRating !== undefined) review.qualityRating = qualityRating;
+        if (clarityRating !== undefined) review.clarityRating = clarityRating;
+        if (commentsToEditor !== undefined) review.commentsToEditor = commentsToEditor;
+        if (commentsToReviewer !== undefined) review.commentsToReviewer = commentsToReviewer;
+        if (strengths !== undefined) review.strengths = strengths;
+        if (weaknesses !== undefined) review.weaknesses = weaknesses;
+
+        review.updatedAt = new Date();
+
+        await review.save();
+
+        console.log(`✅ Review ${reviewId} updated successfully`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Review updated successfully',
+            review: review
+        });
+    } catch (error) {
+        console.error('Error updating review:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error updating review',
+            error: error.message
+        });
+    }
+};
+
+// Get re-reviews (Round 2) for a paper
+export const getPaperReReviews = async (req, res) => {
+    try {
+        const { paperId } = req.params;
+
+        if (!paperId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Paper ID is required'
+            });
+        }
+
+        const { ReReview } = await import('../models/ReReview.js');
+
+        // Find all re-reviews for this paper
+        const reReviews = await ReReview.find({ paperId })
+            .populate('reviewerId', 'username email')
+            .sort({ submittedAt: -1 });
+
+        console.log(`✅ Found ${reReviews.length} re-reviews for paper ${paperId}`);
+
+        return res.status(200).json({
+            success: true,
+            count: reReviews.length,
+            reReviews: reReviews
+        });
+    } catch (error) {
+        console.error('Error fetching re-reviews:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching re-reviews',
             error: error.message
         });
     }

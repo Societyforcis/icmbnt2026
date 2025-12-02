@@ -130,7 +130,9 @@ export const submitReview = async (req, res) => {
             noveltyRating,
             qualityRating,
             clarityRating,
-            recommendation
+            recommendation,
+            commentsToReviewer,
+            commentsToEditor
         } = req.body;
 
         // Validate required fields
@@ -171,6 +173,9 @@ export const submitReview = async (req, res) => {
         if (review) {
             // Update existing review
             review.comments = comments;
+            // preserve/overwrite confidential and editor-facing comments
+            if (typeof commentsToReviewer !== 'undefined') review.commentsToReviewer = commentsToReviewer;
+            if (typeof commentsToEditor !== 'undefined') review.commentsToEditor = commentsToEditor;
             review.strengths = strengths;
             review.weaknesses = weaknesses;
             review.overallRating = overallRating;
@@ -186,6 +191,8 @@ export const submitReview = async (req, res) => {
                 paper: paper._id,
                 reviewer: reviewerId,
                 comments,
+                commentsToReviewer: commentsToReviewer || '',
+                commentsToEditor: commentsToEditor || '',
                 strengths,
                 weaknesses,
                 overallRating,
@@ -710,6 +717,117 @@ export const rejectAssignment = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Error rejecting assignment',
+            error: error.message
+        });
+    }
+};
+
+// Submit re-review (Round 2) for papers with revision requests
+export const submitReReview = async (req, res) => {
+    try {
+        const { submissionId } = req.params;
+        const reviewerId = req.user.userId;
+        const {
+            recommendation,
+            overallRating,
+            noveltyRating,
+            qualityRating,
+            clarityRating,
+            commentsToEditor,
+            commentsToReviewer,
+            strengths,
+            weaknesses
+        } = req.body;
+
+        // Validate required fields
+        if (!recommendation || !overallRating) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: recommendation, overallRating'
+            });
+        }
+
+        // Find paper
+        const paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Paper not found'
+            });
+        }
+
+        // Check if reviewer is assigned
+        const assignment = paper.reviewAssignments.find(
+            a => a.reviewer.toString() === reviewerId
+        );
+
+        if (!assignment) {
+            return res.status(403).json({
+                success: false,
+                message: 'You are not assigned to review this paper'
+            });
+        }
+
+        // Import ReReview model
+        const { ReReview } = await import('../models/ReReview.js');
+
+        // Check if re-review already submitted
+        let reReview = await ReReview.findOne({
+            paperId: paper._id,
+            reviewerId: reviewerId
+        });
+
+        if (reReview) {
+            // Update existing re-review
+            reReview.recommendation = recommendation;
+            reReview.overallRating = overallRating;
+            reReview.noveltyRating = noveltyRating;
+            reReview.qualityRating = qualityRating;
+            reReview.clarityRating = clarityRating;
+            reReview.commentsToEditor = commentsToEditor || '';
+            reReview.commentsToReviewer = commentsToReviewer || '';
+            reReview.strengths = strengths || '';
+            reReview.weaknesses = weaknesses || '';
+            reReview.updatedAt = new Date();
+            reReview.status = 'Submitted';
+        } else {
+            // Create new re-review
+            const reviewer = await User.findById(reviewerId);
+            reReview = new ReReview({
+                paperId: paper._id,
+                submissionId: paper.submissionId,
+                reviewerId: reviewerId,
+                reviewerEmail: reviewer.email,
+                reviewerName: reviewer.username || reviewer.name,
+                recommendation,
+                overallRating,
+                noveltyRating,
+                qualityRating,
+                clarityRating,
+                commentsToEditor: commentsToEditor || '',
+                commentsToReviewer: commentsToReviewer || '',
+                strengths: strengths || '',
+                weaknesses: weaknesses || '',
+                submittedAt: new Date(),
+                status: 'Submitted',
+                reviewRound: 2
+            });
+        }
+
+        await reReview.save();
+
+        console.log(`✅ Re-review (Round 2) submitted for paper ${paper.submissionId} by reviewer ${reviewerId}`);
+
+        return res.status(201).json({
+            success: true,
+            message: 'Re-review submitted successfully',
+            reReview: reReview
+        });
+    } catch (error) {
+        console.error('Error submitting re-review:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error submitting re-review',
             error: error.message
         });
     }

@@ -28,7 +28,10 @@ import {
     submitRevisedPaper,
     removeReviewerFromPaper,
     sendReviewerInquiry,
-    sendReReviewEmails
+    sendReReviewEmails,
+    deleteReview,
+    updateReview,
+    getPaperReReviews
 } from '../controllers/editorController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireEditor } from '../middleware/roleCheck.js';
@@ -67,6 +70,11 @@ router.post('/make-decision', makeFinalDecision);
 router.post('/request-revision', requestRevision);
 router.post('/accept-paper', acceptPaper);
 router.post('/send-re-review-emails', sendReReviewEmails);
+
+// Review management - CRUD operations
+router.delete('/reviews/:reviewId', deleteReview);     // Delete a review
+router.put('/reviews/:reviewId', updateReview);        // Update/edit a review
+router.get('/papers/:paperId/re-reviews', getPaperReReviews); // Get re-reviews (Round 2)
 
 // Reviewer reminders
 router.get('/non-responding-reviewers', getNonRespondingReviewers);

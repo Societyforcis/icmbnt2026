@@ -10,8 +10,8 @@ interface ReviewDetail {
     comments?: string;
     strengths?: string;
     weaknesses?: string;
-    commentsToAuthor?: string;
-    confidentialCommentsToEditor?: string;
+    commentsToEditor?: string;
+    commentsToReviewer?: string;
     overallRating?: number;
     noveltyRating?: number;
     qualityRating?: number;
@@ -210,18 +210,18 @@ const ReviewerDetailsPanel: React.FC<ReviewerDetailsProps> = ({
                     </div>
 
                     {/* Review Comments */}
-                    {(review.commentsToAuthor || review.comments) && (
+                    {(review.commentsToEditor || review.comments) && (
                         <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
                             <h4 className="font-semibold text-gray-800 mb-2">Comments to Author</h4>
-                            <p className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border">{review.commentsToAuthor || review.comments}</p>
+                            <p className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border">{review.commentsToEditor || review.comments}</p>
                         </div>
                     )}
 
                     {/* Confidential Comments to Editor */}
-                    {review.confidentialCommentsToEditor && (
+                    {review.commentsToReviewer && (
                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
                             <h4 className="font-semibold text-gray-800 mb-2">🔒 Confidential Comments to Editor</h4>
-                            <p className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border">{review.confidentialCommentsToEditor}</p>
+                            <p className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border">{review.commentsToReviewer}</p>
                         </div>
                     )}
 

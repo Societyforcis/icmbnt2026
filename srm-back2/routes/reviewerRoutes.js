@@ -10,7 +10,8 @@ import {
     getRejectionForm,
     getAssignmentDetails,
     acceptAssignment,
-    rejectAssignment
+    rejectAssignment,
+    submitReReview
 } from '../controllers/reviewerController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireReviewer } from '../middleware/roleCheck.js';
@@ -35,6 +36,7 @@ router.get('/papers', getAssignedPapers);
 router.get('/papers/:submissionId', getPaperForReview);
 router.get('/papers/:submissionId/draft', getReviewDraft);
 router.post('/papers/:submissionId/submit-review', submitReview);
+router.post('/papers/:submissionId/submit-re-review', submitReReview); // Submit re-review (Round 2)
 
 // Dashboard statistics
 router.get('/dashboard-stats', getReviewerDashboardStats);
