@@ -5,6 +5,7 @@ import { ReviewerReview } from '../models/ReviewerReview.js';
 import { ReviewerMessage } from '../models/ReviewerMessage.js';
 import { Revision } from '../models/Revision.js';
 import { ReviewerAssignment } from '../models/ReviewerAssignment.js';
+import FinalAcceptance from '../models/FinalAcceptance.js';
 import { generateRandomPassword } from '../utils/helpers.js';
 import { sendReviewerConfirmationEmail, sendReviewerAssignmentEmail, sendDecisionEmail, sendReviewerCredentialsEmail, sendReviewerReminderEmail, sendAcceptanceEmail, sendReReviewEmail } from '../utils/emailService.js';
 import { listPdfsFromCloudinary, deletePdfFromCloudinary } from '../config/cloudinary-pdf.js';
@@ -1714,7 +1715,9 @@ export const acceptPaper = async (req, res) => {
         const editorId = req.user.userId;
 
         // Validate paper exists
-        const paper = await PaperSubmission.findById(paperId);
+        const paper = await PaperSubmission.findById(paperId)
+            .populate('assignedReviewers', 'email username');
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -1727,10 +1730,58 @@ export const acceptPaper = async (req, res) => {
         paper.decisionDate = new Date();
         await paper.save();
 
-        console.log('✅ Paper accepted:', {
+        // Get all reviews for this paper to collect reviewer info and ratings
+        const reviews = await ReviewerReview.find({ paperId: paperId });
+
+        // Extract reviewer information from reviews
+        const reviewersInfo = reviews.map(review => ({
+            reviewerName: review.reviewerName || 'Unknown',
+            reviewerEmail: review.reviewerEmail,
+            overallRating: review.overallRating,
+            recommendation: review.recommendation,
+            submittedAt: review.submittedAt || review.createdAt
+        }));
+
+        // Get editor info
+        const editor = await User.findById(editorId);
+
+        // Create entry in FinalAcceptance collection
+        const finalAcceptance = new FinalAcceptance({
+            paperId: paper._id,
+            submissionId: paper.submissionId,
+            paperTitle: paper.paperTitle,
+            authorName: paper.authorName,
+            authorEmail: paper.email,
+            pdfUrl: paper.pdfUrl,
+            pdfPublicId: paper.pdfPublicId,
+            pdfFileName: paper.pdfFileName,
+            category: paper.category,
+            topic: paper.topic || '',
+            reviewers: reviewersInfo,
+            totalReviewers: reviewersInfo.length,
+            finalDecision: 'Accept',
+            editorId: editorId,
+            editorEmail: editor?.email || 'unknown@email.com',
+            acceptanceDate: new Date(),
+            revisionCount: paper.revisionCount || 0,
+            status: 'Accepted',
+            metadata: {
+                originalSubmissionDate: paper.createdAt,
+                notes: `Paper accepted by ${editor?.username || 'Editor'}`
+            }
+        });
+
+        // Generate certificate number
+        finalAcceptance.generateCertificateNumber();
+
+        // Save to FinalAcceptance collection
+        await finalAcceptance.save();
+
+        console.log('✅ Paper accepted and saved to FinalAcceptance:', {
             paperId,
             title: paper.paperTitle,
-            authorEmail: paper.email
+            authorEmail: paper.email,
+            certificateNumber: finalAcceptance.acceptanceCertificateNumber
         });
 
         // Send acceptance email to author
@@ -1748,7 +1799,8 @@ export const acceptPaper = async (req, res) => {
                 _id: paper._id,
                 submissionId: paper.submissionId,
                 title: paper.paperTitle,
-                status: paper.status
+                status: paper.status,
+                certificateNumber: finalAcceptance.acceptanceCertificateNumber
             }
         });
     } catch (error) {
@@ -2386,4 +2438,371 @@ export const getPaperReReviews = async (req, res) => {
         });
     }
 };
+
+// ========== NEW CRUD FUNCTIONS FOR REVIEWER MANAGEMENT ==========
+
+// Update reviewer details (Edit)
+export const updateReviewerDetails = async (req, res) => {
+    try {
+        const { reviewerId } = req.params;
+        const { username, email } = req.body;
+
+        // Validate input
+        if (!username || !email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username and email are required'
+            });
+        }
+
+        // Check if email is already in use by another reviewer
+        const existingUser = await User.findOne({
+            email: email,
+            _id: { $ne: reviewerId } // Exclude current user
+        });
+
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email is already in use by another reviewer'
+            });
+        }
+
+        // Find and update the reviewer
+        const updatedReviewer = await User.findByIdAndUpdate(
+            reviewerId,
+            {
+                username: username.trim(),
+                email: email.trim()
+            },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedReviewer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Reviewer not found'
+            });
+        }
+
+        console.log(`✅ Reviewer updated successfully: ${updatedReviewer.username}`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Reviewer details updated successfully',
+            reviewer: {
+                _id: updatedReviewer._id,
+                username: updatedReviewer.username,
+                email: updatedReviewer.email,
+                role: updatedReviewer.role
+            }
+        });
+    } catch (error) {
+        console.error('Error updating reviewer:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error updating reviewer details',
+            error: error.message
+        });
+    }
+};
+
+// Delete reviewer from system
+export const deleteReviewerFromSystem = async (req, res) => {
+    try {
+        const { reviewerId } = req.params;
+
+        // Find the reviewer to delete
+        const reviewer = await User.findById(reviewerId);
+
+        if (!reviewer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Reviewer not found'
+            });
+        }
+
+        // Check if reviewer has any assigned papers
+        const assignedPapers = await PaperSubmission.find({
+            assignedReviewers: reviewerId
+        });
+
+        if (assignedPapers.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete reviewer with ${assignedPapers.length} assigned paper(s). Remove them from papers first.`
+            });
+        }
+
+        // Delete the reviewer user
+        await User.findByIdAndDelete(reviewerId);
+
+        // Also delete any messages or reviews associated with this reviewer
+        await ReviewerReview.deleteMany({ reviewerId: reviewerId });
+        await ReviewerMessage.deleteMany({ senderId: reviewerId });
+
+        console.log(`✅ Reviewer deleted successfully: ${reviewer.username}`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Reviewer deleted successfully',
+            deletedReviewer: {
+                _id: reviewer._id,
+                username: reviewer.username,
+                email: reviewer.email
+            }
+        });
+    } catch (error) {
+        console.error('Error deleting reviewer:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error deleting reviewer',
+            error: error.message
+        });
+    }
+};
+
+// ========================================
+// FINAL ACCEPTANCE / ACCEPTED PAPERS MANAGEMENT
+// ========================================
+
+// Get all accepted papers (for FinalAcceptance collection)
+export const getAllAcceptedPapers = async (req, res) => {
+    try {
+        const acceptedPapers = await FinalAcceptance.find()
+            .populate('paperId', 'submissionId paperTitle status')
+            .populate('editorId', 'username email')
+            .sort({ acceptanceDate: -1 });
+
+        return res.status(200).json({
+            success: true,
+            count: acceptedPapers.length,
+            acceptedPapers
+        });
+    } catch (error) {
+        console.error('Error fetching accepted papers:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching accepted papers',
+            error: error.message
+        });
+    }
+};
+
+// Get accepted papers by category
+export const getAcceptedPapersByCategory = async (req, res) => {
+    try {
+        const { category } = req.params;
+
+        const acceptedPapers = await FinalAcceptance.find({ category })
+            .sort({ acceptanceDate: -1 });
+
+        return res.status(200).json({
+            success: true,
+            category,
+            count: acceptedPapers.length,
+            acceptedPapers
+        });
+    } catch (error) {
+        console.error('Error fetching accepted papers by category:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching accepted papers',
+            error: error.message
+        });
+    }
+};
+
+// Get accepted papers by author email
+export const getAcceptedPapersByAuthor = async (req, res) => {
+    try {
+        const { email } = req.params;
+
+        const acceptedPapers = await FinalAcceptance.find({ authorEmail: email })
+            .sort({ acceptanceDate: -1 });
+
+        return res.status(200).json({
+            success: true,
+            authorEmail: email,
+            count: acceptedPapers.length,
+            acceptedPapers
+        });
+    } catch (error) {
+        console.error('Error fetching accepted papers by author:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching accepted papers',
+            error: error.message
+        });
+    }
+};
+
+// Get high-rated accepted papers (average rating >= threshold)
+export const getHighRatedPapers = async (req, res) => {
+    try {
+        const { minRating = 4 } = req.query;
+
+        const acceptedPapers = await FinalAcceptance.find({
+            averageRating: { $gte: parseFloat(minRating) }
+        }).sort({ averageRating: -1 });
+
+        return res.status(200).json({
+            success: true,
+            minRating,
+            count: acceptedPapers.length,
+            acceptedPapers
+        });
+    } catch (error) {
+        console.error('Error fetching high-rated papers:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching high-rated papers',
+            error: error.message
+        });
+    }
+};
+
+// Get single accepted paper details by submissionId
+export const getAcceptedPaperDetails = async (req, res) => {
+    try {
+        const { submissionId } = req.params;
+
+        const acceptedPaper = await FinalAcceptance.findOne({ submissionId })
+            .populate('paperId')
+            .populate('editorId', 'username email');
+
+        if (!acceptedPaper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Accepted paper not found'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            acceptedPaper
+        });
+    } catch (error) {
+        console.error('Error fetching accepted paper details:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching accepted paper details',
+            error: error.message
+        });
+    }
+};
+
+// Get acceptance statistics
+export const getAcceptanceStatistics = async (req, res) => {
+    try {
+        const totalAccepted = await FinalAcceptance.countDocuments({ status: 'Accepted' });
+        const certGenerated = await FinalAcceptance.countDocuments({ status: 'Certificate Generated' });
+        const published = await FinalAcceptance.countDocuments({ status: 'Published' });
+
+        // Get stats by category
+        const byCategory = await FinalAcceptance.aggregate([
+            {
+                $group: {
+                    _id: '$category',
+                    count: { $sum: 1 },
+                    avgRating: { $avg: '$averageRating' }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]);
+
+        // Get stats by reviewer
+        const byReviewer = await FinalAcceptance.aggregate([
+            { $unwind: '$reviewers' },
+            {
+                $group: {
+                    _id: '$reviewers.reviewerEmail',
+                    papersReviewed: { $sum: 1 },
+                    avgReviewerRating: { $avg: '$reviewers.overallRating' }
+                }
+            },
+            { $sort: { papersReviewed: -1 } }
+        ]);
+
+        // Get stats by author
+        const topAuthors = await FinalAcceptance.aggregate([
+            {
+                $group: {
+                    _id: '$authorEmail',
+                    acceptedPapers: { $sum: 1 },
+                    authorName: { $first: '$authorName' },
+                    avgRating: { $avg: '$averageRating' }
+                }
+            },
+            { $sort: { acceptedPapers: -1 } },
+            { $limit: 10 }
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            statistics: {
+                totalAccepted,
+                certGenerated,
+                published,
+                byCategory,
+                topReviewers: byReviewer.slice(0, 10),
+                topAuthors
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching acceptance statistics:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching acceptance statistics',
+            error: error.message
+        });
+    }
+};
+
+// Update FinalAcceptance status (e.g., to Certificate Generated or Published)
+export const updateAcceptanceStatus = async (req, res) => {
+    try {
+        const { submissionId } = req.params;
+        const { status } = req.body;
+
+        if (!['Accepted', 'Certificate Generated', 'Published'].includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid status. Must be one of: Accepted, Certificate Generated, Published'
+            });
+        }
+
+        const acceptedPaper = await FinalAcceptance.findOneAndUpdate(
+            { submissionId },
+            { status, updatedAt: new Date() },
+            { new: true }
+        );
+
+        if (!acceptedPaper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Accepted paper not found'
+            });
+        }
+
+        console.log('✅ Updated acceptance status:', {
+            submissionId,
+            newStatus: status
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Acceptance status updated',
+            acceptedPaper
+        });
+    } catch (error) {
+        console.error('Error updating acceptance status:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error updating acceptance status',
+            error: error.message
+        });
+    }
+};
+
 

@@ -97,7 +97,7 @@ const CallForPapers = () => {
           </div>
         </section>
 
-        {/* Paper Submission Section */}
+        
         <section className="mb-16">
           <div className="flex items-center mb-6">
             <FaFileAlt className="text-[#F5A051] text-2xl mr-4" />

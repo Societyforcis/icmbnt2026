@@ -5,7 +5,8 @@ import {
     getPaperStatus,
     editSubmission,
     getAllPapers,
-    getPaperById
+    getPaperById,
+    submitRevision
 } from '../controllers/paperController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { uploadPaperPDF } from '../middleware/upload.js';
@@ -17,6 +18,7 @@ const router = express.Router();
 router.post('/submit', verifyJWT, uploadPaperPDF.single('pdf'), submitPaper);
 router.get('/my-submission', verifyJWT, getUserSubmission);
 router.put('/edit/:submissionId', verifyJWT, uploadPaperPDF.single('pdf'), editSubmission);
+router.post('/submit-revision', verifyJWT, uploadPaperPDF.single('pdf'), submitRevision);
 
 // Public/semi-public routes
 router.get('/status/:submissionId', getPaperStatus);

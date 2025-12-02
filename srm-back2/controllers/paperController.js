@@ -386,3 +386,174 @@ export const getPaperById = async (req, res) => {
         });
     }
 };
+
+// Submit revised paper
+export const submitRevision = async (req, res) => {
+    console.log('Received revision submission request:', req.body);
+    console.log('File received:', req.file ? 'Yes, ' + req.file.originalname : 'No file');
+
+    try {
+        const { submissionId, paperTitle, authorName, email, category, topic, revisionNotes } = req.body;
+
+        // Validate required fields
+        if (!submissionId || !paperTitle || !authorName || !email || !category || !revisionNotes) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing required fields: submissionId, paperTitle, authorName, email, category, revisionNotes"
+            });
+        }
+
+        // Check if PDF file was uploaded
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "Revised PDF file is required"
+            });
+        }
+
+        // Find the original submission
+        const paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: "Paper not found"
+            });
+        }
+
+        // Verify the user is the author
+        if (paper.email !== email) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized: You can only revise your own paper"
+            });
+        }
+
+        // Delete old PDF from Cloudinary before uploading new one
+        if (paper.pdfPublicId) {
+            try {
+                await deletePdfFromCloudinary(paper.pdfPublicId);
+                console.log('Old PDF deleted from Cloudinary:', paper.pdfPublicId);
+            } catch (deleteError) {
+                console.warn('Warning: Could not delete old PDF from Cloudinary:', deleteError.message);
+                // Continue with upload even if delete fails
+            }
+        }
+
+        // Upload revised PDF to Cloudinary
+        let revisionPdfUrl, revisionPdfPublicId, revisionPdfFileName;
+        try {
+            const cloudinaryResult = await uploadPdfToCloudinary(req.file.buffer, req.file.originalname);
+            revisionPdfUrl = cloudinaryResult.url;
+            revisionPdfPublicId = cloudinaryResult.publicId;
+            revisionPdfFileName = cloudinaryResult.fileName;
+            
+            console.log('Revised PDF uploaded to Cloudinary:', { 
+                fileName: revisionPdfFileName, 
+                url: revisionPdfUrl,
+                publicId: revisionPdfPublicId
+            });
+        } catch (uploadError) {
+            console.error('Failed to upload revised PDF to Cloudinary:', uploadError.message);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to upload revised PDF: ' + uploadError.message
+            });
+        }
+
+        // Update the paper with new revision
+        paper.paperTitle = paperTitle;
+        paper.authorName = authorName;
+        paper.category = category;
+        if (topic) {
+            paper.topic = topic;
+        }
+
+        // Add to versions history
+        const nextVersion = (paper.versions && paper.versions.length > 0) ? paper.versions.length + 1 : 1;
+        
+        if (!paper.versions) {
+            paper.versions = [];
+        }
+
+        paper.versions.push({
+            version: nextVersion,
+            pdfUrl: revisionPdfUrl,
+            pdfPublicId: revisionPdfPublicId,
+            pdfFileName: revisionPdfFileName,
+            submittedAt: new Date()
+        });
+
+        // Update main PDF to the latest revision
+        paper.pdfUrl = revisionPdfUrl;
+        paper.pdfPublicId = revisionPdfPublicId;
+        paper.pdfFileName = revisionPdfFileName;
+
+        // Increment revision count
+        paper.revisionCount = (paper.revisionCount || 0) + 1;
+
+        // Update status to show revision submitted
+        if (paper.status === 'Revision Required') {
+            paper.status = 'Revised Submitted';
+        }
+
+        // Update the corresponding revision request status (if using new revision requests array)
+        if (paper.revisionRequests && paper.revisionRequests.length > 0) {
+            // Find the latest pending revision request and mark it as submitted
+            const latestRevision = paper.revisionRequests[paper.revisionRequests.length - 1];
+            if (latestRevision && latestRevision.status === 'Pending') {
+                latestRevision.status = 'Submitted';
+                latestRevision.submittedAt = new Date();
+                latestRevision.pdfUrl = revisionPdfUrl;
+                latestRevision.pdfPublicId = revisionPdfPublicId;
+                latestRevision.pdfFileName = revisionPdfFileName;
+            }
+        }
+
+        // Store revision notes (add to editorComments or create new field)
+        if (!paper.editorComments) {
+            paper.editorComments = '';
+        }
+        paper.editorComments += `\n\n[AUTHOR REVISION ${nextVersion}]: ${revisionNotes}`;
+
+        // Save the updated paper
+        await paper.save();
+
+        console.log('Paper revision saved successfully:', {
+            submissionId,
+            revisionVersion: nextVersion,
+            revisionCount: paper.revisionCount
+        });
+
+        // Send email notification to admin/editor
+        try {
+            await sendAdminNotificationEmail({
+                subject: `Revised Paper Submitted - ${submissionId}`,
+                message: `${authorName} has submitted a revised version of their paper.\n\nSubmission ID: ${submissionId}\nTitle: ${paperTitle}\nRevision Version: ${nextVersion}\n\nRevision Notes:\n${revisionNotes}`,
+                recipientEmail: process.env.ADMIN_EMAIL || 'admin@example.com'
+            });
+        } catch (emailError) {
+            console.error('Failed to send admin notification email:', emailError);
+            // Don't fail the submission if email fails
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Revised paper submitted successfully',
+            paper: {
+                submissionId: paper.submissionId,
+                paperTitle: paper.paperTitle,
+                status: paper.status,
+                revisionVersion: nextVersion,
+                revisionCount: paper.revisionCount
+            }
+        });
+
+    } catch (error) {
+        console.error("Error submitting revision:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error submitting revision",
+            error: error.message
+        });
+    }
+};

@@ -756,7 +756,7 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
                         <li style="margin: 5px 0;">Review and sign the attached Copyright Form</li>
                         <li style="margin: 5px 0;">Prepare your presentation slides for March 13-14, 2026</li>
                         <li style="margin: 5px 0;">Arrange your travel to Bali, Indonesia</li>
-                        <li style="margin: 5px 0;"><strong><a href="http://localhost:5173/Registrations" style="color: #0066cc; text-decoration: none;">Click here to register for the conference</a></strong></li>
+                        <li style="margin: 5px 0;"><strong><a href="https://icmbnt2026-yovz.vercel.app/Registrations" style="color: #0066cc; text-decoration: none;">Click here to register for the conference</a></strong></li>
                         <li style="margin: 5px 0;">Join us for this exciting hybrid conference experience!</li>
                     </ol>
                 </div>

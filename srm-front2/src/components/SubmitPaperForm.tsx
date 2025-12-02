@@ -140,10 +140,14 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
     // Set loading state to true when submission starts
     setIsSubmitting(true);
 
-    // For revision, only require PDF and author response
+    // For revision, require PDF file and other details
     if (isRevision && revisionData) {
-      // Note: File upload is optional for now - backend doesn't handle it yet
-      // We'll just send the data as JSON
+      // Validate that a PDF file was uploaded
+      if (!abstractFile) {
+        toast.error('Please upload the revised PDF file');
+        setIsSubmitting(false);
+        return;
+      }
 
       // Get the submissionId from revisionData
       const submissionId = revisionData.submissionId;
@@ -159,18 +163,25 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
         console.log('📤 Sending revision with submissionId:', submissionId);
-        console.log('📤 Author response:', formData.paperTitle);
+        console.log('📤 File:', abstractFile?.name);
 
-        // Send revision data as JSON (file upload will be added later with multer)
+        // Create FormData for file upload
+        const revisionFormData = new FormData();
+        revisionFormData.append('submissionId', submissionId);
+        revisionFormData.append('paperTitle', formData.paperTitle);
+        revisionFormData.append('authorName', formData.authorName);
+        revisionFormData.append('email', formData.email);
+        revisionFormData.append('category', formData.category);
+        revisionFormData.append('topic', '');
+        revisionFormData.append('revisionNotes', formData.paperTitle || 'Revision submitted'); // Using paperTitle as notes
+        revisionFormData.append('pdf', abstractFile);
+
         const response = await axios.post<SubmissionResponse>(
-          `${apiUrl}/submit-revised-paper`,
-          {
-            submissionId: submissionId,
-            authorResponse: formData.paperTitle || '' // Using paperTitle field for response
-          },
+          `${apiUrl}/api/papers/submit-revision`,
+          revisionFormData,
           {
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type': 'multipart/form-data',
               ...(token && { 'Authorization': `Bearer ${token}` })
             },
           }
@@ -257,7 +268,7 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
           localStorage.setItem('lastSubmissionId', response.data.submissionId);
         }
 
-        // Reset form
+    
         setFormData({
           paperTitle: "",
           authorName: "",
@@ -267,7 +278,6 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
         setAbstractFile(null);
         setAbstractFileName("Click to browse files");
 
-        // Call success callback or navigate
         if (onSubmissionSuccess) {
           onSubmissionSuccess();
         } else {

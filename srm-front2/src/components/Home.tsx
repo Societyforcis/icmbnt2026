@@ -1,11 +1,25 @@
 "use client"
 
 import { Calendar, MapPin, Users, Target, Compass, Globe } from "lucide-react"
+import { useState, useEffect } from "react"
 import bali from "./images/bali.png"
 import con from "./images/c.png"
 import society from "./images/bali/society.png"
 import isius from "./images/bali/isius.png"
+
 const Home = () => {
+  const [showLogos, setShowLogos] = useState(false)
+
+  useEffect(() => {
+    // Check screen size on mount and on resize
+    const checkScreenSize = () => {
+      setShowLogos(window.innerWidth > 1500)
+    }
+
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900">
@@ -23,7 +37,7 @@ const Home = () => {
           <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-12">
             <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
               <Calendar className="w-5 h-5 mr-2 text-[#F5A051]" />
-              <span>March 13 & 14, 2026</span>
+              <span>April 26 & 27, 2026</span>
             </div>
             <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
               <MapPin className="w-5 h-5 mr-2 text-[#F5A051]" />
@@ -35,35 +49,39 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Left Logo - ISIUS - Hidden on mobile and tablet, visible only on desktop */}
-          <div className="hidden lg:absolute lg:left-4 lg:top-1/2 lg:-translate-y-1/2 lg:z-20">
-            <div className="flex flex-col items-center ml-[-60px]">
-              <img
-                src={isius}
-                alt="ICSCS Logo"
-                className="h-28 lg:h-32 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
-                loading="lazy"
-                decoding="async"
-              />
-              <p className="text-sm text-slate-300 mt-2 font-semibold text-center max-w-[150px]">International Society of Intelligent Unmanned Systems</p>
-              <p className="text-xs text-slate-400 mt-1">(ICSCS)</p>
+          {/* Left Logo - ISIUS - Show only on screens > 1500px */}
+          {showLogos && (
+            <div className="absolute left-4 xl:left-8 top-1/2 -translate-y-1/2 z-20">
+              <div className="flex flex-col items-center ml-[-60px]">
+                <img
+                  src={isius}
+                  alt="ICSCS Logo"
+                  className="h-28 xl:h-32 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <p className="text-sm text-slate-300 mt-2 font-semibold text-center max-w-[150px]">International Society of Intelligent Unmanned Systems</p>
+                <p className="text-xs text-slate-400 mt-1">(ICSCS)</p>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Right Logo - Society - Hidden on mobile and tablet, visible only on desktop */}
-          <div className="hidden lg:absolute lg:right-4 lg:top-1/2 lg:-translate-y-1/2 lg:z-20">
-            <div className="flex flex-col items-center">
-              <img
-                src={society}
-                alt="Society CIS Logo"
-                className="h-40 lg:h-48 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
-                loading="lazy"
-                decoding="async"
-              />
-              <p className="text-sm text-slate-300 mt-2 font-semibold text-center max-w-[150px]">Society for Cyber Intelligent Systems</p>
-              <p className="text-xs text-slate-400 mt-1">Puducherry – India</p>
+          {/* Right Logo - Society - Show only on screens > 1500px */}
+          {showLogos && (
+            <div className="absolute right-4 xl:right-8 top-1/2 -translate-y-1/2 z-20">
+              <div className="flex flex-col items-center">
+                <img
+                  src={society}
+                  alt="Society CIS Logo"
+                  className="h-40 xl:h-48 object-contain drop-shadow-lg hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <p className="text-sm text-slate-300 mt-2 font-semibold text-center max-w-[150px]">Society for Cyber Intelligent Systems</p>
+                <p className="text-xs text-slate-400 mt-1">Puducherry – India</p>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="mb-8">
             <p className="text-lg text-slate-200 mb-4">

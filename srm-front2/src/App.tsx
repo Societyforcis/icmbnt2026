@@ -18,6 +18,7 @@ import Registrations from "./components/Registrations";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
 import EditSubmission from "./components/EditSubmission";
+import RevisedPaperSubmissionForm from "./components/RevisedPaperSubmissionForm";
 import Venue from './components/Venue';
 import KeynoteSpeakers from './components/KeynoteSpeakers';
 import SpeakerProfile from './components/SpeakerProfile';
@@ -173,6 +174,13 @@ const AppRoutes = () => {
         <Route path="/edit-submission/:submissionId" element={
           <ProtectedRoute>
             <RouteWithLoading element={<EditSubmission />} />
+          </ProtectedRoute>
+        } />
+
+        {/* Revised Paper Submission - protected route for authors revising papers */}
+        <Route path="/revised-paper/:submissionId" element={
+          <ProtectedRoute>
+            <RouteWithLoading element={<RevisedPaperSubmissionForm />} />
           </ProtectedRoute>
         } />
         

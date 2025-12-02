@@ -114,6 +114,25 @@ const paperSubmissionSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Track revision requests from editor (can be multiple)
+  revisionRequests: [{
+    revisionNumber: Number, // 1st revision, 2nd revision, etc
+    requestedAt: {
+      type: Date,
+      default: Date.now
+    },
+    editorComments: String, // Comments for this specific revision request
+    deadline: Date,
+    status: {
+      type: String,
+      enum: ['Pending', 'Submitted', 'Overdue'],
+      default: 'Pending'
+    },
+    submittedAt: Date, // When author submitted the revision
+    pdfUrl: String, // Cloudinary URL for revised PDF
+    pdfPublicId: String,
+    pdfFileName: String
+  }],
   // Paper status collection
   collectionStatus: {
     type: String,

@@ -31,7 +31,16 @@ import {
     sendReReviewEmails,
     deleteReview,
     updateReview,
-    getPaperReReviews
+    getPaperReReviews,
+    updateReviewerDetails,
+    deleteReviewerFromSystem,
+    getAllAcceptedPapers,
+    getAcceptedPapersByCategory,
+    getAcceptedPapersByAuthor,
+    getHighRatedPapers,
+    getAcceptedPaperDetails,
+    getAcceptanceStatistics,
+    updateAcceptanceStatus
 } from '../controllers/editorController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireEditor } from '../middleware/roleCheck.js';
@@ -52,6 +61,8 @@ router.get('/papers/:paperId/reviews', getPaperReviews);
 // Reviewer management
 router.post('/reviewers', createReviewer);
 router.get('/reviewers', getAllReviewers);
+router.put('/reviewers/:reviewerId', updateReviewerDetails);    // Update reviewer details
+router.delete('/reviewers/:reviewerId', deleteReviewerFromSystem); // Delete reviewer
 router.post('/assign-reviewers', assignReviewers);
 router.post('/remove-reviewer', removeReviewerFromPaper);
 router.post('/send-reviewer-inquiry', sendReviewerInquiry);
@@ -65,9 +76,9 @@ router.post('/send-message', sendMessage);
 router.post('/send-message-to-reviewer', sendMessageToReviewer);
 router.post('/send-message-to-author', sendMessageToAuthor);
 
-// Decision making
+// Decision making - Revision requests use the existing requestRevision function
 router.post('/make-decision', makeFinalDecision);
-router.post('/request-revision', requestRevision);
+router.post('/request-revision', requestRevision);     // Request revision (original function handles multiple requests)
 router.post('/accept-paper', acceptPaper);
 router.post('/send-re-review-emails', sendReReviewEmails);
 
@@ -87,5 +98,16 @@ router.delete('/pdfs', deletePdf);        // Delete PDF from Cloudinary
 
 // Dashboard statistics
 router.get('/dashboard-stats', getEditorDashboardStats);
+
+// ========================================
+// FINAL ACCEPTANCE / ACCEPTED PAPERS MANAGEMENT
+// ========================================
+router.get('/accepted-papers', getAllAcceptedPapers);                           // Get all accepted papers
+router.get('/accepted-papers/category/:category', getAcceptedPapersByCategory); // Get by category
+router.get('/accepted-papers/author/:email', getAcceptedPapersByAuthor);        // Get by author email
+router.get('/accepted-papers/high-rated', getHighRatedPapers);                  // Get high-rated papers
+router.get('/accepted-papers/:submissionId', getAcceptedPaperDetails);          // Get single paper details
+router.get('/acceptance-statistics', getAcceptanceStatistics);                  // Get statistics
+router.put('/accepted-papers/:submissionId/status', updateAcceptanceStatus);    // Update status
 
 export default router;

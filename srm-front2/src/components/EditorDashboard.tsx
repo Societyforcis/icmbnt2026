@@ -103,6 +103,7 @@ const EditorDashboard = () => {
     // Paper details view state (instead of modal)
     const [viewingPaper, setViewingPaper] = useState<Paper | null>(null);
     const [paperReviewers, setPaperReviewers] = useState<any[]>([]);
+    // @ts-ignore - paperReReviews is used indirectly through reviewer.reReview property
     const [paperReReviews, setPaperReReviews] = useState<any[]>([]); // Re-reviews (Round 2)
     const [reviewerListLoading, setReviewerListLoading] = useState(false);
     const [paperDetailsTab, setPaperDetailsTab] = useState<'details' | 'reviewers'>('details');
@@ -149,7 +150,12 @@ const EditorDashboard = () => {
     // All Reviewers tab states
     const [allReviewersSearchTerm, setAllReviewersSearchTerm] = useState('');
     const [expandedReviewerId, setExpandedReviewerId] = useState<string | null>(null);
-    const [reviewerAssignedPapers, setReviewerAssignedPapers] = useState<{ [key: string]: Paper[] }>({});
+    
+    // CRUD states for reviewers
+    const [editingReviewerId, setEditingReviewerId] = useState<string | null>(null);
+    const [editFormData, setEditFormData] = useState({ username: '', email: '' });
+    const [isLoadingReviewerAction, setIsLoadingReviewerAction] = useState(false);
+    // const [reviewerAssignedPapers, setReviewerAssignedPapers] = useState<{ [key: string]: Paper[] }>({}); // Not used currently
 
     // Review search state - REMOVED (Reviews tab removed)
     // const [reviewSearchTerm, setReviewSearchTerm] = useState('');
@@ -559,6 +565,102 @@ const EditorDashboard = () => {
         } finally {
             setDeleteLoading(false);
         }
+    };
+
+    // ========== NEW CRUD FUNCTIONS FOR ALL REVIEWERS PAGE ==========
+
+    // Update reviewer details (Edit)
+    const handleEditReviewer = async (reviewerId: string) => {
+        if (!editFormData.username || !editFormData.email) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        setIsLoadingReviewerAction(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.put(
+                `${API_URL}/api/editor/reviewers/${reviewerId}`,
+                {
+                    username: editFormData.username,
+                    email: editFormData.email
+                },
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            if (response.data.success) {
+                alert('✅ Reviewer updated successfully!');
+                setEditingReviewerId(null);
+                setEditFormData({ username: '', email: '' });
+                
+                // Refresh reviewers list
+                const reviewersRes = await axios.get(`${API_URL}/api/editor/reviewers`, { headers: { Authorization: `Bearer ${token}` } });
+                setReviewers(reviewersRes.data.reviewers || []);
+            } else {
+                alert('❌ Error: ' + (response.data.message || 'Failed to update reviewer'));
+            }
+        } catch (error: any) {
+            console.error('Error updating reviewer:', error);
+            const errorMsg = error.response?.data?.message || 'Failed to update reviewer';
+            alert('❌ Error: ' + errorMsg);
+        } finally {
+            setIsLoadingReviewerAction(false);
+        }
+    };
+
+    // Delete reviewer (Remove from system)
+    const handleDeleteReviewerFromSystem = async (reviewerId: string, reviewerName: string) => {
+        if (!window.confirm(`Are you sure you want to delete reviewer "${reviewerName}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        setIsLoadingReviewerAction(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.delete(
+                `${API_URL}/api/editor/reviewers/${reviewerId}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            if (response.data.success) {
+                alert('✅ Reviewer deleted successfully!');
+                
+                // Refresh reviewers list
+                const reviewersRes = await axios.get(`${API_URL}/api/editor/reviewers`, { headers: { Authorization: `Bearer ${token}` } });
+                setReviewers(reviewersRes.data.reviewers || []);
+                
+                // Also refresh papers list to update counts
+                const papersRes = await axios.get(`${API_URL}/api/editor/papers`, { headers: { Authorization: `Bearer ${token}` } });
+                setPapers(papersRes.data.papers || []);
+            } else {
+                alert('❌ Error: ' + (response.data.message || 'Failed to delete reviewer'));
+            }
+        } catch (error: any) {
+            console.error('Error deleting reviewer:', error);
+            const errorMsg = error.response?.data?.message || 'Failed to delete reviewer';
+            alert('❌ Error: ' + errorMsg);
+        } finally {
+            setIsLoadingReviewerAction(false);
+        }
+    };
+
+    // Start editing a reviewer
+    const startEditReviewer = (reviewer: any) => {
+        setEditingReviewerId(reviewer._id);
+        setEditFormData({
+            username: reviewer.username || '',
+            email: reviewer.email || ''
+        });
+    };
+
+    // Cancel editing
+    const cancelEditReviewer = () => {
+        setEditingReviewerId(null);
+        setEditFormData({ username: '', email: '' });
     };
 
     const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
@@ -1092,7 +1194,26 @@ const EditorDashboard = () => {
                                                     <>
                                                         {/* Send Re-Review Emails Button */}
                                                         <button
-                                                            onClick={() => handleSendReReviewEmails()}
+                                                            onClick={async () => {
+                                                                setDecisionLoading(true);
+                                                                try {
+                                                                    const token = localStorage.getItem('token');
+                                                                    await axios.post(
+                                                                        `${API_URL}/api/editor/send-re-review-emails`,
+                                                                        { paperId: viewingPaper._id },
+                                                                        { headers: { Authorization: `Bearer ${token}` } }
+                                                                    );
+                                                                    alert('✅ Re-review emails sent successfully');
+                                                                    if (viewingPaper?._id) {
+                                                                        await fetchPaperReviewsAndReviewers(viewingPaper._id);
+                                                                    }
+                                                                } catch (error: any) {
+                                                                    console.error('Error sending re-review emails:', error);
+                                                                    alert('❌ ' + (error.response?.data?.message || 'Failed to send re-review emails'));
+                                                                } finally {
+                                                                    setDecisionLoading(false);
+                                                                }
+                                                            }}
                                                             disabled={decisionLoading}
                                                             className="flex-1 px-3 py-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
                                                         >
@@ -1102,7 +1223,7 @@ const EditorDashboard = () => {
                                                         {/* Assign More Reviewers Button */}
                                                         <button
                                                             onClick={() => {
-                                                                setShowDecisionModal('assignReviewers');
+                                                                setShowAssignModal(true);
                                                                 setSelectedReviewersForAssignment([]);
                                                             }}
                                                             disabled={!viewingPaper}
@@ -1242,7 +1363,7 @@ const EditorDashboard = () => {
                                         </div>
                                     </div>
 
-                                    {/* Database Information - 3 columns */}
+                                 
                                     <div className="mb-6 border-t pt-6">
                                         <p className="text-sm font-semibold text-gray-700 mb-3">Database Information</p>
                                         <div className="grid grid-cols-3 gap-4">
@@ -1263,7 +1384,7 @@ const EditorDashboard = () => {
                                 </div>
                             )}
 
-                            {/* Reviewers & Reviews Tab */}
+                          
                             {paperDetailsTab === 'reviewers' && (
                                 <div>
                                         {reviewerListLoading ? (
@@ -1427,7 +1548,7 @@ const EditorDashboard = () => {
                                                                 </button>
 
                                                                 {/* Edit Button - Allow editing if review exists */}
-                                                                {reviewer.review && (
+                                                                {/* {reviewer.review && (
                                                                     <button
                                                                         onClick={() => {
                                                                             // Will implement in ReviewerDashboard to allow editing existing review
@@ -1438,7 +1559,7 @@ const EditorDashboard = () => {
                                                                     >
                                                                         ✎ Edit
                                                                     </button>
-                                                                )}
+                                                                )} */}
 
                                                                 {/* Delete Button - Allow removing review if not yet used for decision */}
                                                                 {reviewer.review && viewingPaper?.status !== 'Accepted' && viewingPaper?.status !== 'Rejected' && (
@@ -1453,7 +1574,9 @@ const EditorDashboard = () => {
                                                                                     );
                                                                                     alert('Review deleted successfully');
                                                                                     // Refresh the paper view
-                                                                                    await loadPaperDetails(viewingPaper.submissionId);
+                                                                                    if (viewingPaper?._id) {
+                                                                                        await fetchPaperReviewsAndReviewers(viewingPaper._id);
+                                                                                    }
                                                                                 } catch (error: any) {
                                                                                     console.error('Error deleting review:', error);
                                                                                     alert(error.response?.data?.message || 'Failed to delete review');
@@ -2194,6 +2317,7 @@ const EditorDashboard = () => {
                     {activeTab === 'allReviewers' && (
                         <div className="bg-white rounded-lg shadow-md p-6">
                             <div className="mb-6">
+                                <h2 className="text-2xl font-bold text-gray-800 mb-4">Manage All Reviewers</h2>
                                 <div className="relative">
                                     <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                                     <input
@@ -2212,48 +2336,113 @@ const EditorDashboard = () => {
                                     <p>No reviewers created yet</p>
                                 </div>
                             ) : (
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                     {reviewers.filter(r => 
                                         !allReviewersSearchTerm || 
                                         r.email.toLowerCase().includes(allReviewersSearchTerm.toLowerCase()) ||
-                                        (r.username && r.username.toLowerCase().includes(allReviewersSearchTerm.toLowerCase()))
+                                        (r.name && r.name.toLowerCase().includes(allReviewersSearchTerm.toLowerCase()))
                                     ).map((reviewer: any) => {
                                         const assignedPapersList = papers.filter(p => 
                                             p.assignedReviewers && 
                                             p.assignedReviewers.some(ar => ar._id === reviewer._id || ar === reviewer._id)
                                         );
                                         
+                                        const isEditing = editingReviewerId === reviewer._id;
+                                        
                                         return (
-                                            <div key={reviewer._id} className="border border-gray-200 rounded-lg">
-                                                {/* Reviewer Header */}
-                                                <button
-                                                    onClick={() => setExpandedReviewerId(
-                                                        expandedReviewerId === reviewer._id ? null : reviewer._id
-                                                    )}
-                                                    className="w-full px-6 py-4 flex items-center justify-between hover:bg-blue-50 transition"
-                                                >
-                                                    <div className="flex items-center gap-4 flex-1 text-left">
-                                                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                                            <Users className="w-6 h-6 text-blue-600" />
+                                            <div key={reviewer._id} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
+                                                {/* Reviewer Card - Main View or Edit Mode */}
+                                                {!isEditing ? (
+                                                    // Display Mode
+                                                    <div className="p-6">
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <div className="flex items-center gap-4 flex-1">
+                                                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                                    <Users className="w-6 h-6 text-blue-600" />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="font-semibold text-gray-900 truncate">{reviewer.username}</p>
+                                                                    <p className="text-sm text-gray-600 truncate">{reviewer.email}</p>
+                                                                </div>
+                                                                <div className="text-right ml-4 flex-shrink-0">
+                                                                    <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                                                                        {assignedPapersList.length} paper{assignedPapersList.length !== 1 ? 's' : ''}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex-1">
-                                                            <p className="font-semibold text-gray-900">{reviewer.username}</p>
-                                                            <p className="text-sm text-gray-600">{reviewer.email}</p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                                                                {assignedPapersList.length} paper{assignedPapersList.length !== 1 ? 's' : ''}
-                                                            </span>
+
+                                                        {/* Action Buttons */}
+                                                        <div className="flex gap-2 mt-4 border-t pt-4">
+                                                            <button
+                                                                onClick={() => startEditReviewer(reviewer)}
+                                                                className="flex-1 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium transition flex items-center justify-center gap-2"
+                                                                title="Edit reviewer details"
+                                                            >
+                                                                ✏️ Edit
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setExpandedReviewerId(
+                                                                    expandedReviewerId === reviewer._id ? null : reviewer._id
+                                                                )}
+                                                                className="flex-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium transition flex items-center justify-center gap-2"
+                                                            >
+                                                                📄 {expandedReviewerId === reviewer._id ? 'Hide' : 'View'} Papers
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteReviewerFromSystem(reviewer._id, reviewer.username)}
+                                                                disabled={isLoadingReviewerAction}
+                                                                className="flex-1 px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 text-sm font-medium transition flex items-center justify-center gap-2"
+                                                                title="Delete reviewer permanently"
+                                                            >
+                                                                {isLoadingReviewerAction ? '⏳...' : '🗑️ Delete'}
+                                                            </button>
                                                         </div>
                                                     </div>
-                                                    <div className="ml-2">
-                                                        {expandedReviewerId === reviewer._id ? (
-                                                            <X className="w-5 h-5 text-gray-400" />
-                                                        ) : (
-                                                            <FileText className="w-5 h-5 text-gray-400" />
-                                                        )}
+                                                ) : (
+                                                    // Edit Mode
+                                                    <div className="p-6 bg-blue-50 border-2 border-blue-300">
+                                                        <h4 className="font-bold text-gray-900 mb-4">Edit Reviewer Details</h4>
+                                                        <div className="space-y-4 mb-4">
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={editFormData.username}
+                                                                    onChange={(e) => setEditFormData({ ...editFormData, username: e.target.value })}
+                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                    placeholder="Reviewer name"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                                                <input
+                                                                    type="email"
+                                                                    value={editFormData.email}
+                                                                    onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                    placeholder="reviewer@example.com"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => handleEditReviewer(reviewer._id)}
+                                                                disabled={isLoadingReviewerAction}
+                                                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 font-medium transition"
+                                                            >
+                                                                {isLoadingReviewerAction ? '⏳ Saving...' : '💾 Save Changes'}
+                                                            </button>
+                                                            <button
+                                                                onClick={cancelEditReviewer}
+                                                                disabled={isLoadingReviewerAction}
+                                                                className="flex-1 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-400 font-medium transition"
+                                                            >
+                                                                ✕ Cancel
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                </button>
+                                                )}
 
                                                 {/* Assigned Papers Dropdown */}
                                                 {expandedReviewerId === reviewer._id && (
