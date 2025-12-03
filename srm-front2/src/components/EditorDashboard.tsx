@@ -1520,7 +1520,7 @@ const EditorDashboard = () => {
                                                                     </button>
                                                                 )} */}
 
-                                                                {/* Delete Button - Allow removing review if not yet used for decision */}
+                                                                {/* Delete Review Button */}
                                                                 {reviewer.review && viewingPaper?.status !== 'Accepted' && viewingPaper?.status !== 'Rejected' && (
                                                                     <button
                                                                         onClick={async () => {
@@ -1545,7 +1545,48 @@ const EditorDashboard = () => {
                                                                         className="px-3 py-2 rounded text-xs bg-red-600 text-white hover:bg-red-700 font-medium transition"
                                                                         title="Delete this review"
                                                                     >
-                                                                        🗑 Delete
+                                                                        🗑 Delete Review
+                                                                    </button>
+                                                                )}
+
+                                                                {/* Delete Reviewer Button - Remove entire reviewer from paper */}
+                                                                {viewingPaper?.status !== 'Accepted' && viewingPaper?.status !== 'Rejected' && (
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            if (confirm(`Are you sure you want to DELETE ${reviewer.username || reviewer.email} as a reviewer? All their reviews and related data will be permanently removed.`)) {
+                                                                                try {
+                                                                                    const token = localStorage.getItem('token');
+                                                                                    const response = await axios.post(
+                                                                                        `${API_URL}/api/editor/remove-reviewer`,
+                                                                                        {
+                                                                                            paperId: viewingPaper._id,
+                                                                                            reviewerId: reviewer._id
+                                                                                        },
+                                                                                        {
+                                                                                            headers: {
+                                                                                                Authorization: `Bearer ${token}`
+                                                                                            }
+                                                                                        }
+                                                                                    );
+
+                                                                                    if (response.data.success) {
+                                                                                        alert('✅ Reviewer deleted successfully! All related data has been removed.');
+                                                                                        if (viewingPaper?._id) {
+                                                                                            await fetchPaperReviewsAndReviewers(viewingPaper._id);
+                                                                                        }
+                                                                                    } else {
+                                                                                        alert('Error: ' + (response.data.message || 'Failed to delete reviewer'));
+                                                                                    }
+                                                                                } catch (error: any) {
+                                                                                    console.error('Error deleting reviewer:', error);
+                                                                                    alert(error.response?.data?.message || 'Failed to delete reviewer');
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        className="px-3 py-2 rounded text-xs bg-orange-600 text-white hover:bg-orange-700 font-medium transition"
+                                                                        title="Remove reviewer from paper (deletes all related data)"
+                                                                    >
+                                                                        ✕ Remove Reviewer
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -1713,6 +1754,45 @@ const EditorDashboard = () => {
                                                             >
                                                                 ❓ Query
                                                             </button>
+                                                            {viewingPaper?.status !== 'Accepted' && viewingPaper?.status !== 'Rejected' && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (confirm(`Are you sure you want to DELETE ${reviewer.username || reviewer.name} as a reviewer? All their reviews and related data will be permanently deleted. This action cannot be undone.`)) {
+                                                                            try {
+                                                                                const token = localStorage.getItem('token');
+                                                                                const response = await axios.post(
+                                                                                    `${API_URL}/api/editor/remove-reviewer`,
+                                                                                    {
+                                                                                        paperId: viewingPaper._id,
+                                                                                        reviewerId: reviewer._id
+                                                                                    },
+                                                                                    {
+                                                                                        headers: {
+                                                                                            Authorization: `Bearer ${token}`
+                                                                                        }
+                                                                                    }
+                                                                                );
+
+                                                                                if (response.data.success) {
+                                                                                    alert('✅ Reviewer deleted successfully! All related data has been removed.');
+                                                                                    if (viewingPaper?._id) {
+                                                                                        await fetchPaperReviewsAndReviewers(viewingPaper._id);
+                                                                                    }
+                                                                                } else {
+                                                                                    alert('Error: ' + (response.data.message || 'Failed to delete reviewer'));
+                                                                                }
+                                                                            } catch (error: any) {
+                                                                                console.error('Error deleting reviewer:', error);
+                                                                                alert(error.response?.data?.message || 'Failed to delete reviewer');
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition font-medium"
+                                                                    title="Delete this reviewer and all related data (not available after paper is accepted/rejected)"
+                                                                >
+                                                                    🗑 Delete
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 );
