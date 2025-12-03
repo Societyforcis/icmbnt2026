@@ -145,7 +145,6 @@ const EditorDashboard = () => {
     const [reviewerInquiryModal, setReviewerInquiryModal] = useState<{ reviewerId: string; reviewerName: string } | null>(null);
     const [inquiryMessage, setInquiryMessage] = useState('');
     const [inquiryLoading, setInquiryLoading] = useState(false);
-    const [deleteLoading, setDeleteLoading] = useState(false);
 
     // All Reviewers tab states
     const [allReviewersSearchTerm, setAllReviewersSearchTerm] = useState('');
@@ -524,46 +523,6 @@ const EditorDashboard = () => {
             alert('Error sending inquiry');
         } finally {
             setInquiryLoading(false);
-        }
-    };
-
-    // Handle delete reviewer from paper
-    const handleDeleteReviewer = async (reviewerId: string) => {
-        if (!viewingPaper || !window.confirm('Are you sure you want to remove this reviewer? Their review will also be deleted.')) {
-            return;
-        }
-
-        setDeleteLoading(true);
-        try {
-            const response = await axios.post(
-                `${API_URL}/api/editor/remove-reviewer`,
-                {
-                    paperId: viewingPaper._id,
-                    reviewerId: reviewerId
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`
-                    }
-                }
-            );
-
-            if (response.data.success) {
-                alert('Reviewer removed successfully');
-                setViewingPaper(null);
-                // Refresh papers list
-                const token = localStorage.getItem('token');
-                const headers = { Authorization: `Bearer ${token}` };
-                const papersRes = await axios.get(`${API_URL}/api/editor/papers`, { headers });
-                setPapers(papersRes.data.papers || []);
-            } else {
-                alert('Error: ' + (response.data.message || 'Failed to remove reviewer'));
-            }
-        } catch (error) {
-            console.error('Error removing reviewer:', error);
-            alert('Error removing reviewer');
-        } finally {
-            setDeleteLoading(false);
         }
     };
 
@@ -1142,8 +1101,8 @@ const EditorDashboard = () => {
                                             📄 View PDF
                                         </button>
 
-                                        {/* Assign Reviewers Button - Show if < 3 reviewers assigned and not decided */}
-                                        {paperReviewers.length < 3 && viewingPaper.status !== 'Accepted' && viewingPaper.status !== 'Rejected' && (
+                                        {/* Assign Reviewers Button - Show anytime (no limit) except when Accepted or Rejected */}
+                                        {viewingPaper.status !== 'Accepted' && viewingPaper.status !== 'Rejected' && (
                                             <button
                                                 onClick={() => setShowAssignModal(true)}
                                                 className="flex-1 px-3 py-3 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm flex items-center justify-center gap-2 font-medium transition"
@@ -1754,14 +1713,6 @@ const EditorDashboard = () => {
                                                             >
                                                                 ❓ Query
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleDeleteReviewer(reviewer._id)}
-                                                                disabled={deleteLoading}
-                                                                className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-400 transition"
-                                                                title="Remove reviewer"
-                                                            >
-                                                                🗑️ Delete
-                                                            </button>
                                                         </div>
                                                     </div>
                                                 );
@@ -1770,90 +1721,88 @@ const EditorDashboard = () => {
                                     </div>
                                 )}
 
-                                {/* Add New Reviewers Section - Only show if < 3 */}
-                                {paperReviewers.length < 3 && (
-                                    <>
-                                        <div className="mb-4">
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Review Deadline *
-                                            </label>
-                                            <input
-                                                type="date"
-                                                value={assignmentDeadline}
-                                                onChange={(e) => setAssignmentDeadline(e.target.value)}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                            />
-                                        </div>
+                                {/* Add New Reviewers Section - Allow adding reviewers anytime */}
+                                <>
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Review Deadline *
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={assignmentDeadline}
+                                            onChange={(e) => setAssignmentDeadline(e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        />
+                                    </div>
 
-                                        <div className="mb-4">
-                                            <label className="block text-sm font-medium text-gray-700 mb-3">
-                                                Select Reviewers (add {3 - paperReviewers.length} to reach 3 total) *
-                                            </label>
-                                            <div className="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto">
-                                                {reviewers.length === 0 ? (
-                                                    <p className="text-gray-500 text-sm">No reviewers available</p>
-                                                ) : (
-                                                    <div className="space-y-2">
-                                                        {reviewers.map((reviewer: any) => {
-                                                            // Hide reviewers already assigned to this paper
-                                                            const alreadyAssigned = paperReviewers.some((pr: any) => 
-                                                                pr._id === reviewer._id || pr.reviewer === reviewer._id
-                                                            );
-                                                            
-                                                            if (alreadyAssigned) return null;
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                                            Select Reviewers {paperReviewers.length < 3 ? `(add ${3 - paperReviewers.length} to reach minimum 3)` : '(add additional reviewers)'} *
+                                        </label>
+                                        <div className="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto">
+                                            {reviewers.length === 0 ? (
+                                                <p className="text-gray-500 text-sm">No reviewers available</p>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {reviewers.map((reviewer: any) => {
+                                                        // Hide reviewers already assigned to this paper
+                                                        const alreadyAssigned = paperReviewers.some((pr: any) => 
+                                                            pr._id === reviewer._id || pr.reviewer === reviewer._id
+                                                        );
+                                                        
+                                                        if (alreadyAssigned) return null;
 
-                                                            const isSelected = selectedReviewersForAssignment.includes(reviewer._id);
-                                                            
-                                                            return (
-                                                                <label key={reviewer._id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isSelected}
-                                                                        onChange={(e) => {
-                                                                            if (e.target.checked) {
-                                                                                setSelectedReviewersForAssignment([...selectedReviewersForAssignment, reviewer._id]);
-                                                                            } else {
-                                                                                setSelectedReviewersForAssignment(
-                                                                                    selectedReviewersForAssignment.filter(id => id !== reviewer._id)
-                                                                                );
-                                                                            }
-                                                                        }}
-                                                                        className="w-4 h-4 text-purple-600 rounded cursor-pointer"
-                                                                    />
-                                                                    <span className="ml-3 text-sm">
-                                                                        <strong>{reviewer.username}</strong> - {reviewer.email}
-                                                                    </span>
-                                                                </label>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-2">
-                                                New selection: {selectedReviewersForAssignment.length} reviewers
-                                            </p>
+                                                        const isSelected = selectedReviewersForAssignment.includes(reviewer._id);
+                                                        
+                                                        return (
+                                                            <label key={reviewer._id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isSelected}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            setSelectedReviewersForAssignment([...selectedReviewersForAssignment, reviewer._id]);
+                                                                        } else {
+                                                                            setSelectedReviewersForAssignment(
+                                                                                selectedReviewersForAssignment.filter(id => id !== reviewer._id)
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    className="w-4 h-4 text-purple-600 rounded cursor-pointer"
+                                                                />
+                                                                <span className="ml-3 text-sm">
+                                                                    <strong>{reviewer.username}</strong> - {reviewer.email}
+                                                                </span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            New selection: {selectedReviewersForAssignment.length} reviewers
+                                        </p>
+                                    </div>
 
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    setShowAssignModal(false);
-                                                    setSelectedReviewersForAssignment([]);
-                                                }}
-                                                className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={handleAssignReviewers}
-                                                disabled={assignmentLoading || selectedReviewersForAssignment.length < 1 || !assignmentDeadline}
-                                                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 transition font-medium"
-                                            >
-                                                {assignmentLoading ? 'Assigning...' : `Add ${selectedReviewersForAssignment.length} More Reviewers`}
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setShowAssignModal(false);
+                                                setSelectedReviewersForAssignment([]);
+                                            }}
+                                            className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleAssignReviewers}
+                                            disabled={assignmentLoading || selectedReviewersForAssignment.length < 1 || !assignmentDeadline}
+                                            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 transition font-medium"
+                                        >
+                                            {assignmentLoading ? 'Assigning...' : `Add ${selectedReviewersForAssignment.length} More Reviewers`}
+                                        </button>
+                                    </div>
+                                </>
                         </div>
                     )}
 

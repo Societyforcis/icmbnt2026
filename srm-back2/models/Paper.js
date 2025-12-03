@@ -22,6 +22,11 @@ const paperSubmissionSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  abstract: {
+    type: String,
+    required: false,
+    default: null
+  },
   topic: String,
   // PDF stored as URL from Cloudinary
   pdfUrl: {

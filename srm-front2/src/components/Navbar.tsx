@@ -140,8 +140,8 @@ const Navbar: React.FC = () => {
               </Link>
             </div>
 
-            {/* Dashboard Link (Left side, visible when logged in) */}
-            {isLoggedIn && (
+            {/* Dashboard Link (Left side, visible when logged in - but NOT for Authors) */}
+            {isLoggedIn && (localStorage.getItem('role') === 'Editor' || localStorage.getItem('role') === 'Admin' || localStorage.getItem('role') === 'Reviewer') && (
               <div className="hidden md:flex items-center ml-6 mr-3 gap-2">
                 <Link 
                   to={localStorage.getItem('role') === 'Reviewer' ? '/reviewer' : '/dashboard'}
@@ -236,8 +236,8 @@ const Navbar: React.FC = () => {
                 </Link>
               </li>
               
-              {/* Dashboard link in mobile menu (only when logged in) */}
-              {isLoggedIn && (
+              {/* Dashboard link in mobile menu (only when logged in and NOT author) */}
+              {isLoggedIn && (localStorage.getItem('role') === 'Editor' || localStorage.getItem('role') === 'Admin' || localStorage.getItem('role') === 'Reviewer') && (
                 <>
                   <li>
                     <Link 

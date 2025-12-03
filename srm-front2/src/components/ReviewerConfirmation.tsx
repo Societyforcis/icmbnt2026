@@ -12,6 +12,7 @@ interface ReviewAssignment {
     submissionId: string;
     category: string;
     authorName: string;
+    abstract?: string;
     reviewerEmail: string;
     reviewerName: string;
     status: 'pending' | 'accepted' | 'rejected';
@@ -273,6 +274,23 @@ const ReviewerConfirmation = () => {
                         </div>
                     </div>
 
+                    {/* Abstract Section */}
+                    {assignment.abstract && (
+                        <div className="mb-8 p-6 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg border border-amber-200">
+                            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                📋 Paper Abstract
+                            </h2>
+                            <div className="prose prose-sm max-w-none">
+                                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+                                    {assignment.abstract}
+                                </p>
+                            </div>
+                            <p className="text-xs text-amber-700 mt-4 pt-4 border-t border-amber-200">
+                                ℹ️ <strong>Please review this abstract carefully</strong> before confirming your availability to review this paper.
+                            </p>
+                        </div>
+                    )}
+
                     {/* Decision Buttons */}
                     <div className="grid grid-cols-2 gap-4 mb-8">
                         <button
@@ -331,6 +349,18 @@ const ReviewerConfirmation = () => {
                             })}</p>
                         </div>
                     </div>
+
+                    {/* Abstract Section */}
+                    {assignment.abstract && (
+                        <div className="mb-8 p-6 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                📋 Paper Abstract
+                            </h3>
+                            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap break-words text-sm">
+                                {assignment.abstract}
+                            </p>
+                        </div>
+                    )}
 
                     {/* Info */}
                     <div className="mb-8 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
@@ -394,6 +424,18 @@ const ReviewerConfirmation = () => {
                             <p><strong>Category:</strong> {assignment.category}</p>
                         </div>
                     </div>
+
+                    {/* Abstract Section */}
+                    {assignment.abstract && (
+                        <div className="mb-8 p-6 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                📋 Paper Abstract
+                            </h3>
+                            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap break-words text-sm">
+                                {assignment.abstract}
+                            </p>
+                        </div>
+                    )}
 
                     {/* Rejection Form */}
                     <div className="space-y-6 mb-8">

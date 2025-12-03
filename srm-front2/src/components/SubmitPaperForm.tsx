@@ -97,7 +97,8 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
     paperTitle: "",
     authorName: "",
     email: "",
-    category: ""
+    category: "",
+    abstract: ""
   });
 
   // Extract and pre-fill email from logged-in user on component mount
@@ -172,6 +173,7 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
         revisionFormData.append('authorName', formData.authorName);
         revisionFormData.append('email', formData.email);
         revisionFormData.append('category', formData.category);
+        revisionFormData.append('abstract', formData.abstract);
         revisionFormData.append('topic', '');
         revisionFormData.append('revisionNotes', formData.paperTitle || 'Revision submitted'); // Using paperTitle as notes
         revisionFormData.append('pdf', abstractFile);
@@ -197,7 +199,8 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
             paperTitle: "",
             authorName: "",
             email: "",
-            category: ""
+            category: "",
+            abstract: ""
           });
           setAbstractFile(null);
           setAbstractFileName("Click to browse files");
@@ -236,6 +239,7 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
     submissionFormData.append('authorName', formData.authorName);
     submissionFormData.append('email', formData.email);
     submissionFormData.append('category', formData.category);
+    submissionFormData.append('abstract', formData.abstract);
 
     // Append PDF file
     if (abstractFile) {
@@ -273,7 +277,8 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
           paperTitle: "",
           authorName: "",
           email: "",
-          category: ""
+          category: "",
+          abstract: ""
         });
         setAbstractFile(null);
         setAbstractFileName("Click to browse files");
@@ -437,6 +442,25 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
 
           {/* Category */}
           <CategorySelectorSection />
+
+          {/* Abstract */}
+          <div className="form-group">
+            <label htmlFor="abstract" className="block mb-2 font-medium text-gray-700">
+              Abstract *
+            </label>
+            <textarea
+              id="abstract"
+              name="abstract"
+              required
+              placeholder="Enter a brief abstract of your paper (200-500 words recommended)"
+              maxLength={2000}
+              rows={6}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F5A051] resize-none"
+              value={formData.abstract}
+              onChange={handleChange}
+            />
+            <p className="text-xs text-gray-500 mt-1">{formData.abstract.length}/2000 characters</p>
+          </div>
 
           {/* File Upload */}
           <div className="form-group">

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { 
   ArrowRight, 
   Download, 
@@ -12,19 +12,73 @@ import {
   Briefcase, 
   Globe,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import axios from 'axios';
 import RegistrationCountdown from './RegistrationCountdown';
 
 const MemoizedRegistrationCountdown = React.memo(RegistrationCountdown);
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+// Access Denied Component
+const AccessDeniedPage: React.FC = () => (
+  <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+    <div className="relative bg-gradient-to-r from-blue-900 via-blue-800 to-[#F5A051] text-white py-12 sm:py-16 md:py-24 overflow-hidden">
+      <div className="absolute inset-0 bg-black opacity-30"></div>
+      <div className="relative z-10 container mx-auto px-4 text-center">
+        <div className="inline-block mb-6">
+          <div className="w-16 h-1 bg-[#F5A051] mx-auto mb-2"></div>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">Registration</h1>
+          <div className="w-16 h-1 bg-[#F5A051] mx-auto mt-2"></div>
+        </div>
+        <p className="text-lg md:text-xl max-w-3xl mx-auto font-light">
+          International Conference on Multidisciplinary Breakthroughs and NextGen Technologies
+        </p>
+      </div>
+    </div>
+    
+    <div className="container mx-auto px-4 py-16">
+      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8 text-center">
+        <Lock className="mx-auto h-16 w-16 text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Access Denied</h2>
+        <p className="text-gray-600 mb-4">
+          Registration is only available for <span className="font-semibold">accepted authors</span>.
+        </p>
+        <p className="text-gray-600 mb-6">
+          Your paper has not been accepted yet. Please wait for the final acceptance decision from the conference organizers.
+        </p>
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-left">
+          <p className="text-sm text-yellow-700">
+            <span className="font-medium">Note:</span> Once your paper is accepted, you will be able to access the registration page to complete your registration for ICMBNT 2026.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Loading Component
+const LoadingPage: React.FC = () => (
+  <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+    <div className="text-center">
+      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+      <p className="mt-4 text-gray-600">Verifying acceptance status...</p>
+    </div>
+  </div>
+);
+
 const Registrations: React.FC = () => {
+  // Define ALL state hooks FIRST
   const [activeTab, setActiveTab] = useState<'fee' | 'form'>('fee');
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [paymentProofName, setPaymentProofName] = useState("No file selected");
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [isAccepted, setIsAccepted] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -39,7 +93,7 @@ const Registrations: React.FC = () => {
 
   const bankDetailsRef = useRef<HTMLDivElement>(null);
   
-  // Use useCallback to prevent unnecessary re-renders
+  // Define ALL callback hooks SECOND
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -70,7 +124,6 @@ const Registrations: React.FC = () => {
   }, []);
   
   const handleDownload = useCallback((url: string, filename: string) => {
-    // Show loading indicator
     Swal.fire({
       title: 'Downloading...',
       text: `Preparing ${filename} for download`,
@@ -89,21 +142,17 @@ const Registrations: React.FC = () => {
         return response.blob();
       })
       .then(blob => {
-        // Close loading indicator
         Swal.close();
         
-        // Create download link
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = filename;
         document.body.appendChild(link);
         link.click();
         
-        // Clean up
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
         
-        // Show success message
         Swal.fire({
           icon: 'success',
           title: 'Download Started',
@@ -114,11 +163,8 @@ const Registrations: React.FC = () => {
       })
       .catch(error => {
         console.error('Download error:', error);
-        
-        // Close loading indicator
         Swal.close();
         
-        // Show error message
         Swal.fire({
           icon: 'error',
           title: 'Download Failed',
@@ -130,10 +176,8 @@ const Registrations: React.FC = () => {
   
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission - can be implemented with API calls
     console.log('Form submitted:', formData, 'Category:', selectedCategory);
     
-    // Show success message or redirect
     Swal.fire({
       icon: 'success',
       title: 'Registration Successful',
@@ -142,6 +186,54 @@ const Registrations: React.FC = () => {
     });
   }, [formData, selectedCategory]);
   
+  // Define effect hook THIRD
+  useEffect(() => {
+    const checkAcceptanceStatus = async () => {
+      try {
+        setLoading(true);
+        const email = localStorage.getItem('email');
+        const token = localStorage.getItem('token');
+        
+        console.log('Registration check - Email from storage:', email);
+        console.log('Registration check - Token from storage:', token ? 'Present' : 'Missing');
+        
+        if (!email || !token) {
+          console.log('Missing email or token for acceptance check');
+          setIsAccepted(false);
+          return;
+        }
+        
+        const response = await axios.get(
+          `${API_URL}/api/auth/check-acceptance-status`,
+          {
+            params: { email },
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+        
+        console.log('Acceptance check response:', response.data);
+        setIsAccepted(response.data.isAccepted || false);
+      } catch (error) {
+        console.error('Error checking acceptance status:', error);
+        setIsAccepted(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAcceptanceStatus();
+  }, []);
+  
+  // NOW render based on state - all hooks have been called
+  if (loading) {
+    return <LoadingPage />;
+  }
+  
+  if (!isAccepted) {
+    return <AccessDeniedPage />;
+  }
+  
+  // Main component JSX
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       {/* Rest of your component remains the same */}

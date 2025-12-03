@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { User } from '../models/User.js';
+import FinalAcceptance from '../models/FinalAcceptance.js';
 import { sendVerificationEmail, sendOTPEmail } from '../utils/emailService.js';
 
 // Register new user
@@ -301,6 +302,51 @@ export const getCurrentUser = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "An error occurred while fetching user data",
+            error: error.message
+        });
+    }
+};
+
+// Check if user's email exists in FinalAcceptance (is accepted for registration)
+export const checkAcceptanceStatus = async (req, res) => {
+    try {
+        const email = req.query.email;
+        
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                isAccepted: false,
+                message: "Email is required"
+            });
+        }
+
+        // Search for acceptance record with this email
+        const acceptanceRecord = await FinalAcceptance.findOne({ authorEmail: email });
+
+        if (acceptanceRecord) {
+            return res.status(200).json({
+                success: true,
+                isAccepted: true,
+                message: "User is accepted for registration",
+                acceptanceData: {
+                    paperTitle: acceptanceRecord.paperTitle,
+                    authorName: acceptanceRecord.authorName,
+                    acceptanceDate: acceptanceRecord.acceptanceDate
+                }
+            });
+        } else {
+            return res.status(200).json({
+                success: true,
+                isAccepted: false,
+                message: "User is not accepted for registration"
+            });
+        }
+    } catch (error) {
+        console.error("Check acceptance status error:", error);
+        return res.status(500).json({
+            success: false,
+            isAccepted: false,
+            message: "An error occurred while checking acceptance status",
             error: error.message
         });
     }

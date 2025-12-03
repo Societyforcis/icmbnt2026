@@ -332,6 +332,7 @@ export const assignReviewers = async (req, res) => {
                     reviewerEmail: reviewer.email,
                     reviewerName: reviewer.username,
                     paperTitle: paper.paperTitle,
+                    abstract: paper.abstract || null,  // Include abstract from paper
                     status: 'Pending',
                     reviewDeadline: deadline
                 });
@@ -349,6 +350,7 @@ export const assignReviewers = async (req, res) => {
                     submissionId: paper.submissionId,
                     paperTitle: paper.paperTitle,
                     category: paper.category,
+                    abstract: assignment.abstract,  // Include abstract in email data
                     deadline: assignment.reviewDeadline
                 },
                 assignment._id.toString()  // Pass the ReviewerAssignment _id

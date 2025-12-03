@@ -11,7 +11,7 @@ export const submitPaper = async (req, res) => {
 
     try {
         // Get email from request body or from JWT token
-        let { email, paperTitle, authorName, category, topic } = req.body;
+        let { email, paperTitle, authorName, category, topic, abstract } = req.body;
         
         // If email not provided in request, get it from JWT token
         if (!email && req.user && req.user.email) {
@@ -82,6 +82,7 @@ export const submitPaper = async (req, res) => {
             authorName,
             email,
             category,
+            abstract: abstract || null,
             pdfUrl,
             pdfPublicId,
             pdfFileName,
@@ -259,6 +260,7 @@ export const editSubmission = async (req, res) => {
         if (req.body.category) paperSubmission.category = req.body.category;
         if (req.body.topic) paperSubmission.topic = req.body.topic;
         if (req.body.authorName) paperSubmission.authorName = req.body.authorName;
+        if (req.body.abstract) paperSubmission.abstract = req.body.abstract;
 
         // Handle file upload if new file provided
         if (req.file) {
@@ -393,7 +395,7 @@ export const submitRevision = async (req, res) => {
     console.log('File received:', req.file ? 'Yes, ' + req.file.originalname : 'No file');
 
     try {
-        const { submissionId, paperTitle, authorName, email, category, topic, revisionNotes } = req.body;
+        const { submissionId, paperTitle, authorName, email, category, topic, abstract, revisionNotes } = req.body;
 
         // Validate required fields
         if (!submissionId || !paperTitle || !authorName || !email || !category || !revisionNotes) {
@@ -466,6 +468,9 @@ export const submitRevision = async (req, res) => {
         paper.category = category;
         if (topic) {
             paper.topic = topic;
+        }
+        if (abstract) {
+            paper.abstract = abstract;
         }
 
         // Add to versions history

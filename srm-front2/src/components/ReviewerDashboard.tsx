@@ -454,17 +454,17 @@ const ReviewerDashboard = () => {
                             {/* Comments to Editor */}
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Comments for Editor / Author Decision <span className="text-red-500">*</span>
+                                    Private Comments to Editor (Will Not Be Shared to Author) <span className="text-red-500">*</span>
                                 </label>
                                 <textarea
                                     value={formData.commentsToEditor}
                                     onChange={(e) => setFormData({ ...formData, commentsToEditor: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                                     rows={3}
-                                    placeholder="Comments to be included in the editor's decision email to the author..."
+                                    placeholder="Your private comments and observations for the editor only (confidential)..."
                                     required
                                 />
-                                <p className="text-xs text-green-600 mt-1">These comments will be sent to the author in the decision email.</p>
+                                <p className="text-xs text-red-600 mt-1">These comments are PRIVATE and will NOT be sent to the author. Only the editor will see these.</p>
                             </div>
 
                             {/* Strengths */}

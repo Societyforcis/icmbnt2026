@@ -2,7 +2,7 @@ import { PaperSubmission } from '../models/Paper.js';
 import { ReviewerReview } from '../models/ReviewerReview.js';
 import { User } from '../models/User.js';
 import { ReviewerAssignment } from '../models/ReviewerAssignment.js';
-import { sendReviewerAcceptanceEmail, sendReviewerRejectionNotification, sendReviewerAssignmentEmail } from '../utils/emailService.js';
+import { sendReviewerAcceptanceEmail, sendReviewerRejectionNotification, sendReviewerAssignmentEmail, sendReviewSubmissionEmail } from '../utils/emailService.js';
 import { generateRandomPassword } from '../utils/helpers.js';
 
 // Get reviewer's assigned papers with deadline tracking
@@ -221,6 +221,36 @@ export const submitReview = async (req, res) => {
         if (allReviewsSubmitted && paper.status === 'Under Review') {
             paper.status = 'Review Received';
             await paper.save();
+        }
+
+        // Get reviewer details for email
+        const reviewer = await User.findById(reviewerId);
+
+        // Send email to editor (not reviewer) about review submission
+        if (paper.assignedEditor) {
+            try {
+                const editor = await User.findById(paper.assignedEditor);
+                if (editor) {
+                    const reviewData = {
+                        submissionId: paper.submissionId,
+                        paperTitle: paper.paperTitle,
+                        reviewerName: reviewer?.username || 'Unknown Reviewer',
+                        recommendation: recommendation,
+                        overallRating: overallRating,
+                        submittedAt: new Date().toLocaleString()
+                    };
+
+                    await sendReviewSubmissionEmail(
+                        editor.email,
+                        editor.username,
+                        reviewData
+                    );
+                    console.log(`📧 Review submission email sent to editor ${editor.email}`);
+                }
+            } catch (emailError) {
+                console.error('Error sending review submission email to editor:', emailError);
+                // Don't fail the request, just log the error
+            }
         }
 
         return res.status(201).json({
@@ -557,6 +587,7 @@ export const getAssignmentDetails = async (req, res) => {
                 submissionId: paper.submissionId,
                 category: paper.category,
                 authorName: paper.authorName,
+                abstract: assignment.abstract || null,  // Include abstract from assignment
                 reviewerEmail: assignment.reviewerEmail,
                 reviewerName: assignment.reviewerName,
                 status: assignment.status,

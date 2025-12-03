@@ -27,6 +27,10 @@ const reviewerAssignmentSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    abstract: {
+        type: String,
+        default: null
+    },
     status: {
         type: String,
         enum: ['Pending', 'Accepted', 'Rejected', 'Review Submitted'],

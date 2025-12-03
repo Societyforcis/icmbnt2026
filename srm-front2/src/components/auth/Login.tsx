@@ -125,6 +125,7 @@ const Login = () => {
       if (response.data.success && response.data.verified) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('role', response.data.role); // Store role
+        localStorage.setItem('email', response.data.email); // Store email for registration check
         localStorage.setItem('user', JSON.stringify({
           email: response.data.email,
           username: response.data.username,

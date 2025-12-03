@@ -168,6 +168,16 @@ export const sendReviewerConfirmationEmail = async (reviewerEmail, reviewerName,
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const confirmationLink = `${frontendUrl}/reviewer/confirm?assignmentId=${assignmentId}&email=${encodeURIComponent(reviewerEmail)}`;
     
+    // Abstract section - only show if abstract exists
+    const abstractSection = paperData.abstract ? `
+        <div style="background-color: #e8f4f8; border-left: 4px solid #0288d1; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #01579b; font-size: 14px;">📋 Paper Abstract</p>
+            <p style="margin: 0; font-size: 13px; color: #01579b; line-height: 1.6; max-height: 200px; overflow-y: auto;">
+                ${paperData.abstract}
+            </p>
+        </div>
+    ` : '';
+    
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: reviewerEmail,
@@ -184,7 +194,7 @@ export const sendReviewerConfirmationEmail = async (reviewerEmail, reviewerName,
                 </p>
 
                 <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 20px;">
-                    We would like to invite you to review a manuscript submitted to ICMBNT 2026. Your expertise in this area would be valuable to our conference. Please review the paper details below and confirm whether you can review this paper.
+                    We would like to invite you to review a manuscript submitted to ICMBNT 2026. Your expertise in this area would be valuable to our conference. Please review the paper details and abstract below and confirm whether you can review this paper.
                 </p>
 
                 <div style="background-color: #ecf0f6; border-left: 4px solid #1a5490; padding: 15px; margin: 20px 0; border-radius: 4px;">
@@ -205,6 +215,8 @@ export const sendReviewerConfirmationEmail = async (reviewerEmail, reviewerName,
                     </table>
                 </div>
 
+                ${abstractSection}
+
                 <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
                     <p style="margin: 0 0 15px 0; font-weight: bold; color: #856404; font-size: 15px;">⚠️ Next Step Required</p>
                     <p style="margin: 0 0 15px 0; font-size: 14px; color: #856404; line-height: 1.6;">
@@ -214,6 +226,7 @@ export const sendReviewerConfirmationEmail = async (reviewerEmail, reviewerName,
                         <li><strong>✓ Accept</strong> - Confirm that you will review this paper</li>
                         <li><strong>✗ Reject</strong> - Decline and optionally suggest another reviewer</li>
                     </ul>
+                    <p style="margin: 0; font-size: 13px; color: #856404;">After you confirm, you will receive login credentials and full access to the review system.</p>
                 </div>
 
                 <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px;">
@@ -227,7 +240,7 @@ export const sendReviewerConfirmationEmail = async (reviewerEmail, reviewerName,
                 </div>
 
                 <p style="font-size: 13px; color: #888; line-height: 1.5; margin: 20px 0;">
-                    Once you confirm your availability, you will receive login credentials and full paper details.
+                    🔒 <strong>Important:</strong> Your login credentials and full paper details will be sent only after you confirm your availability. This ensures confidentiality until you accept the review invitation.
                 </p>
 
                 <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-top: 20px; text-align: center;">
