@@ -24,6 +24,7 @@ import {
     sendMessageToAuthor,
     requestRevision,
     acceptPaper,
+    rejectPaper,
     getRevisionStatus,
     submitRevisedPaper,
     removeReviewerFromPaper,
@@ -80,6 +81,7 @@ router.post('/send-message-to-author', sendMessageToAuthor);
 router.post('/make-decision', makeFinalDecision);
 router.post('/request-revision', requestRevision);     // Request revision (original function handles multiple requests)
 router.post('/accept-paper', acceptPaper);
+router.post('/reject-paper/:paperId', rejectPaper);    // Reject paper and store in RejectedPaper collection
 router.post('/send-re-review-emails', sendReReviewEmails);
 
 // Review management - CRUD operations

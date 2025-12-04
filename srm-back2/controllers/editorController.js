@@ -6,6 +6,7 @@ import { ReviewerMessage } from '../models/ReviewerMessage.js';
 import { Revision } from '../models/Revision.js';
 import { ReviewerAssignment } from '../models/ReviewerAssignment.js';
 import FinalAcceptance from '../models/FinalAcceptance.js';
+import RejectedPaper from '../models/RejectedPaper.js';
 import { generateRandomPassword } from '../utils/helpers.js';
 import { sendReviewerConfirmationEmail, sendReviewerAssignmentEmail, sendDecisionEmail, sendReviewerCredentialsEmail, sendReviewerReminderEmail, sendAcceptanceEmail, sendReReviewEmail } from '../utils/emailService.js';
 import { listPdfsFromCloudinary, deletePdfFromCloudinary } from '../config/cloudinary-pdf.js';
@@ -1893,6 +1894,219 @@ export const getRevisionStatus = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Error fetching revision status',
+            error: error.message
+        });
+    }
+};
+
+// Reject paper and store in RejectedPaper collection
+export const rejectPaper = async (req, res) => {
+    try {
+        const { paperId } = req.params;
+        const { rejectionReason, rejectionComments } = req.body;
+        const editorId = req.user.userId || req.user._id;
+        const editorEmail = req.user.email;
+        const editorName = req.user.username || req.user.name;
+
+        // Validate required fields
+        if (!rejectionReason) {
+            return res.status(400).json({
+                success: false,
+                message: 'Rejection reason is required'
+            });
+        }
+
+        if (!rejectionComments || rejectionComments.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Rejection comments are required'
+            });
+        }
+
+        // Find the paper
+        const paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Paper not found'
+            });
+        }
+
+        // Get all reviews for this paper, organized by round
+        const reviews = await ReviewerReview.find({ 
+            paper: paperId 
+        })
+        .populate('reviewer', 'name email affiliation')
+        .sort({ round: 1, createdAt: 1 })
+        .lean();
+
+        // Organize reviews by round
+        const reviewsByRound = [];
+        const roundMap = new Map();
+
+        reviews.forEach(review => {
+            const roundNum = review.round || 1;
+            if (!roundMap.has(roundNum)) {
+                roundMap.set(roundNum, {
+                    round: roundNum,
+                    reviews: []
+                });
+            }
+            
+            roundMap.get(roundNum).reviews.push({
+                reviewerId: review.reviewer._id,
+                reviewerName: review.reviewer.name,
+                reviewerEmail: review.reviewer.email,
+                reviewerAffiliation: review.reviewer.affiliation,
+                recommendation: review.recommendation,
+                rating: review.rating,
+                comments: review.comments,
+                internalComments: review.internalComments,
+                commentsToEditor: review.commentsToEditor,
+                submittedAt: review.createdAt
+            });
+        });
+
+        // Convert map to array
+        roundMap.forEach(value => {
+            reviewsByRound.push(value);
+        });
+
+        // Get all revisions if any
+        const revisions = await Revision.find({ 
+            paper: paperId 
+        })
+        .sort({ revisionNumber: 1 })
+        .lean();
+
+        const revisionPDFs = revisions.map(rev => ({
+            revisionNumber: rev.revisionNumber,
+            pdfUrl: rev.pdfUrl,
+            uploadedAt: rev.uploadedAt
+        }));
+
+        // Create rejected paper document
+        const rejectedPaper = await RejectedPaper.create({
+            paperId: paper._id,
+            submissionId: paper.submissionId,
+            paperTitle: paper.paperTitle,
+            authorName: paper.authorName,
+            authorEmail: paper.email, // Paper model uses 'email' not 'authorEmail'
+            authorAffiliation: paper.authorAffiliation || '',
+            coAuthors: paper.coAuthors || [],
+            abstract: paper.abstract || '',
+            keywords: paper.keywords || [],
+            category: paper.category,
+            pdfUrl: paper.pdfUrl,
+            revisionPDFs,
+            reviewsByRound,
+            rejectionReason,
+            rejectionComments,
+            editorId,
+            editorEmail,
+            editorName,
+            revisionCount: revisions.length,
+            originalSubmissionDate: paper.createdAt,
+            rejectionDate: new Date()
+        });
+
+        // Update paper status to rejected
+        paper.status = 'Rejected';
+        paper.finalDecision = 'Reject'; // Valid enum value is 'Reject' not 'Rejected'
+        paper.finalDecisionDate = new Date();
+        await paper.save();
+
+        // Send rejection email to author
+        try {
+            const nodemailer = (await import('nodemailer')).default;
+            const transporter = nodemailer.createTransport({
+                service: "gmail",
+                auth: {
+                    user: process.env.EMAIL_USER,
+                    pass: process.env.EMAIL_PASS
+                }
+            });
+
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: paper.email,
+                subject: `Paper Rejection - ${paper.submissionId}`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                        <div style="background-color: #f8d7da; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <h2 style="margin: 0; color: #721c24;">Paper Rejection Notification</h2>
+                            <p style="margin: 5px 0 0 0; color: #666;">ICMBNT 2026 Conference</p>
+                        </div>
+
+                        <p style="font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                            Dear <strong>${paper.authorName}</strong>,
+                        </p>
+
+                        <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 15px;">
+                            We regret to inform you that your paper has not been accepted for publication.
+                        </p>
+
+                        <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0; border-radius: 4px; border-left: 3px solid #999;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #666;">Paper Details:</p>
+                            <ul style="margin: 0; padding-left: 20px;">
+                                <li style="padding: 5px 0;"><strong>Submission ID:</strong> ${paper.submissionId}</li>
+                                <li style="padding: 5px 0;"><strong>Title:</strong> ${paper.paperTitle}</li>
+                                <li style="padding: 5px 0;"><strong>Category:</strong> ${paper.category}</li>
+                            </ul>
+                        </div>
+
+                        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">Rejection Reason:</p>
+                            <p style="margin: 0; color: #856404;">${rejectionReason}</p>
+                        </div>
+
+                        <div style="background-color: #e8f4f8; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #0066cc;">Comments from Editor:</p>
+                            <p style="margin: 0; color: #333; line-height: 1.6;">${rejectionComments.replace(/\n/g, '<br>')}</p>
+                        </div>
+
+                        <div style="background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #0c5460;">Review Summary:</p>
+                            <p style="margin: 0; color: #0c5460;">Your paper underwent ${reviewsByRound.length} round(s) of review with a total of ${reviews.length} review(s).</p>
+                        </div>
+
+                        <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
+                            We appreciate your submission and encourage you to consider the reviewers' feedback for future work.
+                        </p>
+
+                        <p style="font-size: 13px; color: #666; margin-top: 25px; padding-top: 15px; border-top: 1px solid #ddd;">
+                            Best regards,<br>
+                            <strong>${editorName}</strong><br>
+                            Editor, ICMBNT 2026 Conference<br>
+                            <a href="mailto:${editorEmail}">${editorEmail}</a>
+                        </p>
+                    </div>
+                `
+            };
+
+            await transporter.sendMail(mailOptions);
+            console.log('📧 Rejection email sent to:', paper.email);
+        } catch (emailError) {
+            console.error('⚠️ Error sending rejection email:', emailError);
+            // Don't fail the request if email fails
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Paper rejected successfully',
+            rejectedPaper: {
+                id: rejectedPaper._id,
+                submissionId: rejectedPaper.submissionId,
+                paperTitle: rejectedPaper.paperTitle,
+                rejectionReason: rejectedPaper.rejectionReason,
+                rejectionDate: rejectedPaper.rejectionDate
+            }
+        });
+    } catch (error) {
+        console.error('Error rejecting paper:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error rejecting paper',
             error: error.message
         });
     }

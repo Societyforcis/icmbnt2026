@@ -51,7 +51,7 @@ const ReviewerDashboard = () => {
     const [previousReviews, setPreviousReviews] = useState<any[]>([]);  // Store all previous reviews by this reviewer
     const lastLoadedDraft = useRef<{submissionId: string, round: number} | null>(null);  // Track last loaded draft to prevent duplicates
     const [currentRoundSubmitted, setCurrentRoundSubmitted] = useState(false);  // Track if current round review is submitted
-    const [submittedReviewId, setSubmittedReviewId] = useState<string | null>(null);  // Store submitted review ID for editing
+    const [, setSubmittedReviewId] = useState<string | null>(null);  // Store submitted review ID for editing (only setter used)
     
     const [formData, setFormData] = useState<ReviewFormData>({
         comments: '',

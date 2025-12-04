@@ -135,6 +135,8 @@ const EditorDashboard = () => {
     const [showDecisionModal, setShowDecisionModal] = useState<'accept' | 'reject' | 'revision' | null>(null);
     const [revisionMessage, setRevisionMessage] = useState('');
     const [revisionDeadline, setRevisionDeadline] = useState('');  // Add revision deadline state
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [rejectionComments, setRejectionComments] = useState('');
     
     // Assign reviewers states
     const [showAssignModal, setShowAssignModal] = useState(false);
@@ -153,6 +155,16 @@ const EditorDashboard = () => {
     
     // Review card expansion state
     const [expandedReviewCards, setExpandedReviewCards] = useState<Set<string>>(new Set());
+    
+    // Review editing state
+    const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+    const [editReviewData, setEditReviewData] = useState<any>({
+        recommendation: '',
+        overallRating: 3,
+        comments: '',
+        commentsToEditor: ''
+    });
+    const [isLoadingReviewEdit, setIsLoadingReviewEdit] = useState(false);
     
     // CRUD states for reviewers
     const [editingReviewerId, setEditingReviewerId] = useState<string | null>(null);
@@ -448,6 +460,57 @@ const EditorDashboard = () => {
         }
     };
 
+    // Handle paper rejection
+    const handleRejectPaper = async () => {
+        if (!viewingPaper) return;
+
+        if (!rejectionReason) {
+            alert('Please select a rejection reason');
+            return;
+        }
+
+        if (!rejectionComments.trim()) {
+            alert('Please provide rejection comments');
+            return;
+        }
+
+        setDecisionLoading(true);
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/editor/reject-paper/${viewingPaper._id}`,
+                {
+                    rejectionReason,
+                    rejectionComments
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                }
+            );
+
+            if (response.data.success) {
+                alert('Paper rejected successfully. Rejection email sent to author.');
+                setShowDecisionModal(null);
+                setRejectionReason('');
+                setRejectionComments('');
+                setViewingPaper(null);
+                // Refresh papers list
+                const token = localStorage.getItem('token');
+                const headers = { Authorization: `Bearer ${token}` };
+                const papersRes = await axios.get(`${API_URL}/api/editor/papers`, { headers });
+                setPapers(papersRes.data.papers || []);
+            } else {
+                alert('Error: ' + (response.data.message || 'Failed to reject paper'));
+            }
+        } catch (error) {
+            console.error('Error rejecting paper:', error);
+            alert('Error rejecting paper');
+        } finally {
+            setDecisionLoading(false);
+        }
+    };
+
     // Handle assign reviewers
     const handleAssignReviewers = async () => {
         if (!viewingPaper || selectedReviewersForAssignment.length < 1) {
@@ -631,6 +694,68 @@ const EditorDashboard = () => {
     const cancelEditReviewer = () => {
         setEditingReviewerId(null);
         setEditFormData({ username: '', email: '' });
+    };
+
+    // Start editing a review
+    const startEditReview = (review: any) => {
+        setEditingReviewId(review._id);
+        setEditReviewData({
+            recommendation: review.recommendation || '',
+            overallRating: review.overallRating || 3,
+            comments: review.comments || '',
+            commentsToEditor: review.commentsToEditor || ''
+        });
+    };
+
+    // Cancel editing review
+    const cancelEditReview = () => {
+        setEditingReviewId(null);
+        setEditReviewData({
+            recommendation: '',
+            overallRating: 3,
+            comments: '',
+            commentsToEditor: ''
+        });
+    };
+
+    // Update review
+    const updateReview = async (reviewId: string) => {
+        if (!editReviewData.recommendation || !editReviewData.comments.trim() || !editReviewData.commentsToEditor.trim()) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        if (window.confirm('Are you sure you want to update this review?')) {
+            setIsLoadingReviewEdit(true);
+            try {
+                const token = localStorage.getItem('token');
+                const response = await axios.put(
+                    `${API_URL}/api/editor/reviews/${reviewId}`,
+                    editReviewData,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
+                );
+
+                if (response.data.success) {
+                    alert('✅ Review updated successfully!');
+                    setEditingReviewId(null);
+                    // Refresh the paper view
+                    if (viewingPaper?._id) {
+                        await fetchPaperReviewsAndReviewers(viewingPaper._id);
+                    }
+                } else {
+                    alert('❌ Error: ' + (response.data.message || 'Failed to update review'));
+                }
+            } catch (error: any) {
+                console.error('Error updating review:', error);
+                alert('❌ Error: ' + (error.response?.data?.message || 'Failed to update review'));
+            } finally {
+                setIsLoadingReviewEdit(false);
+            }
+        }
     };
 
     const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
@@ -1275,10 +1400,7 @@ const EditorDashboard = () => {
 
                                                                     {/* Reject Button */}
                                                                     <button
-                                                                        onClick={() => {
-                                                                            // Handle reject decision
-                                                                            alert(`Rejected: ${viewingPaper.paperTitle}`);
-                                                                        }}
+                                                                        onClick={() => setShowDecisionModal('reject')}
                                                                         className="flex-1 px-3 py-3 bg-red-600 text-white rounded hover:bg-red-700 text-sm flex items-center justify-center gap-2 font-medium transition"
                                                                     >
                                                                         ✗ Reject
@@ -1459,114 +1581,286 @@ const EditorDashboard = () => {
                                                             {reviewer.review ? (
                                                                 <div className="flex-1 space-y-3 mb-3">
                                                                     {/* Initial Review (Round 1) */}
-                                                                    <div 
-                                                                        className="bg-white rounded border-l-4 border-green-500 p-3 space-y-2 cursor-pointer hover:shadow-md transition"
-                                                                        onClick={() => {
-                                                                            const cardId = `${reviewer._id}-round1`;
-                                                                            setExpandedReviewCards(prev => {
-                                                                                const newSet = new Set(prev);
-                                                                                if (newSet.has(cardId)) {
-                                                                                    newSet.delete(cardId);
-                                                                                } else {
-                                                                                    newSet.add(cardId);
-                                                                                }
-                                                                                return newSet;
-                                                                            });
-                                                                        }}
-                                                                    >
-                                                                        {/* Review Round Indicator */}
+                                                                    <div className="bg-white rounded border-l-4 border-green-500 p-3 space-y-2">
+                                                                        {/* Review Round Indicator with Edit Button */}
                                                                         <div className="mb-2 pb-2 border-b flex justify-between items-center">
                                                                             <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">
                                                                                 Review 1 (Initial)
                                                                             </span>
-                                                                            <span className="text-xs text-gray-500">
-                                                                                {expandedReviewCards.has(`${reviewer._id}-round1`) ? '▼ Click to collapse' : '▶ Click to expand'}
-                                                                            </span>
+                                                                            <div className="flex gap-2 items-center">
+                                                                                {editingReviewId !== reviewer.review._id && (
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            startEditReview(reviewer.review);
+                                                                                        }}
+                                                                                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                                                                                        title="Edit this review"
+                                                                                    >
+                                                                                        ✎ Edit
+                                                                                    </button>
+                                                                                )}
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        const cardId = `${reviewer._id}-round1`;
+                                                                                        setExpandedReviewCards(prev => {
+                                                                                            const newSet = new Set(prev);
+                                                                                            if (newSet.has(cardId)) {
+                                                                                                newSet.delete(cardId);
+                                                                                            } else {
+                                                                                                newSet.add(cardId);
+                                                                                            }
+                                                                                            return newSet;
+                                                                                        });
+                                                                                    }}
+                                                                                    className="text-xs text-gray-500 hover:text-gray-700"
+                                                                                >
+                                                                                    {expandedReviewCards.has(`${reviewer._id}-round1`) ? '▼ Collapse' : '▶ Expand'}
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
-                                                                        <div>
-                                                                            <label className="text-xs font-semibold text-gray-700">Recommendation</label>
-                                                                            <p className={`font-bold text-sm mt-0.5 ${
-                                                                                reviewer.review.recommendation === 'Accept' ? 'text-green-600' :
-                                                                                reviewer.review.recommendation === 'Reject' ? 'text-red-600' : 'text-yellow-600'
-                                                                            }`}>
-                                                                                {reviewer.review.recommendation || 'N/A'}
-                                                                            </p>
-                                                                        </div>
-                                                                        <div>
-                                                                            <label className="text-xs font-semibold text-gray-700">Overall Rating</label>
-                                                                            <p className="font-bold text-sm text-blue-600 mt-0.5">
-                                                                                {reviewer.review.ratings?.overall || reviewer.review.overallRating || 'N/A'}
-                                                                                {reviewer.review.overallRating && !reviewer.review.ratings?.overall ? '/5' : ''}
-                                                                            </p>
-                                                                        </div>
-                                                                        <div>
-                                                                            <label className="text-xs font-semibold text-gray-700">Comments</label>
-                                                                            <p className={`text-xs text-gray-600 mt-0.5 bg-gray-50 p-2 rounded ${
-                                                                                expandedReviewCards.has(`${reviewer._id}-round1`) 
-                                                                                    ? 'max-h-none whitespace-pre-wrap' 
-                                                                                    : 'max-h-12 overflow-hidden line-clamp-2'
-                                                                            }`}>
-                                                                                {reviewer.review.commentsToEditor || reviewer.review.comments || 'No comments'}
-                                                                            </p>
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-500 pt-1">
-                                                                            {new Date(reviewer.review.submittedAt).toLocaleDateString()}
-                                                                        </div>
+
+                                                                        {editingReviewId === reviewer.review._id ? (
+                                                                            /* Edit Form */
+                                                                            <div className="space-y-3 bg-blue-50 p-3 rounded" onClick={(e) => e.stopPropagation()}>
+                                                                                <div>
+                                                                                    <label className="text-xs font-semibold text-gray-700">Recommendation *</label>
+                                                                                    <select
+                                                                                        value={editReviewData.recommendation}
+                                                                                        onChange={(e) => setEditReviewData({...editReviewData, recommendation: e.target.value})}
+                                                                                        className="w-full mt-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                                    >
+                                                                                        <option value="Accept">Accept</option>
+                                                                                        <option value="Conditional Accept">Conditional Accept</option>
+                                                                                        <option value="Minor Revision">Minor Revision</option>
+                                                                                        <option value="Major Revision">Major Revision</option>
+                                                                                        <option value="Reject">Reject</option>
+                                                                                    </select>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-xs font-semibold text-gray-700">Overall Rating * (1-5)</label>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min="1"
+                                                                                        max="5"
+                                                                                        value={editReviewData.overallRating}
+                                                                                        onChange={(e) => setEditReviewData({...editReviewData, overallRating: parseInt(e.target.value)})}
+                                                                                        className="w-full mt-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                                    />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-xs font-semibold text-gray-700">Internal Comments *</label>
+                                                                                    <textarea
+                                                                                        value={editReviewData.comments}
+                                                                                        onChange={(e) => setEditReviewData({...editReviewData, comments: e.target.value})}
+                                                                                        className="w-full mt-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                                        rows={3}
+                                                                                        placeholder="Internal comments..."
+                                                                                    />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-xs font-semibold text-gray-700">Comments to Editor *</label>
+                                                                                    <textarea
+                                                                                        value={editReviewData.commentsToEditor}
+                                                                                        onChange={(e) => setEditReviewData({...editReviewData, commentsToEditor: e.target.value})}
+                                                                                        className="w-full mt-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                                        rows={3}
+                                                                                        placeholder="Comments to editor..."
+                                                                                    />
+                                                                                </div>
+                                                                                <div className="flex gap-2 pt-2">
+                                                                                    <button
+                                                                                        onClick={() => updateReview(reviewer.review._id)}
+                                                                                        disabled={isLoadingReviewEdit}
+                                                                                        className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 transition font-medium"
+                                                                                    >
+                                                                                        {isLoadingReviewEdit ? 'Updating...' : '✓ Update'}
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={cancelEditReview}
+                                                                                        disabled={isLoadingReviewEdit}
+                                                                                        className="flex-1 px-3 py-2 text-sm bg-gray-400 text-white rounded hover:bg-gray-500 disabled:bg-gray-300 transition font-medium"
+                                                                                    >
+                                                                                        ✕ Cancel
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : (
+                                                                            /* View Mode */
+                                                                            <>
+                                                                                <div>
+                                                                                    <label className="text-xs font-semibold text-gray-700">Recommendation</label>
+                                                                                    <p className={`font-bold text-sm mt-0.5 ${
+                                                                                        reviewer.review.recommendation === 'Accept' ? 'text-green-600' :
+                                                                                        reviewer.review.recommendation === 'Reject' ? 'text-red-600' : 'text-yellow-600'
+                                                                                    }`}>
+                                                                                        {reviewer.review.recommendation || 'N/A'}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-xs font-semibold text-gray-700">Overall Rating</label>
+                                                                                    <p className="font-bold text-sm text-blue-600 mt-0.5">
+                                                                                        {reviewer.review.ratings?.overall || reviewer.review.overallRating || 'N/A'}
+                                                                                        {reviewer.review.overallRating && !reviewer.review.ratings?.overall ? '/5' : ''}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-xs font-semibold text-gray-700">Comments</label>
+                                                                                    <p className={`text-xs text-gray-600 mt-0.5 bg-gray-50 p-2 rounded ${
+                                                                                        expandedReviewCards.has(`${reviewer._id}-round1`) 
+                                                                                            ? 'max-h-none whitespace-pre-wrap' 
+                                                                                            : 'max-h-12 overflow-hidden line-clamp-2'
+                                                                                    }`}>
+                                                                                        {reviewer.review.commentsToEditor || reviewer.review.comments || 'No comments'}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <div className="text-xs text-gray-500 pt-1">
+                                                                                    {new Date(reviewer.review.submittedAt).toLocaleDateString()}
+                                                                                </div>
+                                                                            </>
+                                                                        )}
                                                                     </div>
 
                                                                     {/* Re-Review (Round 2) if exists */}
                                                                     {reviewer.reReview && (
-                                                                        <div 
-                                                                            className="bg-purple-50 rounded border-l-4 border-purple-500 p-3 space-y-2 cursor-pointer hover:shadow-md transition"
-                                                                            onClick={() => {
-                                                                                const cardId = `${reviewer._id}-round2`;
-                                                                                setExpandedReviewCards(prev => {
-                                                                                    const newSet = new Set(prev);
-                                                                                    if (newSet.has(cardId)) {
-                                                                                        newSet.delete(cardId);
-                                                                                    } else {
-                                                                                        newSet.add(cardId);
-                                                                                    }
-                                                                                    return newSet;
-                                                                                });
-                                                                            }}
-                                                                        >
+                                                                        <div className="bg-purple-50 rounded border-l-4 border-purple-500 p-3 space-y-2">
                                                                             <div className="mb-2 pb-2 border-b flex justify-between items-center">
                                                                                 <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-800">
                                                                                     Review 2 (Re-review)
                                                                                 </span>
-                                                                                <span className="text-xs text-gray-500">
-                                                                                    {expandedReviewCards.has(`${reviewer._id}-round2`) ? '▼ Click to collapse' : '▶ Click to expand'}
-                                                                                </span>
+                                                                                <div className="flex gap-2 items-center">
+                                                                                    {editingReviewId !== reviewer.reReview._id && (
+                                                                                        <button
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                startEditReview(reviewer.reReview);
+                                                                                            }}
+                                                                                            className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition"
+                                                                                            title="Edit this review"
+                                                                                        >
+                                                                                            ✎ Edit
+                                                                                        </button>
+                                                                                    )}
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            const cardId = `${reviewer._id}-round2`;
+                                                                                            setExpandedReviewCards(prev => {
+                                                                                                const newSet = new Set(prev);
+                                                                                                if (newSet.has(cardId)) {
+                                                                                                    newSet.delete(cardId);
+                                                                                                } else {
+                                                                                                    newSet.add(cardId);
+                                                                                                }
+                                                                                                return newSet;
+                                                                                            });
+                                                                                        }}
+                                                                                        className="text-xs text-gray-500 hover:text-gray-700"
+                                                                                    >
+                                                                                        {expandedReviewCards.has(`${reviewer._id}-round2`) ? '▼ Collapse' : '▶ Expand'}
+                                                                                    </button>
+                                                                                </div>
                                                                             </div>
-                                                                            <div>
-                                                                                <label className="text-xs font-semibold text-gray-700">Recommendation</label>
-                                                                                <p className={`font-bold text-sm mt-0.5 ${
-                                                                                    reviewer.reReview.recommendation === 'Accept' ? 'text-green-600' :
-                                                                                    reviewer.reReview.recommendation === 'Reject' ? 'text-red-600' : 'text-yellow-600'
-                                                                                }`}>
-                                                                                    {reviewer.reReview.recommendation || 'N/A'}
-                                                                                </p>
-                                                                            </div>
-                                                                            <div>
-                                                                                <label className="text-xs font-semibold text-gray-700">Rating</label>
-                                                                                <p className="font-bold text-sm text-purple-600 mt-0.5">
-                                                                                    {reviewer.reReview.overallRating || 'N/A'}/5
-                                                                                </p>
-                                                                            </div>
-                                                                            <div>
-                                                                                <label className="text-xs font-semibold text-gray-700">Comments</label>
-                                                                                <p className={`text-xs text-gray-600 mt-0.5 bg-white p-2 rounded ${
-                                                                                    expandedReviewCards.has(`${reviewer._id}-round2`) 
-                                                                                        ? 'max-h-none whitespace-pre-wrap' 
-                                                                                        : 'max-h-12 overflow-hidden line-clamp-2'
-                                                                                }`}>
-                                                                                    {reviewer.reReview.commentsToEditor || 'No comments'}
-                                                                                </p>
-                                                                            </div>
-                                                                            <div className="text-xs text-gray-500 pt-1">
-                                                                                {new Date(reviewer.reReview.submittedAt).toLocaleDateString()}
-                                                                            </div>
+
+                                                                            {editingReviewId === reviewer.reReview._id ? (
+                                                                                /* Edit Form */
+                                                                                <div className="space-y-3 bg-purple-100 p-3 rounded" onClick={(e) => e.stopPropagation()}>
+                                                                                    <div>
+                                                                                        <label className="text-xs font-semibold text-gray-700">Recommendation *</label>
+                                                                                        <select
+                                                                                            value={editReviewData.recommendation}
+                                                                                            onChange={(e) => setEditReviewData({...editReviewData, recommendation: e.target.value})}
+                                                                                            className="w-full mt-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                                                        >
+                                                                                            <option value="Accept">Accept</option>
+                                                                                            <option value="Conditional Accept">Conditional Accept</option>
+                                                                                            <option value="Minor Revision">Minor Revision</option>
+                                                                                            <option value="Major Revision">Major Revision</option>
+                                                                                            <option value="Reject">Reject</option>
+                                                                                        </select>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <label className="text-xs font-semibold text-gray-700">Overall Rating * (1-5)</label>
+                                                                                        <input
+                                                                                            type="number"
+                                                                                            min="1"
+                                                                                            max="5"
+                                                                                            value={editReviewData.overallRating}
+                                                                                            onChange={(e) => setEditReviewData({...editReviewData, overallRating: parseInt(e.target.value)})}
+                                                                                            className="w-full mt-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <label className="text-xs font-semibold text-gray-700">Internal Comments *</label>
+                                                                                        <textarea
+                                                                                            value={editReviewData.comments}
+                                                                                            onChange={(e) => setEditReviewData({...editReviewData, comments: e.target.value})}
+                                                                                            className="w-full mt-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                                                            rows={3}
+                                                                                            placeholder="Internal comments..."
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <label className="text-xs font-semibold text-gray-700">Comments to Editor *</label>
+                                                                                        <textarea
+                                                                                            value={editReviewData.commentsToEditor}
+                                                                                            onChange={(e) => setEditReviewData({...editReviewData, commentsToEditor: e.target.value})}
+                                                                                            className="w-full mt-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                                                            rows={3}
+                                                                                            placeholder="Comments to editor..."
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div className="flex gap-2 pt-2">
+                                                                                        <button
+                                                                                            onClick={() => updateReview(reviewer.reReview._id)}
+                                                                                            disabled={isLoadingReviewEdit}
+                                                                                            className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 transition font-medium"
+                                                                                        >
+                                                                                            {isLoadingReviewEdit ? 'Updating...' : '✓ Update'}
+                                                                                        </button>
+                                                                                        <button
+                                                                                            onClick={cancelEditReview}
+                                                                                            disabled={isLoadingReviewEdit}
+                                                                                            className="flex-1 px-3 py-2 text-sm bg-gray-400 text-white rounded hover:bg-gray-500 disabled:bg-gray-300 transition font-medium"
+                                                                                        >
+                                                                                            ✕ Cancel
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ) : (
+                                                                                /* View Mode */
+                                                                                <>
+                                                                                    <div>
+                                                                                        <label className="text-xs font-semibold text-gray-700">Recommendation</label>
+                                                                                        <p className={`font-bold text-sm mt-0.5 ${
+                                                                                            reviewer.reReview.recommendation === 'Accept' ? 'text-green-600' :
+                                                                                            reviewer.reReview.recommendation === 'Reject' ? 'text-red-600' : 'text-yellow-600'
+                                                                                        }`}>
+                                                                                            {reviewer.reReview.recommendation || 'N/A'}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <label className="text-xs font-semibold text-gray-700">Rating</label>
+                                                                                        <p className="font-bold text-sm text-purple-600 mt-0.5">
+                                                                                            {reviewer.reReview.overallRating || 'N/A'}/5
+                                                                                        </p>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <label className="text-xs font-semibold text-gray-700">Comments</label>
+                                                                                        <p className={`text-xs text-gray-600 mt-0.5 bg-white p-2 rounded ${
+                                                                                            expandedReviewCards.has(`${reviewer._id}-round2`) 
+                                                                                                ? 'max-h-none whitespace-pre-wrap' 
+                                                                                                : 'max-h-12 overflow-hidden line-clamp-2'
+                                                                                        }`}>
+                                                                                            {reviewer.reReview.commentsToEditor || 'No comments'}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                    <div className="text-xs text-gray-500 pt-1">
+                                                                                        {new Date(reviewer.reReview.submittedAt).toLocaleDateString()}
+                                                                                    </div>
+                                                                                </>
+                                                                            )}
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -2123,6 +2417,109 @@ const EditorDashboard = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Rejection Inline Panel */}
+                    {showDecisionModal === 'reject' && viewingPaper && (
+                        <div className="bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-300 rounded-lg shadow-md p-6 mb-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                                    <AlertCircle className="w-5 h-5 text-red-600" />
+                                    Reject Paper
+                                </h3>
+                                <button
+                                    onClick={() => {
+                                        setShowDecisionModal(null);
+                                        setRejectionReason('');
+                                        setRejectionComments('');
+                                    }}
+                                    className="text-gray-500 hover:text-gray-700 transition"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            
+                            <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 rounded">
+                                <p className="text-red-800 text-sm">
+                                    <strong>⚠️ Warning:</strong> Rejection is permanent. The author will be notified via email with your comments and all reviewer feedback.
+                                </p>
+                            </div>
+
+                            <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white rounded border border-gray-200">
+                                <div>
+                                    <p className="text-sm text-gray-600"><strong>📄 Paper:</strong></p>
+                                    <p className="text-sm text-gray-800">{viewingPaper.paperTitle}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600"><strong>👤 Author:</strong></p>
+                                    <p className="text-sm text-gray-800">{viewingPaper.authorName} ({viewingPaper.email})</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600"><strong>👥 Reviewers:</strong></p>
+                                    <p className="text-sm text-gray-700 font-medium">{paperReviewers.length} reviewer(s), {paperReviewers.filter((r: any) => r.review).length} review(s) submitted</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600"><strong>📋 Category:</strong></p>
+                                    <p className="text-sm text-gray-800">{viewingPaper.category}</p>
+                                </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Rejection Reason *
+                                </label>
+                                <select
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                                    required
+                                >
+                                    <option value="">-- Select Reason --</option>
+                                    <option value="Quality Issues">Quality Issues - Below conference standards</option>
+                                    <option value="Out of Scope">Out of Scope - Not aligned with conference topics</option>
+                                    <option value="Insufficient Novelty">Insufficient Novelty - Lacks original contribution</option>
+                                    <option value="Methodology Flaws">Methodology Flaws - Serious issues in approach</option>
+                                    <option value="Poor Presentation">Poor Presentation - Unclear writing/structure</option>
+                                    <option value="Plagiarism Concerns">Plagiarism Concerns - Ethical issues detected</option>
+                                    <option value="Inadequate Literature Review">Inadequate Literature Review - Missing key references</option>
+                                    <option value="Multiple Major Issues">Multiple Major Issues - Several critical problems</option>
+                                </select>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Rejection Comments to Author *
+                                </label>
+                                <textarea
+                                    value={rejectionComments}
+                                    onChange={(e) => setRejectionComments(e.target.value)}
+                                    placeholder="Provide detailed feedback explaining the rejection decision. Be professional and constructive..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-2"
+                                    rows={6}
+                                />
+                                <p className="text-xs text-gray-500">{rejectionComments.length} characters</p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowDecisionModal(null);
+                                        setRejectionReason('');
+                                        setRejectionComments('');
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleRejectPaper}
+                                    disabled={decisionLoading || !rejectionReason || !rejectionComments.trim()}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition font-medium"
+                                >
+                                    {decisionLoading ? 'Rejecting...' : 'Confirm Rejection'}
+                                </button>
+                            </div>
                         </div>
                     )}
 
