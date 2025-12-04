@@ -2495,19 +2495,27 @@ export const getPaperReReviews = async (req, res) => {
             });
         }
 
-        const { ReReview } = await import('../models/ReReview.js');
+        // Find all Round 2+ reviews for this paper from ReviewerReview collection
+        const reReviews = await ReviewerReview.find({ 
+            paper: paperId,
+            round: { $gte: 2 },  // Get Round 2 and higher
+            status: 'Submitted'  // Only submitted reviews
+        })
+            .populate('reviewer', 'username email')
+            .sort({ round: 1, submittedAt: -1 });
 
-        // Find all re-reviews for this paper
-        const reReviews = await ReReview.find({ paperId })
-            .populate('reviewerId', 'username email')
-            .sort({ submittedAt: -1 });
+        console.log(`✅ Found ${reReviews.length} re-reviews (Round 2+) for paper ${paperId}`);
 
-        console.log(`✅ Found ${reReviews.length} re-reviews for paper ${paperId}`);
+        // Map to match expected format (reviewerId field for frontend compatibility)
+        const formattedReReviews = reReviews.map(review => ({
+            ...review.toObject(),
+            reviewerId: review.reviewer  // Add reviewerId field for frontend
+        }));
 
         return res.status(200).json({
             success: true,
-            count: reReviews.length,
-            reReviews: reReviews
+            count: formattedReReviews.length,
+            reReviews: formattedReReviews
         });
     } catch (error) {
         console.error('Error fetching re-reviews:', error);
