@@ -50,6 +50,8 @@ const ReviewerDashboard = () => {
     const [activePdfInModal, setActivePdfInModal] = useState<'highlighted' | 'response'>('highlighted');  // Which PDF to show in modal
     const [previousReviews, setPreviousReviews] = useState<any[]>([]);  // Store all previous reviews by this reviewer
     const lastLoadedDraft = useRef<{submissionId: string, round: number} | null>(null);  // Track last loaded draft to prevent duplicates
+    const [currentRoundSubmitted, setCurrentRoundSubmitted] = useState(false);  // Track if current round review is submitted
+    const [submittedReviewId, setSubmittedReviewId] = useState<string | null>(null);  // Store submitted review ID for editing
     
     const [formData, setFormData] = useState<ReviewFormData>({
         comments: '',
@@ -126,27 +128,54 @@ const ReviewerDashboard = () => {
                 { headers }
             );
 
-            if (draftResponse.data.review && draftResponse.data.review.status === 'Draft') {
-                const draft = draftResponse.data.review;
-                console.log(`📝 Loaded DRAFT for Round ${round}:`, draft);
+            const review = draftResponse.data.review;
+            
+            if (review) {
                 lastLoadedDraft.current = { submissionId, round };
-                setFormData(prev => ({
-                    ...prev,
-                    comments: draft.comments || '',
-                    commentsToReviewer: draft.commentsToReviewer || '',
-                    commentsToEditor: draft.commentsToEditor || '',
-                    strengths: draft.strengths || '',
-                    weaknesses: draft.weaknesses || '',
-                    overallRating: draft.overallRating || 3,
-                    noveltyRating: draft.noveltyRating || 3,
-                    qualityRating: draft.qualityRating || 3,
-                    clarityRating: draft.clarityRating || 3,
-                    recommendation: draft.recommendation || 'Major Revision',
-                }));
+                
+                // Check if this review is already submitted
+                if (review.status === 'Submitted') {
+                    console.log(`✅ Loaded SUBMITTED review for Round ${round}:`, review);
+                    setCurrentRoundSubmitted(true);
+                    setSubmittedReviewId(review._id);
+                    // Load submitted data (read-only, but editable)
+                    setFormData(prev => ({
+                        ...prev,
+                        comments: review.comments || '',
+                        commentsToReviewer: review.commentsToReviewer || '',
+                        commentsToEditor: review.commentsToEditor || '',
+                        strengths: review.strengths || '',
+                        weaknesses: review.weaknesses || '',
+                        overallRating: review.overallRating || 3,
+                        noveltyRating: review.noveltyRating || 3,
+                        qualityRating: review.qualityRating || 3,
+                        clarityRating: review.clarityRating || 3,
+                        recommendation: review.recommendation || 'Major Revision',
+                    }));
+                } else if (review.status === 'Draft') {
+                    console.log(`📝 Loaded DRAFT for Round ${round}:`, review);
+                    setCurrentRoundSubmitted(false);
+                    setSubmittedReviewId(null);
+                    setFormData(prev => ({
+                        ...prev,
+                        comments: review.comments || '',
+                        commentsToReviewer: review.commentsToReviewer || '',
+                        commentsToEditor: review.commentsToEditor || '',
+                        strengths: review.strengths || '',
+                        weaknesses: review.weaknesses || '',
+                        overallRating: review.overallRating || 3,
+                        noveltyRating: review.noveltyRating || 3,
+                        qualityRating: review.qualityRating || 3,
+                        clarityRating: review.clarityRating || 3,
+                        recommendation: review.recommendation || 'Major Revision',
+                    }));
+                }
             } else {
-                console.log(`📝 No draft found for Round ${round} - resetting form`);
+                console.log(`📝 No review found for Round ${round} - resetting form`);
                 lastLoadedDraft.current = { submissionId, round };
-                // Reset form if no draft for this round (or if it's already submitted)
+                setCurrentRoundSubmitted(false);
+                setSubmittedReviewId(null);
+                // Reset form if no review for this round
                 setFormData(prev => ({
                     ...prev,
                     comments: '',
@@ -162,8 +191,10 @@ const ReviewerDashboard = () => {
                 }));
             }
         } catch (error) {
-            console.log(`⚠️ No draft for Round ${round}`);
+            console.log(`⚠️ No review for Round ${round}`);
             lastLoadedDraft.current = { submissionId, round };
+            setCurrentRoundSubmitted(false);
+            setSubmittedReviewId(null);
             // Reset form on error
             setFormData(prev => ({
                 ...prev,
@@ -179,6 +210,11 @@ const ReviewerDashboard = () => {
                 recommendation: 'Major Revision',
             }));
         }
+    };
+
+    // Helper function to count words
+    const countWords = (text: string): number => {
+        return text.trim().split(/\s+/).filter(word => word.length > 0).length;
     };
 
     const verifyReviewerAccess = async () => {
@@ -309,11 +345,29 @@ const ReviewerDashboard = () => {
         }
 
         if (!formData.commentsToEditor.trim()) {
-            alert('Please provide comments for the editor/author decision');
+            alert('Please provide comments for the editor');
             return;
         }
 
-        if (window.confirm('Are you sure you want to submit this review? You cannot edit it after submission.')) {
+        // Word count validation (minimum 150 words for both fields)
+        const commentsWordCount = countWords(formData.comments);
+        const commentsToEditorWordCount = countWords(formData.commentsToEditor);
+
+        if (commentsWordCount < 150) {
+            alert(`Review Comments (Internal) must be at least 150 words. Current: ${commentsWordCount} words.`);
+            return;
+        }
+
+        if (commentsToEditorWordCount < 150) {
+            alert(`Private Comments to Editor must be at least 150 words. Current: ${commentsToEditorWordCount} words.`);
+            return;
+        }
+
+        const confirmMessage = currentRoundSubmitted 
+            ? 'Are you sure you want to update this submitted review?' 
+            : 'Are you sure you want to submit this review? You can edit it later if needed.';
+
+        if (window.confirm(confirmMessage)) {
             setSubmitting(true);
             try {
                 const token = localStorage.getItem('token');
@@ -331,25 +385,11 @@ const ReviewerDashboard = () => {
                     { headers }
                 );
 
-                alert('Review submitted successfully!');
+                alert(currentRoundSubmitted ? 'Review updated successfully!' : 'Review submitted successfully!');
                 
-                // Reset form
-                setFormData({
-                    comments: '',
-                    commentsToReviewer: '',
-                    commentsToEditor: '',
-                    strengths: '',
-                    weaknesses: '',
-                    overallRating: 3,
-                    noveltyRating: 3,
-                    qualityRating: 3,
-                    clarityRating: 3,
-                    recommendation: 'Major Revision',
-                    round: 1
-                });
-                
-                // Refresh papers list
-                fetchAssignedPapers();
+                // Refresh papers list and reload the review
+                await fetchAssignedPapers();
+                await loadDraftForRound(selectedPaper.submissionId, formData.round);
             } catch (error: any) {
                 console.error('Error submitting review:', error);
                 if (error.response?.status === 401) {
@@ -797,7 +837,12 @@ const ReviewerDashboard = () => {
                                     placeholder="Internal comments for your records..."
                                     required
                                 />
-                                <p className="text-xs text-gray-500 mt-1">These comments are for system tracking only and won't be sent to the author.</p>
+                                <div className="flex justify-between items-center mt-1">
+                                    <p className="text-xs text-gray-500">These comments are for system tracking only and won't be sent to the author.</p>
+                                    <p className={`text-xs font-semibold ${countWords(formData.comments) >= 150 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {countWords(formData.comments)} / 150 words
+                                    </p>
+                                </div>
                             </div>
 
                             {/* Comments to Editor */}
@@ -813,7 +858,12 @@ const ReviewerDashboard = () => {
                                     placeholder="Your private comments and observations for the editor only (confidential)..."
                                     required
                                 />
-                                <p className="text-xs text-red-600 mt-1">These comments are PRIVATE and will NOT be sent to the author. Only the editor will see these.</p>
+                                <div className="flex justify-between items-center mt-1">
+                                    <p className="text-xs text-red-600">These comments are PRIVATE and will NOT be sent to the author. Only the editor will see these.</p>
+                                    <p className={`text-xs font-semibold ${countWords(formData.commentsToEditor) >= 150 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {countWords(formData.commentsToEditor)} / 150 words
+                                    </p>
+                                </div>
                             </div>
 
                             {/* Strengths */}
@@ -943,25 +993,42 @@ const ReviewerDashboard = () => {
                             {/* Submit Button */}
                             <button
                                 onClick={handleSubmitReview}
-                                disabled={submitting || !formData.comments.trim() || !formData.commentsToEditor.trim()}
-                                className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+                                disabled={submitting || !formData.comments.trim() || !formData.commentsToEditor.trim() || countWords(formData.comments) < 150 || countWords(formData.commentsToEditor) < 150}
+                                className={`w-full px-4 py-3 ${currentRoundSubmitted ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold`}
                             >
                                 {submitting ? (
                                     <>
                                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                        Submitting...
+                                        {currentRoundSubmitted ? 'Updating...' : 'Submitting...'}
                                     </>
                                 ) : (
                                     <>
-                                        <CheckCircle className="w-5 h-5" />
-                                        Submit Review
+                                        {currentRoundSubmitted ? (
+                                            <>
+                                                <Send className="w-5 h-5" />
+                                                ✏️ Edit Review
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle className="w-5 h-5" />
+                                                Submit Review
+                                            </>
+                                        )}
                                     </>
                                 )}
                             </button>
 
-                            <p className="text-xs text-gray-500 mt-2 text-center">
-                                ⚠️ Review cannot be edited after submission
-                            </p>
+                            {currentRoundSubmitted ? (
+                                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                                    <p className="text-xs text-green-800 text-center">
+                                        ℹ️ This review has been submitted. You can still edit and update it.
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-500 mt-2 text-center">
+                                    ⚠️ Both comment fields must have at least 150 words
+                                </p>
+                            )}
                         </div>
                     </div>
                 )}

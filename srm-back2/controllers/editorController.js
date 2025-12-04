@@ -2061,10 +2061,16 @@ export const removeReviewerFromPaper = async (req, res) => {
 
         await paper.save();
 
-        // NOTE: We DO NOT delete the review history
-        // Review data is kept for records and can be accessed for Final Acceptance collection
-        // Only the assignment is removed, not the review comments or data
-        const review = await ReviewerReview.findOne({
+        // Delete ALL reviews (all rounds) submitted by this reviewer for this paper
+        const deletedReviews = await ReviewerReview.deleteMany({
+            paper: paperId,
+            reviewer: reviewerId
+        });
+
+        console.log(`🗑️ Deleted ${deletedReviews.deletedCount} review(s) for reviewer ${reviewerId} on paper ${paperId}`);
+
+        // Also delete reviewer assignments from ReviewerAssignment collection
+        await ReviewerAssignment.deleteMany({
             paper: paperId,
             reviewer: reviewerId
         });
@@ -2101,11 +2107,11 @@ export const removeReviewerFromPaper = async (req, res) => {
                                     <td style="padding: 8px;">${paper.reviewAssignments.length}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 8px; font-weight: bold;">Review Submitted:</td>
-                                    <td style="padding: 8px;">${review ? 'Yes - Kept for records' : 'No'}</td>
+                                    <td style="padding: 8px; font-weight: bold;">Reviews Deleted:</td>
+                                    <td style="padding: 8px;">${deletedReviews.deletedCount} review(s) removed</td>
                                 </tr>
                             </table>
-                            <p style="color: #666; font-size: 13px;">Note: Review history is preserved in the system for final acceptance records.</p>
+                            <p style="color: #666; font-size: 13px;">Note: All reviews by this reviewer for this paper have been permanently deleted.</p>
                         </div>
                     `
                 };
@@ -2126,9 +2132,9 @@ export const removeReviewerFromPaper = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: "Reviewer assignment removed successfully. Review history is preserved.",
+            message: `Reviewer removed successfully. ${deletedReviews.deletedCount} review(s) deleted.`,
             remainingReviewers: paper.reviewAssignments.length,
-            reviewHistoryPreserved: !!review,
+            reviewsDeleted: deletedReviews.deletedCount,
             updatedPaper: paper
         });
     } catch (error) {

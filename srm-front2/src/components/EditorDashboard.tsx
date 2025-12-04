@@ -134,6 +134,7 @@ const EditorDashboard = () => {
     const [decisionLoading, setDecisionLoading] = useState(false);
     const [showDecisionModal, setShowDecisionModal] = useState<'accept' | 'reject' | 'revision' | null>(null);
     const [revisionMessage, setRevisionMessage] = useState('');
+    const [revisionDeadline, setRevisionDeadline] = useState('');  // Add revision deadline state
     
     // Assign reviewers states
     const [showAssignModal, setShowAssignModal] = useState(false);
@@ -149,6 +150,9 @@ const EditorDashboard = () => {
     // All Reviewers tab states
     const [allReviewersSearchTerm, setAllReviewersSearchTerm] = useState('');
     const [expandedReviewerId, setExpandedReviewerId] = useState<string | null>(null);
+    
+    // Review card expansion state
+    const [expandedReviewCards, setExpandedReviewCards] = useState<Set<string>>(new Set());
     
     // CRUD states for reviewers
     const [editingReviewerId, setEditingReviewerId] = useState<string | null>(null);
@@ -364,13 +368,19 @@ const EditorDashboard = () => {
             return;
         }
 
+        if (!revisionDeadline) {
+            alert('Please select a revision deadline');
+            return;
+        }
+
         setDecisionLoading(true);
         try {
             const response = await axios.post(
                 `${API_BASE_URL}/api/editor/request-revision`,
                 {
                     paperId: viewingPaper._id,
-                    revisionMessage
+                    revisionMessage,
+                    revisionDeadline: revisionDeadline
                 },
                 {
                     headers: {
@@ -383,6 +393,7 @@ const EditorDashboard = () => {
                 alert('Revision request sent to author successfully!');
                 setShowDecisionModal(null);
                 setRevisionMessage('');
+                setRevisionDeadline('');
                 setViewingPaper(null);
                 // Refresh papers list by re-fetching
                 const token = localStorage.getItem('token');
@@ -1448,11 +1459,28 @@ const EditorDashboard = () => {
                                                             {reviewer.review ? (
                                                                 <div className="flex-1 space-y-3 mb-3">
                                                                     {/* Initial Review (Round 1) */}
-                                                                    <div className="bg-white rounded border-l-4 border-green-500 p-3 space-y-2">
+                                                                    <div 
+                                                                        className="bg-white rounded border-l-4 border-green-500 p-3 space-y-2 cursor-pointer hover:shadow-md transition"
+                                                                        onClick={() => {
+                                                                            const cardId = `${reviewer._id}-round1`;
+                                                                            setExpandedReviewCards(prev => {
+                                                                                const newSet = new Set(prev);
+                                                                                if (newSet.has(cardId)) {
+                                                                                    newSet.delete(cardId);
+                                                                                } else {
+                                                                                    newSet.add(cardId);
+                                                                                }
+                                                                                return newSet;
+                                                                            });
+                                                                        }}
+                                                                    >
                                                                         {/* Review Round Indicator */}
-                                                                        <div className="mb-2 pb-2 border-b">
+                                                                        <div className="mb-2 pb-2 border-b flex justify-between items-center">
                                                                             <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">
                                                                                 Review 1 (Initial)
+                                                                            </span>
+                                                                            <span className="text-xs text-gray-500">
+                                                                                {expandedReviewCards.has(`${reviewer._id}-round1`) ? '▼ Click to collapse' : '▶ Click to expand'}
                                                                             </span>
                                                                         </div>
                                                                         <div>
@@ -1473,7 +1501,11 @@ const EditorDashboard = () => {
                                                                         </div>
                                                                         <div>
                                                                             <label className="text-xs font-semibold text-gray-700">Comments</label>
-                                                                            <p className="text-xs text-gray-600 mt-0.5 bg-gray-50 p-2 rounded max-h-12 overflow-y-auto line-clamp-2">
+                                                                            <p className={`text-xs text-gray-600 mt-0.5 bg-gray-50 p-2 rounded ${
+                                                                                expandedReviewCards.has(`${reviewer._id}-round1`) 
+                                                                                    ? 'max-h-none whitespace-pre-wrap' 
+                                                                                    : 'max-h-12 overflow-hidden line-clamp-2'
+                                                                            }`}>
                                                                                 {reviewer.review.commentsToEditor || reviewer.review.comments || 'No comments'}
                                                                             </p>
                                                                         </div>
@@ -1484,10 +1516,27 @@ const EditorDashboard = () => {
 
                                                                     {/* Re-Review (Round 2) if exists */}
                                                                     {reviewer.reReview && (
-                                                                        <div className="bg-purple-50 rounded border-l-4 border-purple-500 p-3 space-y-2">
-                                                                            <div className="mb-2 pb-2 border-b">
+                                                                        <div 
+                                                                            className="bg-purple-50 rounded border-l-4 border-purple-500 p-3 space-y-2 cursor-pointer hover:shadow-md transition"
+                                                                            onClick={() => {
+                                                                                const cardId = `${reviewer._id}-round2`;
+                                                                                setExpandedReviewCards(prev => {
+                                                                                    const newSet = new Set(prev);
+                                                                                    if (newSet.has(cardId)) {
+                                                                                        newSet.delete(cardId);
+                                                                                    } else {
+                                                                                        newSet.add(cardId);
+                                                                                    }
+                                                                                    return newSet;
+                                                                                });
+                                                                            }}
+                                                                        >
+                                                                            <div className="mb-2 pb-2 border-b flex justify-between items-center">
                                                                                 <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-800">
                                                                                     Review 2 (Re-review)
+                                                                                </span>
+                                                                                <span className="text-xs text-gray-500">
+                                                                                    {expandedReviewCards.has(`${reviewer._id}-round2`) ? '▼ Click to collapse' : '▶ Click to expand'}
                                                                                 </span>
                                                                             </div>
                                                                             <div>
@@ -1507,7 +1556,11 @@ const EditorDashboard = () => {
                                                                             </div>
                                                                             <div>
                                                                                 <label className="text-xs font-semibold text-gray-700">Comments</label>
-                                                                                <p className="text-xs text-gray-600 mt-0.5 bg-white p-2 rounded max-h-12 overflow-y-auto line-clamp-2">
+                                                                                <p className={`text-xs text-gray-600 mt-0.5 bg-white p-2 rounded ${
+                                                                                    expandedReviewCards.has(`${reviewer._id}-round2`) 
+                                                                                        ? 'max-h-none whitespace-pre-wrap' 
+                                                                                        : 'max-h-12 overflow-hidden line-clamp-2'
+                                                                                }`}>
                                                                                     {reviewer.reReview.commentsToEditor || 'No comments'}
                                                                                 </p>
                                                                             </div>
@@ -1559,35 +1612,6 @@ const EditorDashboard = () => {
                                                                         ✎ Edit
                                                                     </button>
                                                                 )} */}
-
-                                                                {/* Delete Review Button */}
-                                                                {reviewer.review && viewingPaper?.status !== 'Accepted' && viewingPaper?.status !== 'Rejected' && (
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            if (confirm('Are you sure you want to delete this review? This action cannot be undone.')) {
-                                                                                try {
-                                                                                    const token = localStorage.getItem('token');
-                                                                                    await axios.delete(
-                                                                                        `${API_URL}/api/editor/reviews/${reviewer.review._id}`,
-                                                                                        { headers: { Authorization: `Bearer ${token}` } }
-                                                                                    );
-                                                                                    alert('Review deleted successfully');
-                                                                                    // Refresh the paper view
-                                                                                    if (viewingPaper?._id) {
-                                                                                        await fetchPaperReviewsAndReviewers(viewingPaper._id);
-                                                                                    }
-                                                                                } catch (error: any) {
-                                                                                    console.error('Error deleting review:', error);
-                                                                                    alert(error.response?.data?.message || 'Failed to delete review');
-                                                                                }
-                                                                            }
-                                                                        }}
-                                                                        className="px-3 py-2 rounded text-xs bg-red-600 text-white hover:bg-red-700 font-medium transition"
-                                                                        title="Delete this review"
-                                                                    >
-                                                                        🗑 Delete Review
-                                                                    </button>
-                                                                )}
 
                                                                 {/* Delete Reviewer Button - Remove entire reviewer from paper */}
                                                                 {viewingPaper?.status !== 'Accepted' && viewingPaper?.status !== 'Rejected' && (
@@ -2035,11 +2059,27 @@ const EditorDashboard = () => {
                                         <p className="text-xs text-gray-500">{revisionMessage.length} characters</p>
                                     </div>
 
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Revision Deadline *
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={revisionDeadline}
+                                            onChange={(e) => setRevisionDeadline(e.target.value)}
+                                            min={new Date().toISOString().split('T')[0]}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            required
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Select the deadline for author to submit revision</p>
+                                    </div>
+
                                     <div className="flex gap-3">
                                         <button
                                             onClick={() => {
                                                 setShowDecisionModal(null);
                                                 setRevisionMessage('');
+                                                setRevisionDeadline('');
                                             }}
                                             className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium"
                                         >
@@ -2047,7 +2087,7 @@ const EditorDashboard = () => {
                                         </button>
                                         <button
                                             onClick={handleRevisionRequest}
-                                            disabled={decisionLoading || !revisionMessage.trim()}
+                                            disabled={decisionLoading || !revisionMessage.trim() || !revisionDeadline}
                                             className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 transition font-medium"
                                         >
                                             {decisionLoading ? 'Sending...' : 'Send Revision Request'}
@@ -2073,6 +2113,7 @@ const EditorDashboard = () => {
                                                 onClick={() => {
                                                     setShowDecisionModal(null);
                                                     setRevisionMessage('');
+                                                    setRevisionDeadline('');
                                                 }}
                                                 className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium"
                                             >
