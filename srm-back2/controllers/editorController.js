@@ -2418,6 +2418,7 @@ export const updateReview = async (req, res) => {
             noveltyRating, 
             qualityRating, 
             clarityRating,
+            comments,
             commentsToEditor, 
             commentsToReviewer, 
             strengths, 
@@ -2441,7 +2442,7 @@ export const updateReview = async (req, res) => {
         }
 
         // Get paper to check status
-        const paper = await PaperSubmission.findById(review.paperId);
+        const paper = await PaperSubmission.findById(review.paper);
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -2463,6 +2464,7 @@ export const updateReview = async (req, res) => {
         if (noveltyRating !== undefined) review.noveltyRating = noveltyRating;
         if (qualityRating !== undefined) review.qualityRating = qualityRating;
         if (clarityRating !== undefined) review.clarityRating = clarityRating;
+        if (comments !== undefined) review.comments = comments;
         if (commentsToEditor !== undefined) review.commentsToEditor = commentsToEditor;
         if (commentsToReviewer !== undefined) review.commentsToReviewer = commentsToReviewer;
         if (strengths !== undefined) review.strengths = strengths;
