@@ -29,7 +29,7 @@ const finalAcceptanceSchema = new mongoose.Schema({
         index: true
     },
     
-    // Paper Link/URL
+    // Paper Link/URL - Clean PDF (editor-approved final version)
     pdfUrl: {
         type: String,
         required: true
@@ -43,6 +43,44 @@ const finalAcceptanceSchema = new mongoose.Schema({
         required: false
     },
     
+    // REVISION PDFS - All three versions
+    revisionPdfs: {
+        cleanPdfUrl: String,        // Final corrected paper (not shown to reviewers)
+        cleanPdfPublicId: String,
+        cleanPdfFileName: String,
+        
+        highlightedPdfUrl: String,  // Shows corrections (shown to reviewers in round 2)
+        highlightedPdfPublicId: String,
+        highlightedPdfFileName: String,
+        
+        responsePdfUrl: String,     // Explains corrections made
+        responsePdfPublicId: String,
+        responsePdfFileName: String
+    },
+    
+    // REVIEWS BY ROUND - Store each review round separately
+    reviewsByRound: [{
+        round: Number,              // 1, 2, 3, etc.
+        reviewerId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        reviewerName: String,
+        reviewerEmail: String,
+        comments: String,
+        commentsToReviewer: String,
+        commentsToEditor: String,
+        strengths: String,
+        weaknesses: String,
+        overallRating: Number,
+        noveltyRating: Number,
+        qualityRating: Number,
+        clarityRating: Number,
+        recommendation: String,
+        reviewedPdfUrl: String,      // Which PDF was reviewed in this round
+        submittedAt: Date
+    }],
+    
     // Category and Topic
     category: {
         type: String,
@@ -53,7 +91,8 @@ const finalAcceptanceSchema = new mongoose.Schema({
         required: false
     },
     
-    // Reviewers Information
+    
+    // LEGACY: Old reviewers array (kept for backward compatibility)
     reviewers: [{
         reviewerId: {
             type: mongoose.Schema.Types.ObjectId,

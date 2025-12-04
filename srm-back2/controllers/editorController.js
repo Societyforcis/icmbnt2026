@@ -1449,10 +1449,10 @@ export const sendMessageToAuthor = async (req, res) => {
 // Request revision from author with all reviewer comments
 export const requestRevision = async (req, res) => {
     try {
-        const { paperId, revisionMessage } = req.body;
+        const { paperId, revisionMessage, revisionDeadline } = req.body;
         const editorId = req.user.userId;
 
-        console.log('📋 Request Revision - Input:', { paperId, editorId, messageLength: revisionMessage?.length });
+        console.log('📋 Request Revision - Input:', { paperId, editorId, messageLength: revisionMessage?.length, revisionDeadline });
         console.log('🔐 User info:', { role: req.user.role, userId: req.user.userId, email: req.user.email });
 
         // Validate inputs
@@ -1522,9 +1522,14 @@ export const requestRevision = async (req, res) => {
         let revision = await Revision.findOne({ paperId });
 
         if (!revision) {
-            // Calculate revision deadline (14 days from now)
-            const revisionDeadline = new Date();
-            revisionDeadline.setDate(revisionDeadline.getDate() + 14);
+            // Use provided deadline or default to 14 days from now
+            let finalDeadline;
+            if (revisionDeadline) {
+                finalDeadline = new Date(revisionDeadline);
+            } else {
+                finalDeadline = new Date();
+                finalDeadline.setDate(finalDeadline.getDate() + 14);
+            }
 
             revision = new Revision({
                 submissionId: paper.submissionId,
@@ -1533,7 +1538,7 @@ export const requestRevision = async (req, res) => {
                 authorName: paper.authorName,
                 editorEmail: editor.email,
                 editorName: editor.username,
-                revisionDeadline,
+                revisionDeadline: finalDeadline,
                 revisionMessage,
                 reviewerComments: reviews.map(review => ({
                     reviewerId: review.reviewer._id,
@@ -1642,6 +1647,12 @@ export const requestRevision = async (req, res) => {
                             <p style="margin: 0; font-weight: bold; color: #856404;">Revision Deadline: ${new Date(revision.revisionDeadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                         </div>
 
+                        <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px; text-align: center;">
+                            <p style="margin: 0 0 10px 0; font-size: 14px; color: #155724;"><strong>Submit Your Revision</strong></p>
+                            <a href="${process.env.FRONTEND_URL || 'https://icmbnt2025.vercel.app'}/author/revision/${paper.submissionId}" style="display: inline-block; padding: 12px 30px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px;">Login & Submit Revision</a>
+                            <p style="margin: 10px 0 0 0; font-size: 12px; color: #155724;">Click the button above to login and submit your revised paper</p>
+                        </div>
+
                         <h3 style="color: #0066cc; margin-top: 25px; margin-bottom: 15px;">Editor's Message:</h3>
                         <div style="background-color: #e8f4f8; border-left: 4px solid #0066cc; padding: 15px; margin: 15px 0; border-radius: 4px; font-size: 14px; line-height: 1.8; color: #333;">
                             ${revisionMessage.replace(/\n/g, '<br>')}
@@ -1669,8 +1680,12 @@ export const requestRevision = async (req, res) => {
                         </div>
 
                         <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 20px 0;">
-                            Please submit your revised paper through the conference management system before the deadline.
-                            When submitting, please include a response document addressing all reviewer comments.
+                            <strong>What to submit:</strong>
+                            <ul style="margin: 10px 0; padding-left: 20px;">
+                                <li><strong>Clean PDF:</strong> Your final corrected paper</li>
+                                <li><strong>Highlighted PDF:</strong> Shows all corrections made (visible to reviewers)</li>
+                                <li><strong>Response Document:</strong> Explains what corrections were made</li>
+                            </ul>
                         </p>
 
                         <p style="font-size: 13px; color: #666; margin-top: 25px; padding-top: 15px; border-top: 1px solid #ddd;">
@@ -1732,10 +1747,33 @@ export const acceptPaper = async (req, res) => {
         paper.decisionDate = new Date();
         await paper.save();
 
-        // Get all reviews for this paper to collect reviewer info and ratings
-        const reviews = await ReviewerReview.find({ paperId: paperId });
+        // Get all reviews for this paper to collect reviewer info and ratings by round
+        const reviews = await ReviewerReview.find({ paper: paperId }).sort({ round: 1 });
 
-        // Extract reviewer information from reviews
+        // Get revision data with all 3 PDFs
+        const revision = await Revision.findOne({ paperId: paperId });
+
+        // Organize reviews by round with complete details
+        const reviewsByRound = reviews.map(review => ({
+            round: review.round || 1,
+            reviewerId: review.reviewer,
+            reviewerName: review.reviewerName || 'Unknown',
+            reviewerEmail: review.reviewerEmail,
+            comments: review.comments,
+            commentsToReviewer: review.commentsToReviewer,
+            commentsToEditor: review.commentsToEditor,
+            strengths: review.strengths,
+            weaknesses: review.weaknesses,
+            overallRating: review.overallRating,
+            noveltyRating: review.noveltyRating,
+            qualityRating: review.qualityRating,
+            clarityRating: review.clarityRating,
+            recommendation: review.recommendation,
+            reviewedPdfUrl: review.reviewedPdfUrl,
+            submittedAt: review.submittedAt || review.createdAt
+        }));
+
+        // Legacy: Extract reviewer information for backward compatibility
         const reviewersInfo = reviews.map(review => ({
             reviewerName: review.reviewerName || 'Unknown',
             reviewerEmail: review.reviewerEmail,
@@ -1747,18 +1785,33 @@ export const acceptPaper = async (req, res) => {
         // Get editor info
         const editor = await User.findById(editorId);
 
-        // Create entry in FinalAcceptance collection
+        // Create entry in FinalAcceptance collection with all revision PDFs and review rounds
         const finalAcceptance = new FinalAcceptance({
             paperId: paper._id,
             submissionId: paper.submissionId,
             paperTitle: paper.paperTitle,
             authorName: paper.authorName,
             authorEmail: paper.email,
-            pdfUrl: paper.pdfUrl,
+            pdfUrl: paper.pdfUrl,  // Clean PDF (final version)
             pdfPublicId: paper.pdfPublicId,
             pdfFileName: paper.pdfFileName,
             category: paper.category,
             topic: paper.topic || '',
+            // Store all revision PDFs
+            revisionPdfs: revision ? {
+                cleanPdfUrl: revision.cleanPdfUrl,
+                cleanPdfPublicId: revision.cleanPdfPublicId,
+                cleanPdfFileName: revision.cleanPdfFileName,
+                highlightedPdfUrl: revision.highlightedPdfUrl,
+                highlightedPdfPublicId: revision.highlightedPdfPublicId,
+                highlightedPdfFileName: revision.highlightedPdfFileName,
+                responsePdfUrl: revision.responsePdfUrl,
+                responsePdfPublicId: revision.responsePdfPublicId,
+                responsePdfFileName: revision.responsePdfFileName
+            } : {},
+            // Store reviews organized by round
+            reviewsByRound: reviewsByRound,
+            // Legacy reviewer array for backward compatibility
             reviewers: reviewersInfo,
             totalReviewers: reviewersInfo.length,
             finalDecision: 'Accept',
@@ -1769,7 +1822,8 @@ export const acceptPaper = async (req, res) => {
             status: 'Accepted',
             metadata: {
                 originalSubmissionDate: paper.createdAt,
-                notes: `Paper accepted by ${editor?.username || 'Editor'}`
+                notes: `Paper accepted by ${editor?.username || 'Editor'}`,
+                totalReviewRounds: Math.max(...reviews.map(r => r.round || 1), 1)
             }
         });
 
@@ -2007,8 +2061,10 @@ export const removeReviewerFromPaper = async (req, res) => {
 
         await paper.save();
 
-        // Delete associated review if exists
-        const review = await ReviewerReview.findOneAndDelete({
+        // NOTE: We DO NOT delete the review history
+        // Review data is kept for records and can be accessed for Final Acceptance collection
+        // Only the assignment is removed, not the review comments or data
+        const review = await ReviewerReview.findOne({
             paper: paperId,
             reviewer: reviewerId
         });
@@ -2044,8 +2100,12 @@ export const removeReviewerFromPaper = async (req, res) => {
                                     <td style="padding: 8px; font-weight: bold;">Remaining Reviewers:</td>
                                     <td style="padding: 8px;">${paper.reviewAssignments.length}</td>
                                 </tr>
+                                <tr>
+                                    <td style="padding: 8px; font-weight: bold;">Review Submitted:</td>
+                                    <td style="padding: 8px;">${review ? 'Yes - Kept for records' : 'No'}</td>
+                                </tr>
                             </table>
-                            <p style="color: #666; font-size: 13px;">If a review was already submitted, it has been deleted from the system.</p>
+                            <p style="color: #666; font-size: 13px;">Note: Review history is preserved in the system for final acceptance records.</p>
                         </div>
                     `
                 };
@@ -2066,8 +2126,9 @@ export const removeReviewerFromPaper = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: "Reviewer removed successfully",
+            message: "Reviewer assignment removed successfully. Review history is preserved.",
             remainingReviewers: paper.reviewAssignments.length,
+            reviewHistoryPreserved: !!review,
             updatedPaper: paper
         });
     } catch (error) {
@@ -2218,9 +2279,22 @@ export const sendReReviewEmails = async (req, res) => {
         const deadline = new Date();
         deadline.setDate(deadline.getDate() + 7);
 
-        // Send email to each reviewer
+        // 🔥 IMPORTANT: For re-reviews, automatically set status to "Accepted" 
+        // since reviewers don't need to accept again (they already accepted in Round 1)
         for (const reviewer of paper.assignedReviewers) {
             try {
+                // Find the reviewer's assignment in the Paper model
+                const assignment = paper.reviewAssignments.find(
+                    a => a.reviewer.toString() === reviewer._id.toString()
+                );
+
+                if (assignment && assignment.status !== 'Accepted') {
+                    assignment.status = 'Accepted';
+                    assignment.respondedAt = Date.now();
+                    console.log(`✅ Auto-accepted re-review assignment for reviewer ${reviewer.email}`);
+                }
+
+                // Send re-review email
                 const paperData = {
                     submissionId: paper.submissionId,
                     paperTitle: paper.paperTitle,
@@ -2237,6 +2311,10 @@ export const sendReReviewEmails = async (req, res) => {
                 failedEmails.push(reviewer.email);
             }
         }
+
+        // Save the paper with updated assignment statuses
+        await paper.save();
+        console.log(`💾 Saved paper with auto-accepted re-review assignments`);
 
         return res.status(200).json({
             success: true,

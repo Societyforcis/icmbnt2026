@@ -11,7 +11,8 @@ import {
     getAssignmentDetails,
     acceptAssignment,
     rejectAssignment,
-    submitReReview
+    submitReReview,
+    acceptAssignmentBySubmission
 } from '../controllers/reviewerController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireReviewer } from '../middleware/roleCheck.js';
@@ -37,6 +38,7 @@ router.get('/papers/:submissionId', getPaperForReview);
 router.get('/papers/:submissionId/draft', getReviewDraft);
 router.post('/papers/:submissionId/submit-review', submitReview);
 router.post('/papers/:submissionId/submit-re-review', submitReReview); // Submit re-review (Round 2)
+router.post('/papers/:submissionId/accept-assignment', acceptAssignmentBySubmission); // Accept assignment using submissionId
 
 // Dashboard statistics
 router.get('/dashboard-stats', getReviewerDashboardStats);

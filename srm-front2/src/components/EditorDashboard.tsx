@@ -918,9 +918,46 @@ const EditorDashboard = () => {
                                                             <span className="font-medium ml-2">Author:</span> {paper.authorName} |
                                                             <span className="font-medium ml-2">Category:</span> {paper.category}
                                                         </p>
-                                                        <p className="text-sm text-gray-500 mt-1">
-                                                            Reviewers: {paper.assignedReviewers?.length || 0}
-                                                        </p>
+                                                        
+                                                        {/* Reviewer Status Information */}
+                                                        <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
+                                                            {paper.assignedReviewers && paper.assignedReviewers.length > 0 ? (
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-gray-700 mb-2">
+                                                                        Reviewers: {paper.assignedReviewers.length} assigned
+                                                                    </p>
+                                                                    <div className="space-y-1">
+                                                                        {paper.assignedReviewers.map((reviewer: any, idx: number) => {
+                                                                            // Find the assignment to get status
+                                                                            const assignment = paper.reviewAssignments?.find(
+                                                                                (a: any) => a.reviewer === reviewer._id || a.reviewer?.toString() === reviewer._id?.toString()
+                                                                            );
+                                                                            const status = assignment?.status || 'Pending';
+                                                                            
+                                                                            let statusColor = 'bg-yellow-100 text-yellow-800';
+                                                                            if (status === 'Submitted') {
+                                                                                statusColor = 'bg-green-100 text-green-800';
+                                                                            } else if (status === 'Overdue') {
+                                                                                statusColor = 'bg-red-100 text-red-800';
+                                                                            }
+                                                                            
+                                                                            return (
+                                                                                <div key={idx} className="text-xs flex items-center justify-between">
+                                                                                    <span className="text-gray-600">{reviewer.username || reviewer.email}</span>
+                                                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+                                                                                        {status}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-sm text-gray-600 italic">
+                                                                    ⚠️ No reviewers assigned (Total available: {reviewers.length})
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <StatusBadge status={paper.status} />
                                                 </div>
@@ -936,11 +973,13 @@ const EditorDashboard = () => {
                                                         <Eye className="w-4 h-4" />
                                                         View Details
                                                     </button>
+
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setSelectedPaperForAuthorMessage(selectedPaperForAuthorMessage === paper._id ? null : paper._id);
                                                         }}
+
                                                         className={`px-4 py-2 rounded flex items-center gap-2 transition ${
                                                             selectedPaperForAuthorMessage === paper._id
                                                                 ? 'bg-blue-700 text-white'
@@ -948,6 +987,7 @@ const EditorDashboard = () => {
                                                         }`}
                                                         title="Send message to author"
                                                     >
+
                                                         <MessageSquare className="w-4 h-4" />
                                                         {selectedPaperForAuthorMessage === paper._id ? 'Close' : 'Message Author'}
                                                     </button>

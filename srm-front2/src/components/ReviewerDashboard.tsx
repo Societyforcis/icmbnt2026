@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { FileText, Send, Clock, AlertCircle, CheckCircle, LogOut, Home, ArrowLeft } from 'lucide-react';
@@ -30,6 +30,7 @@ interface ReviewFormData {
     qualityRating: number;
     clarityRating: number;
     recommendation: string;
+    round: number;  // Review round (1, 2, 3, etc.)
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -43,6 +44,12 @@ const ReviewerDashboard = () => {
     const [submitting, setSubmitting] = useState(false);
     const [pdfUrl, setPdfUrl] = useState<string>('');
     const [isDirectReviewLink, setIsDirectReviewLink] = useState(false);
+    const [paperRevisionData, setPaperRevisionData] = useState<any>(null);  // Store revision info (includes highlighted PDF for round 2)
+    const [totalRevisions, setTotalRevisions] = useState(0);  // Total number of revisions for this paper
+    const [showBothPdfsModal, setShowBothPdfsModal] = useState(false);  // Toggle for showing both PDFs side-by-side
+    const [activePdfInModal, setActivePdfInModal] = useState<'highlighted' | 'response'>('highlighted');  // Which PDF to show in modal
+    const [previousReviews, setPreviousReviews] = useState<any[]>([]);  // Store all previous reviews by this reviewer
+    const lastLoadedDraft = useRef<{submissionId: string, round: number} | null>(null);  // Track last loaded draft to prevent duplicates
     
     const [formData, setFormData] = useState<ReviewFormData>({
         comments: '',
@@ -54,7 +61,8 @@ const ReviewerDashboard = () => {
         noveltyRating: 3,
         qualityRating: 3,
         clarityRating: 3,
-        recommendation: 'Major Revision'
+        recommendation: 'Major Revision',
+        round: 1
     });
 
     useEffect(() => {
@@ -71,11 +79,107 @@ const ReviewerDashboard = () => {
     }, [submissionId]);
 
     useEffect(() => {
-        if (selectedPaper?.pdfUrl) {
-            // Use Cloudinary URL directly
-            setPdfUrl(selectedPaper.pdfUrl);
+        if (selectedPaper) {
+            // AUTO-DETECT ROUND: Check if revision exists
+            // If revision with highlighted PDF exists -> Round 2, else -> Round 1
+            const autoDetectedRound = paperRevisionData?.highlightedPdfUrl ? 2 : 1;
+            setFormData(prev => ({ ...prev, round: autoDetectedRound }));
         }
-    }, [selectedPaper]);
+    }, [selectedPaper, paperRevisionData]);
+
+    // Separate useEffect to handle PDF URL changes based on round selection
+    useEffect(() => {
+        if (selectedPaper && formData.round) {
+            // Round 1: Always show original submission PDF
+            if (formData.round === 1) {
+                setPdfUrl(selectedPaper.pdfUrl);
+            } 
+            // Round 2+: Show highlighted PDF if available, otherwise show original
+            else if (formData.round > 1) {
+                if (paperRevisionData?.highlightedPdfUrl) {
+                    setPdfUrl(paperRevisionData.highlightedPdfUrl);
+                } else {
+                    // No revision data, fallback to original
+                    setPdfUrl(selectedPaper.pdfUrl);
+                }
+            }
+
+            // Load draft for the selected round
+            loadDraftForRound(selectedPaper.submissionId, formData.round);
+        }
+    }, [formData.round, selectedPaper?.submissionId]);  // Only trigger when round or paper changes
+
+    const loadDraftForRound = async (submissionId: string, round: number) => {
+        // Prevent loading the same draft multiple times
+        if (lastLoadedDraft.current?.submissionId === submissionId && lastLoadedDraft.current?.round === round) {
+            console.log(`⏭️ Skipping duplicate draft load for ${submissionId} Round ${round}`);
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+
+            const headers = { Authorization: `Bearer ${token}` };
+            const draftResponse = await axios.get(
+                `${API_URL}/api/reviewer/papers/${submissionId}/draft?round=${round}`,
+                { headers }
+            );
+
+            if (draftResponse.data.review && draftResponse.data.review.status === 'Draft') {
+                const draft = draftResponse.data.review;
+                console.log(`📝 Loaded DRAFT for Round ${round}:`, draft);
+                lastLoadedDraft.current = { submissionId, round };
+                setFormData(prev => ({
+                    ...prev,
+                    comments: draft.comments || '',
+                    commentsToReviewer: draft.commentsToReviewer || '',
+                    commentsToEditor: draft.commentsToEditor || '',
+                    strengths: draft.strengths || '',
+                    weaknesses: draft.weaknesses || '',
+                    overallRating: draft.overallRating || 3,
+                    noveltyRating: draft.noveltyRating || 3,
+                    qualityRating: draft.qualityRating || 3,
+                    clarityRating: draft.clarityRating || 3,
+                    recommendation: draft.recommendation || 'Major Revision',
+                }));
+            } else {
+                console.log(`📝 No draft found for Round ${round} - resetting form`);
+                lastLoadedDraft.current = { submissionId, round };
+                // Reset form if no draft for this round (or if it's already submitted)
+                setFormData(prev => ({
+                    ...prev,
+                    comments: '',
+                    commentsToReviewer: '',
+                    commentsToEditor: '',
+                    strengths: '',
+                    weaknesses: '',
+                    overallRating: 3,
+                    noveltyRating: 3,
+                    qualityRating: 3,
+                    clarityRating: 3,
+                    recommendation: 'Major Revision',
+                }));
+            }
+        } catch (error) {
+            console.log(`⚠️ No draft for Round ${round}`);
+            lastLoadedDraft.current = { submissionId, round };
+            // Reset form on error
+            setFormData(prev => ({
+                ...prev,
+                comments: '',
+                commentsToReviewer: '',
+                commentsToEditor: '',
+                strengths: '',
+                weaknesses: '',
+                overallRating: 3,
+                noveltyRating: 3,
+                qualityRating: 3,
+                clarityRating: 3,
+                recommendation: 'Major Revision',
+            }));
+        }
+    };
 
     const verifyReviewerAccess = async () => {
         const token = localStorage.getItem('token');
@@ -137,34 +241,49 @@ const ReviewerDashboard = () => {
             
             setSelectedPaper(response.data.paper);
             
-            // Load existing draft if available
+            // Store previous reviews
+            if (response.data.previousReviews) {
+                setPreviousReviews(response.data.previousReviews);
+                console.log(`📋 Loaded ${response.data.previousReviews.length} previous reviews:`, response.data.previousReviews);
+            }
+            
+            // Fetch all revisions to know how many revisions exist
             try {
-                const draftResponse = await axios.get(
-                    `${API_URL}/api/reviewer/papers/${submissionId}/draft`,
+                const revisionsResponse = await axios.get(
+                    `${API_URL}/api/papers/revisions/${submissionId}`,
                     { headers }
                 );
+                const totalRevs = revisionsResponse.data.totalRevisions || 0;
+                setTotalRevisions(totalRevs);
                 
-                if (draftResponse.data.review) {
-                    const draft = draftResponse.data.review;
-                    setFormData({
-                        comments: draft.comments || '',
-                        commentsToReviewer: draft.commentsToReviewer || '',
-                        commentsToEditor: draft.commentsToEditor || '',
-                        strengths: draft.strengths || '',
-                        weaknesses: draft.weaknesses || '',
-                        overallRating: draft.overallRating || 3,
-                        noveltyRating: draft.noveltyRating || 3,
-                        qualityRating: draft.qualityRating || 3,
-                        clarityRating: draft.clarityRating || 3,
-                        recommendation: draft.recommendation || 'Major Revision'
-                    });
+                // Load the latest revision data
+                if (totalRevs > 0) {
+                    // Load the latest revision (Revision 1 for first revision, Revision 2 for second, etc.)
+                    const latestRevisionNumber = totalRevs;
+                    
+                    const revisionResponse = await axios.get(
+                        `${API_URL}/api/papers/revision/${submissionId}?revisionNumber=${latestRevisionNumber}`,
+                        { headers }
+                    );
+                    console.log('📦 Revision Response:', revisionResponse.data);
+                    if (revisionResponse.data.revision) {
+                        console.log('✅ Revision found! Highlighted PDF:', revisionResponse.data.revision.highlightedPdfUrl);
+                        setPaperRevisionData(revisionResponse.data.revision);
+                    } else {
+                        console.log('⚠️ No revision data in response');
+                        setPaperRevisionData(null);
+                    }
                 } else {
-                    console.log('No existing draft found - starting fresh');
+                    // No revisions - reviewing initial submission
+                    setPaperRevisionData(null);
                 }
-            } catch (draftError: any) {
-                // Handle any unexpected errors
-                console.warn('Could not load draft:', draftError?.message);
+            } catch (err: any) {
+                console.log('⚠️ Error fetching revisions:', err.response?.status, err.message);
+                setTotalRevisions(0);
+                setPaperRevisionData(null);
             }
+            
+            // Note: Draft will be loaded by useEffect when round is determined
         } catch (error: any) {
             console.error('Error loading paper:', error);
             if (error.response?.status === 401) {
@@ -172,6 +291,9 @@ const ReviewerDashboard = () => {
                 localStorage.removeItem('token');
                 localStorage.removeItem('role');
                 navigate('/login');
+            } else if (error.response?.status === 403) {
+                // Paper not accepted yet
+                alert('⚠️ You need to accept this assignment via the confirmation email link before you can view the paper.');
             } else {
                 alert(error.response?.data?.message || 'Failed to load paper details');
             }
@@ -222,7 +344,8 @@ const ReviewerDashboard = () => {
                     noveltyRating: 3,
                     qualityRating: 3,
                     clarityRating: 3,
-                    recommendation: 'Major Revision'
+                    recommendation: 'Major Revision',
+                    round: 1
                 });
                 
                 // Refresh papers list
@@ -332,16 +455,38 @@ const ReviewerDashboard = () => {
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {papers.map((paper) => (
-                                <button
-                                    key={paper._id}
-                                    onClick={() => loadPaperForReview(paper.submissionId)}
-                                    className={`p-4 rounded-lg text-left transition border-2 ${
-                                        selectedPaper?._id === paper._id
-                                            ? 'bg-blue-100 border-blue-600 shadow-lg scale-105'
-                                            : 'bg-gray-50 border-gray-200 hover:border-blue-400 hover:bg-blue-50'
-                                    }`}
-                                >
+                            {papers.map((paper) => {
+                                // Debug: Log paper details
+                                console.log('Paper Card:', {
+                                    submissionId: paper.submissionId,
+                                    assignmentDetails: paper.assignmentDetails,
+                                    status: paper.assignmentDetails?.status
+                                });
+                                
+                                return (
+                                    <button
+                                        key={paper._id}
+                                        onClick={() => {
+                                            // Check if reviewer has accepted this assignment
+                                            const assignmentStatus = paper.assignmentDetails?.status;
+                                            console.log('🔍 Clicked paper:', paper.submissionId, 'Status:', assignmentStatus);
+                                            
+                                            if (assignmentStatus === 'Accepted') {
+                                                // If accepted, load the paper for review
+                                                console.log('✅ Status is Accepted - Loading paper...');
+                                                loadPaperForReview(paper.submissionId);
+                                            } else {
+                                                // If not accepted, show message
+                                                console.log('⚠️ Status is NOT Accepted:', assignmentStatus);
+                                                alert(`⚠️ Please accept this assignment via the confirmation email link before you can view the paper. Current status: ${assignmentStatus || 'Unknown'}`);
+                                            }
+                                        }}
+                                        className={`p-4 rounded-lg text-left transition border-2 ${
+                                            selectedPaper?._id === paper._id
+                                                ? 'bg-blue-100 border-blue-600 shadow-lg scale-105'
+                                                : 'bg-gray-50 border-gray-200 hover:border-blue-400 hover:bg-blue-50'
+                                        }`}
+                                    >
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex-1">
                                             <p className="text-sm font-bold text-gray-800">
@@ -362,12 +507,28 @@ const ReviewerDashboard = () => {
                                         )}
                                     </div>
                                     {paper.assignmentDetails && (
-                                        <div className={`mt-3 text-xs font-medium ${getDeadlineStatus(paper.assignmentDetails.deadline).color}`}>
-                                            {getDeadlineStatus(paper.assignmentDetails.deadline).text}
+                                        <div className="mt-3 space-y-2">
+                                            <div className={`text-xs font-medium ${getDeadlineStatus(paper.assignmentDetails.deadline).color}`}>
+                                                {getDeadlineStatus(paper.assignmentDetails.deadline).text}
+                                            </div>
+                                            {/* Show Assignment Status */}
+                                            <div className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                                                paper.assignmentDetails.status === 'Accepted'
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : paper.assignmentDetails.status === 'Rejected'
+                                                    ? 'bg-red-100 text-red-800'
+                                                    : 'bg-yellow-100 text-yellow-800'
+                                            }`}>
+                                                {paper.assignmentDetails.status === 'Accepted' && '✅ Accepted'}
+                                                {paper.assignmentDetails.status === 'Pending' && '⏳ Pending Acceptance'}
+                                                {paper.assignmentDetails.status === 'Rejected' && '❌ Rejected'}
+                                                {paper.assignmentDetails.status === 'Review Submitted' && '✓ Review Submitted'}
+                                            </div>
                                         </div>
                                     )}
                                 </button>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -395,6 +556,39 @@ const ReviewerDashboard = () => {
                                         <ArrowLeft className="w-4 h-4" />
                                         Back to List
                                     </button>
+
+                                    {/* View Author Response Button - Show only for Round 2+ */}
+                                    {formData.round > 1 && paperRevisionData?.responsePdfUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                window.open(paperRevisionData.responsePdfUrl, '_blank');
+                                            }}
+                                            className="px-3 py-1 bg-green-50 border border-green-300 text-green-700 rounded hover:bg-green-100 font-semibold text-sm flex items-center gap-1"
+                                        >
+                                            📝 View Author Response PDF
+                                        </button>
+                                    )}
+
+                                    {/* View Both PDFs Button - Show only for Round 2+ AND if BOTH PDFs exist */}
+                                    {formData.round > 1 && paperRevisionData?.highlightedPdfUrl && paperRevisionData?.responsePdfUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowBothPdfsModal(!showBothPdfsModal)}
+                                            className={`px-3 py-1 border rounded font-semibold text-sm flex items-center gap-1 ${
+                                                showBothPdfsModal 
+                                                    ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700' 
+                                                    : 'bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100'
+                                            }`}
+                                        >
+                                            {showBothPdfsModal ? '✕ Close' : '📄📄 Compare PDFs'}
+                                        </button>
+                                    )}
+
+                                    {/* Review Round Indicator */}
+                                    <div className="ml-auto bg-blue-100 px-3 py-1 rounded-full text-sm font-semibold text-blue-800">
+                                        📋 Review Round {formData.round}
+                                    </div>
                                 </div>
                                 <h2 className="text-xl font-semibold text-gray-800">{selectedPaper.paperTitle}</h2>
                                 <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
@@ -410,10 +604,70 @@ const ReviewerDashboard = () => {
                                         </span>
                                     </div>
                                 )}
+                                {/* PDF Type Indicator */}
+                                <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                                    {formData.round === 1 ? (
+                                        '📄 Reviewing: Original submission'
+                                    ) : paperRevisionData ? (
+                                        '📝 Reviewing: Author\'s revised version (Highlighted PDF) + Response PDF available below'
+                                    ) : (
+                                        '⚠️ No revision data available for this round'
+                                    )}
+                                </div>
                             </div>
 
+                            {/* Inline PDF Comparison - Show only for Round 2+ AND if revision data exists */}
+                            {formData.round > 1 && showBothPdfsModal && paperRevisionData && paperRevisionData.highlightedPdfUrl && paperRevisionData.responsePdfUrl && (
+                                <div className="mb-4 border-2 border-purple-300 rounded-lg overflow-hidden">
+                                    {/* PDF Tabs */}
+                                    <div className="flex border-b bg-gray-50">
+                                        <button
+                                            onClick={() => setActivePdfInModal('highlighted')}
+                                            className={`flex-1 px-4 py-3 font-semibold text-center transition ${
+                                                activePdfInModal === 'highlighted'
+                                                    ? 'border-b-2 border-blue-600 text-blue-600 bg-white'
+                                                    : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            📝 Highlighted PDF (Author's Changes)
+                                        </button>
+                                        <button
+                                            onClick={() => setActivePdfInModal('response')}
+                                            className={`flex-1 px-4 py-3 font-semibold text-center transition ${
+                                                activePdfInModal === 'response'
+                                                    ? 'border-b-2 border-green-600 text-green-600 bg-white'
+                                                    : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            📄 Author Response Document
+                                        </button>
+                                    </div>
+
+                                    {/* PDF Viewer */}
+                                    <div className="bg-gray-100" style={{ height: '60vh' }}>
+                                        {activePdfInModal === 'highlighted' && paperRevisionData.highlightedPdfUrl ? (
+                                            <iframe
+                                                src={paperRevisionData.highlightedPdfUrl}
+                                                className="w-full h-full"
+                                                title="Highlighted PDF"
+                                            />
+                                        ) : activePdfInModal === 'response' && paperRevisionData.responsePdfUrl ? (
+                                            <iframe
+                                                src={paperRevisionData.responsePdfUrl}
+                                                className="w-full h-full"
+                                                title="Response PDF"
+                                            />
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full">
+                                                <p className="text-gray-500">PDF not available</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* PDF Viewer */}
-                            <div className="bg-gray-200 rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 280px)' }}>
+                            <div className="bg-gray-200 rounded-lg overflow-hidden" style={{ height: showBothPdfsModal ? 'calc(50vh - 140px)' : 'calc(100vh - 280px)' }}>
                                 {pdfUrl ? (
                                     <iframe
                                         src={pdfUrl}
@@ -434,6 +688,101 @@ const ReviewerDashboard = () => {
                                 <Send className="w-5 h-5 text-blue-600" />
                                 Submit Review
                             </h3>
+
+                            {/* Review Round Selector with Dynamic Rounds based on Revision */}
+                            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Review Round
+                                </label>
+                                <select
+                                    value={formData.round}
+                                    onChange={(e) => {
+                                      const selectedRound = parseInt(e.target.value);
+                                      setFormData({ ...formData, round: selectedRound });
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    {/* Always show Round 1 for initial review */}
+                                    <option value="1">Round 1 - Initial Review</option>
+                                    
+                                    {/* Show Round 2 if at least 1 revision exists */}
+                                    {totalRevisions >= 1 && (
+                                        <option value="2">Round 2 - After Revision 1</option>
+                                    )}
+                                    
+                                    {/* Show Round 3 if at least 2 revisions exist */}
+                                    {totalRevisions >= 2 && (
+                                        <option value="3">Round 3 - After Revision 2</option>
+                                    )}
+                                    
+                                    {/* Show Round 4+ for additional revisions */}
+                                    {totalRevisions >= 3 && (
+                                        <option value="4">Round 4 - After Revision 3</option>
+                                    )}
+                                </select>
+                                <p className="text-xs text-gray-600 mt-1">
+                                    {formData.round === 1 
+                                        ? '📄 Reviewing original submission' 
+                                        : `📝 Reviewing Revision ${formData.round - 1} (Author's revised version)`}
+                                </p>
+                                <p className="text-xs text-blue-600 mt-1">
+                                    Total revisions: {totalRevisions}
+                                </p>
+                            </div>
+
+                            {/* Previous Reviews - Show if any exist */}
+                            {previousReviews.length > 0 && (
+                                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <h4 className="text-sm font-bold text-amber-900 mb-3 flex items-center gap-2">
+                                        📜 Your Previous Reviews for This Paper
+                                    </h4>
+                                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                                        {previousReviews.map((review, index) => (
+                                            <div key={index} className="p-3 bg-white rounded border border-amber-200">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-xs font-bold text-blue-700">
+                                                        Round {review.round} Review
+                                                    </span>
+                                                    <span className="text-xs text-gray-500">
+                                                        {new Date(review.submittedAt).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-1 text-xs">
+                                                    <p>
+                                                        <strong>Recommendation:</strong>{' '}
+                                                        <span className={`font-semibold ${
+                                                            review.recommendation === 'Accept' ? 'text-green-600' :
+                                                            review.recommendation === 'Reject' ? 'text-red-600' :
+                                                            'text-orange-600'
+                                                        }`}>
+                                                            {review.recommendation}
+                                                        </span>
+                                                    </p>
+                                                    <p><strong>Overall Rating:</strong> {review.overallRating}/5</p>
+                                                    {review.strengths && (
+                                                        <p className="mt-2">
+                                                            <strong>Strengths:</strong> {review.strengths}
+                                                        </p>
+                                                    )}
+                                                    {review.weaknesses && (
+                                                        <p className="mt-1">
+                                                            <strong>Weaknesses:</strong> {review.weaknesses}
+                                                        </p>
+                                                    )}
+                                                    {review.commentsToEditor && (
+                                                        <p className="mt-1">
+                                                            <strong>Comments to Editor:</strong> {review.commentsToEditor}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-xs text-amber-700 mt-2">
+                                        ℹ️ These are your previously submitted reviews. Use them as reference when evaluating revisions.
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Comments */}
                             <div className="mb-4">

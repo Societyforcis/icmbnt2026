@@ -81,13 +81,14 @@ const paperSubmissionSchema = new mongoose.Schema({
     deadline: Date,
     status: {
       type: String,
-      enum: ['Pending', 'Submitted', 'Overdue'],
+      enum: ['Pending', 'Accepted', 'Rejected', 'Submitted', 'Overdue', 'Review Submitted'],
       default: 'Pending'
     },
     assignedAt: {
       type: Date,
       default: Date.now
     },
+    respondedAt: Date,  // When reviewer accepted/rejected
     emailSent: {
       type: Boolean,
       default: false

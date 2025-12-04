@@ -3,8 +3,13 @@ import mongoose from 'mongoose';
 const revisionSchema = new mongoose.Schema({
   submissionId: {
     type: String,
-    required: true,
-    unique: true
+    required: true
+    // Removed unique: true to allow multiple revisions per submission
+  },
+  revisionNumber: {
+    type: Number,
+    default: 1,  // 1st revision, 2nd revision, etc.
+    required: true
   },
   paperId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -67,6 +72,19 @@ const revisionSchema = new mongoose.Schema({
   revisedPdfFileName: String,
   revisedPaperSubmittedAt: Date,
   
+  // THREE SEPARATE PDFs FOR REVISION
+  cleanPdfUrl: String, // Final corrected paper (not visible to reviewers)
+  cleanPdfPublicId: String,
+  cleanPdfFileName: String,
+  
+  highlightedPdfUrl: String, // Shows all corrections (visible to reviewers)
+  highlightedPdfPublicId: String,
+  highlightedPdfFileName: String,
+  
+  responsePdfUrl: String, // Explains what corrections were made
+  responsePdfPublicId: String,
+  responsePdfFileName: String,
+  
   // Response to revision
   authorResponse: String, // Author's response to revision requests
   authorResponseSubmittedAt: Date,
@@ -84,5 +102,8 @@ const revisionSchema = new mongoose.Schema({
     default: 1
   }
 }, { timestamps: true });
+
+// Compound index to support multiple revisions per submission
+revisionSchema.index({ submissionId: 1, revisionNumber: 1 }, { unique: true });
 
 export const Revision = mongoose.model('Revision', revisionSchema);

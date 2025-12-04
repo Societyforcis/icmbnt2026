@@ -1159,4 +1159,63 @@ export const sendReviewerRejectionNotification = async (reviewerEmail, reviewerN
     }
 };
 
+// Send thank you email to reviewer after review submission
+export const sendReviewerThankYouEmail = async (reviewerEmail, reviewerName, paperData) => {
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: reviewerEmail,
+        subject: `Thank You for Your Review - ${paperData.submissionId}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #28a745;">
+                    <h2 style="margin: 0 0 10px 0; color: #155724; font-size: 20px;">✓ Thank You for Your Review</h2>
+                    <p style="margin: 0; color: #155724;">We sincerely appreciate your contribution to the peer review process.</p>
+                </div>
+
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="margin: 0 0 10px 0; font-size: 14px; line-height: 1.6;">
+                        Dear ${reviewerName},
+                    </p>
+                    <p style="margin: 0 0 15px 0; font-size: 14px; line-height: 1.6;">
+                        We are writing to confirm that we have successfully received your review for the paper <strong>"${paperData.paperTitle}"</strong> (Submission ID: <strong>${paperData.submissionId}</strong>).
+                    </p>
+                    <p style="margin: 0 0 15px 0; font-size: 14px; line-height: 1.6;">
+                        Your review was submitted on <strong>${paperData.submittedAt}</strong>. The editorial team has been notified and will review your feedback.
+                    </p>
+                    <p style="margin: 0; font-size: 14px; line-height: 1.6;">
+                        Your contribution is invaluable to the quality and rigor of our conference. We greatly appreciate your time and effort in providing detailed and constructive feedback.
+                    </p>
+                </div>
+
+                <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0; font-size: 13px; color: #856404;">
+                        <strong>Note:</strong> If you have any questions about your review or the review process, please contact the conference organizers.
+                    </p>
+                </div>
+
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+                    <p style="margin: 0 0 5px 0; font-size: 13px; color: #666;">
+                        Best regards,
+                    </p>
+                    <p style="margin: 0; font-size: 13px; color: #666;">
+                        <strong>ICMBNT 2025 Conference Editorial Team</strong>
+                    </p>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #999;">
+                        This is an automated message. Please do not reply to this email.
+                    </p>
+                </div>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Thank you email sent to reviewer ${reviewerEmail}`);
+        return info;
+    } catch (error) {
+        console.error(`❌ Error sending thank you email:`, error);
+        throw error;
+    }
+};
+
 export default transporter;

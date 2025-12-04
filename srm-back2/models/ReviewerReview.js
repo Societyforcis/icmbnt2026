@@ -11,6 +11,23 @@ const reviewSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  reviewerName: {
+    type: String,
+    required: false
+  },
+  reviewerEmail: {
+    type: String,
+    required: false
+  },
+  
+  // MULTI-ROUND REVIEW SUPPORT
+  // Indicates which round of review this is (1 = initial, 2 = after revision, etc)
+  round: {
+    type: Number,
+    default: 1,
+    min: 1
+  },
+  
   // Review content
   comments: {
     type: String,
@@ -55,6 +72,16 @@ const reviewSchema = new mongoose.Schema({
     type: String,
     enum: ['Accept', 'Reject', 'Major Revision', 'Minor Revision', 'Conditional Accept'],
     required: true
+  },
+  
+  // PDF reviewed in this round (store separately for each round)
+  reviewedPdfUrl: {
+    type: String,
+    required: false  // URL of the PDF this review is for
+  },
+  reviewedPdfPublicId: {
+    type: String,
+    required: false
   },
   
   // Status

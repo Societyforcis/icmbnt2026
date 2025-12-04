@@ -19,6 +19,7 @@ import {
   FaEye
 } from "react-icons/fa";
 import SubmitPaperForm from "./SubmitPaperForm";
+import RevisionForm from "./RevisionForm";
 import PageTransition from "./PageTransition";
 
 interface Submission {
@@ -384,15 +385,15 @@ const PaperSubmission = () => {
                         Upload Revised Paper
                       </button>
                     ) : (
-                      <div className="p-6 bg-blue-50 border-2 border-blue-300 rounded-md mt-6">
-                        <h3 className="text-lg font-bold text-blue-900 mb-4">Upload Your Revised Paper</h3>
-                        <SubmitPaperForm
-                          isOpen={true}
-                          onClose={() => setShowRevisionUpload(false)}
-                          embedded={true}
-                          isRevision={true}
+                      <div className="mt-6">
+                        <RevisionForm
+                          submissionId={revisionStatus.submissionId}
+                          authorEmail={revisionStatus.authorEmail}
+                          paperTitle={revisionStatus.paperTitle || existingSubmission?.paperTitle || ''}
+                          authorName={revisionStatus.authorName}
                           revisionData={revisionStatus}
                           onSubmissionSuccess={handleSubmissionSuccess}
+                          onClose={() => setShowRevisionUpload(false)}
                         />
                       </div>
                     )}

@@ -2,7 +2,7 @@ import { PaperSubmission } from '../models/Paper.js';
 import { ReviewerReview } from '../models/ReviewerReview.js';
 import { User } from '../models/User.js';
 import { ReviewerAssignment } from '../models/ReviewerAssignment.js';
-import { sendReviewerAcceptanceEmail, sendReviewerRejectionNotification, sendReviewerAssignmentEmail, sendReviewSubmissionEmail } from '../utils/emailService.js';
+import { sendReviewerAcceptanceEmail, sendReviewerRejectionNotification, sendReviewerAssignmentEmail, sendReviewSubmissionEmail, sendReviewerThankYouEmail } from '../utils/emailService.js';
 import { generateRandomPassword } from '../utils/helpers.js';
 
 // Get reviewer's assigned papers with deadline tracking
@@ -25,7 +25,7 @@ export const getAssignedPapers = async (req, res) => {
             );
             return {
                 ...paper.toObject(),
-                reviewAssignment: assignment
+                assignmentDetails: assignment  // Changed from reviewAssignment to assignmentDetails
             };
         });
 
@@ -62,26 +62,40 @@ export const getPaperForReview = async (req, res) => {
         }
 
         // Check if this reviewer is assigned
-        const isAssigned = paper.reviewAssignments.some(
+        const assignment = paper.reviewAssignments.find(
             a => a.reviewer.toString() === reviewerId
         );
 
-        if (!isAssigned) {
+        if (!assignment) {
             return res.status(403).json({
                 success: false,
                 message: 'You are not assigned to review this paper'
             });
         }
 
-        const assignment = paper.reviewAssignments.find(
-            a => a.reviewer.toString() === reviewerId
-        );
+        // ✅ IMPORTANT: Reviewer MUST accept the assignment before viewing the paper
+        if (assignment.status !== 'Accepted') {
+            return res.status(403).json({
+                success: false,
+                message: `You must accept the review assignment first. Current status: ${assignment.status}`,
+                requiresAcceptance: true
+            });
+        }
 
         // Check if already reviewed
         const existingReview = await ReviewerReview.findOne({
             paper: paper._id,
             reviewer: reviewerId
         });
+
+        // Fetch ALL previous reviews by this reviewer for this paper (all rounds)
+        const previousReviews = await ReviewerReview.find({
+            paper: paper._id,
+            reviewer: reviewerId,
+            status: 'Submitted'  // Only show submitted reviews
+        }).sort({ round: 1 });  // Sort by round (1, 2, 3, etc.)
+
+        console.log(`📋 Found ${previousReviews.length} previous reviews for paper ${submissionId} by reviewer ${reviewerId}`);
 
         return res.status(200).json({
             success: true,
@@ -105,7 +119,17 @@ export const getPaperForReview = async (req, res) => {
             existingReview: existingReview ? {
                 id: existingReview._id,
                 status: existingReview.status
-            } : null
+            } : null,
+            previousReviews: previousReviews.map(review => ({
+                round: review.round,
+                recommendation: review.recommendation,
+                overallRating: review.overallRating,
+                comments: review.comments,
+                commentsToEditor: review.commentsToEditor,
+                strengths: review.strengths,
+                weaknesses: review.weaknesses,
+                submittedAt: review.submittedAt
+            }))
         });
     } catch (error) {
         console.error('Error fetching paper for review:', error);
@@ -132,7 +156,8 @@ export const submitReview = async (req, res) => {
             clarityRating,
             recommendation,
             commentsToReviewer,
-            commentsToEditor
+            commentsToEditor,
+            round = 1  // Default to round 1 if not specified
         } = req.body;
 
         // Validate required fields
@@ -164,16 +189,37 @@ export const submitReview = async (req, res) => {
             });
         }
 
-        // Check if review already submitted
+        // ✅ IMPORTANT: Reviewer MUST accept the assignment before submitting review
+        if (assignment.status !== 'Accepted') {
+            return res.status(403).json({
+                success: false,
+                message: `You must accept the review assignment first. Current status: ${assignment.status}`,
+                requiresAcceptance: true
+            });
+        }
+
+        // Determine which PDF to use based on review round
+        let reviewedPdfUrl = paper.pdfUrl;  // Default to current PDF
+        
+        // If this is round 2 or later and revision exists, use highlighted PDF
+        if (round > 1) {
+            const { Revision } = await import('../models/Revision.js');
+            const revision = await Revision.findOne({ paperId: paper._id });
+            if (revision && revision.highlightedPdfUrl) {
+                reviewedPdfUrl = revision.highlightedPdfUrl;
+            }
+        }
+
+        // For multi-round reviews: Check if this reviewer has already reviewed this paper in this round
         let review = await ReviewerReview.findOne({
             paper: paper._id,
-            reviewer: reviewerId
+            reviewer: reviewerId,
+            round: round
         });
 
         if (review) {
-            // Update existing review
+            // Update existing review for this round
             review.comments = comments;
-            // preserve/overwrite confidential and editor-facing comments
             if (typeof commentsToReviewer !== 'undefined') review.commentsToReviewer = commentsToReviewer;
             if (typeof commentsToEditor !== 'undefined') review.commentsToEditor = commentsToEditor;
             review.strengths = strengths;
@@ -183,13 +229,18 @@ export const submitReview = async (req, res) => {
             review.qualityRating = qualityRating;
             review.clarityRating = clarityRating;
             review.recommendation = recommendation;
+            review.reviewedPdfUrl = reviewedPdfUrl;
             review.submittedAt = new Date();
             review.status = 'Submitted';
         } else {
-            // Create new review
+            // Create new review for this round
+            const reviewer = await User.findById(reviewerId);
             review = new ReviewerReview({
                 paper: paper._id,
                 reviewer: reviewerId,
+                reviewerName: reviewer?.username || 'Unknown Reviewer',
+                reviewerEmail: reviewer?.email || '',
+                round: round,  // Store the review round
                 comments,
                 commentsToReviewer: commentsToReviewer || '',
                 commentsToEditor: commentsToEditor || '',
@@ -200,6 +251,7 @@ export const submitReview = async (req, res) => {
                 qualityRating,
                 clarityRating,
                 recommendation,
+                reviewedPdfUrl: reviewedPdfUrl,
                 status: 'Submitted',
                 deadline: assignment.deadline,
                 assignedAt: assignment.assignedAt
@@ -208,25 +260,30 @@ export const submitReview = async (req, res) => {
 
         await review.save();
 
-        // Update paper review assignment status
-        assignment.status = 'Submitted';
-        assignment.review = review._id;
+        // Update paper review assignment status (only for round 1)
+        if (round === 1) {
+            assignment.status = 'Submitted';
+            assignment.review = review._id;
+        }
+        
         await paper.save();
 
-        // Update paper status if all reviewers have submitted
-        const allReviewsSubmitted = paper.reviewAssignments.every(
-            a => a.status === 'Submitted'
-        );
+        // Update paper status if all reviewers have submitted for round 1
+        if (round === 1) {
+            const allReviewsSubmitted = paper.reviewAssignments.every(
+                a => a.status === 'Submitted'
+            );
 
-        if (allReviewsSubmitted && paper.status === 'Under Review') {
-            paper.status = 'Review Received';
-            await paper.save();
+            if (allReviewsSubmitted && paper.status === 'Under Review') {
+                paper.status = 'Review Received';
+                await paper.save();
+            }
         }
 
         // Get reviewer details for email
         const reviewer = await User.findById(reviewerId);
 
-        // Send email to editor (not reviewer) about review submission
+        // Send email to editor about review submission
         if (paper.assignedEditor) {
             try {
                 const editor = await User.findById(paper.assignedEditor);
@@ -237,7 +294,8 @@ export const submitReview = async (req, res) => {
                         reviewerName: reviewer?.username || 'Unknown Reviewer',
                         recommendation: recommendation,
                         overallRating: overallRating,
-                        submittedAt: new Date().toLocaleString()
+                        submittedAt: new Date().toLocaleString(),
+                        round: round
                     };
 
                     await sendReviewSubmissionEmail(
@@ -245,28 +303,50 @@ export const submitReview = async (req, res) => {
                         editor.username,
                         reviewData
                     );
-                    console.log(`📧 Review submission email sent to editor ${editor.email}`);
+                    console.log(`📧 Review submission email sent to editor ${editor.email} for Round ${round}`);
                 }
             } catch (emailError) {
                 console.error('Error sending review submission email to editor:', emailError);
-                // Don't fail the request, just log the error
             }
         }
 
-        return res.status(201).json({
+        // Send thank you email to reviewer
+        if (reviewer) {
+            try {
+                const reviewerThankYouData = {
+                    submissionId: paper.submissionId,
+                    paperTitle: paper.paperTitle,
+                    submittedAt: new Date().toLocaleString(),
+                    round: round
+                };
+
+                await sendReviewerThankYouEmail(
+                    reviewer.email,
+                    reviewer.username,
+                    reviewerThankYouData
+                );
+                console.log(`📧 Thank you email sent to reviewer ${reviewer.email} for Round ${round}`);
+            } catch (emailError) {
+                console.error('Failed to send reviewer thank you email:', emailError);
+            }
+        }
+
+        return res.status(200).json({
             success: true,
-            message: 'Review submitted successfully',
+            message: `Review submitted successfully for Round ${round}`,
             review: {
-                id: review._id,
-                status: review.status,
-                submittedAt: review.submittedAt
+                round: review.round,
+                comments: review.comments,
+                recommendation: review.recommendation,
+                overallRating: review.overallRating
             }
         });
+
     } catch (error) {
-        console.error('Error submitting review:', error);
+        console.error("Error submitting review:", error);
         return res.status(500).json({
             success: false,
-            message: 'Error submitting review',
+            message: "Error submitting review",
             error: error.message
         });
     }
@@ -276,6 +356,7 @@ export const submitReview = async (req, res) => {
 export const getReviewDraft = async (req, res) => {
     try {
         const { submissionId } = req.params;
+        const { round } = req.query;  // Get round from query parameter
         const reviewerId = req.user.userId;
 
         const paper = await PaperSubmission.findOne({ submissionId });
@@ -286,16 +367,26 @@ export const getReviewDraft = async (req, res) => {
             });
         }
 
-        const review = await ReviewerReview.findOne({
+        // Build query - filter by round if specified
+        const query = {
             paper: paper._id,
             reviewer: reviewerId
-        });
+        };
+
+        // If round is specified, only get draft for that specific round
+        if (round) {
+            query.round = parseInt(round);
+        }
+
+        const review = await ReviewerReview.findOne(query);
+
+        console.log(`📝 Draft query for paper ${submissionId}, round ${round || 'any'}:`, review ? 'Found' : 'Not found');
 
         // Return 200 with null if no draft exists (not an error)
         return res.status(200).json({
             success: true,
             review: review || null,
-            message: review ? 'Draft found' : 'No draft exists'
+            message: review ? `Draft found for Round ${review.round}` : 'No draft exists for this round'
         });
     } catch (error) {
         console.error('Error fetching review draft:', error);
@@ -618,7 +709,7 @@ export const acceptAssignment = async (req, res) => {
             });
         }
 
-        // Update assignment status to "Accepted"
+        // Update assignment status to "Accepted" in ReviewerAssignment collection
         const assignment = await ReviewerAssignment.findByIdAndUpdate(
             assignmentId,
             { status: 'Accepted', respondedAt: Date.now() },
@@ -637,36 +728,122 @@ export const acceptAssignment = async (req, res) => {
         const paper = await PaperSubmission.findById(finalPaperId);
         const reviewer = await User.findById(assignment.reviewerId);
 
-        if (paper && reviewer) {
-            // Generate temp password for reviewer if needed
-            const reviewerPassword = reviewer.tempPassword || generateRandomPassword();
-            
-            const paperData = {
-                submissionId: paper.submissionId,
-                paperTitle: paper.paperTitle,
-                category: paper.category,
-                deadline: assignment.reviewDeadline || paper.deadline,
-                reviewerPassword: reviewerPassword,
-                loginLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reviewer-dashboard`
-            };
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Paper not found'
+            });
+        }
 
-            try {
-                // Send assignment email with credentials
-                await sendReviewerAssignmentEmail(
-                    reviewerEmail,
-                    assignment.reviewerName,
-                    paperData
-                );
-                console.log(`✅ Assignment credentials email sent to ${reviewerEmail}`);
-            } catch (emailError) {
-                console.error('Error sending credentials email:', emailError);
-                // Don't fail the request, just log the error
-            }
+        if (!reviewer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Reviewer not found'
+            });
+        }
+
+        // 🔥 IMPORTANT: Also update the Paper model's embedded reviewAssignments array
+        const reviewerAssignment = paper.reviewAssignments.find(
+            a => a.reviewer.toString() === assignment.reviewerId.toString()
+        );
+
+        if (reviewerAssignment) {
+            reviewerAssignment.status = 'Accepted';
+            reviewerAssignment.respondedAt = Date.now();
+            await paper.save();
+            console.log(`✅ Updated Paper model reviewAssignments status to 'Accepted' for reviewer ${assignment.reviewerId}`);
+        } else {
+            console.warn(`⚠️ Reviewer ${assignment.reviewerId} not found in Paper's reviewAssignments array`);
+        }
+
+        // Generate temp password for reviewer if needed
+        const reviewerPassword = reviewer.tempPassword || generateRandomPassword();
+        
+        const paperData = {
+            submissionId: paper.submissionId,
+            paperTitle: paper.paperTitle,
+            category: paper.category,
+            deadline: assignment.reviewDeadline || paper.deadline,
+            reviewerPassword: reviewerPassword,
+            loginLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reviewer-dashboard`
+        };
+
+        try {
+            // Send assignment email with credentials
+            await sendReviewerAssignmentEmail(
+                reviewerEmail,
+                assignment.reviewerName,
+                paperData
+            );
+            console.log(`✅ Assignment credentials email sent to ${reviewerEmail}`);
+        } catch (emailError) {
+            console.error('Error sending credentials email:', emailError);
+            // Don't fail the request, just log the error
         }
 
         return res.status(200).json({
             success: true,
             message: 'Assignment accepted successfully. Login credentials have been sent to your email.',
+            assignment
+        });
+    } catch (error) {
+        console.error('Error accepting assignment:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error accepting assignment',
+            error: error.message
+        });
+    }
+};
+
+// Accept assignment using submissionId (for authenticated reviewers in dashboard)
+export const acceptAssignmentBySubmission = async (req, res) => {
+    try {
+        const reviewerId = req.user.userId;
+        const { submissionId } = req.params;
+
+        // Find the paper
+        const paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: 'Paper not found'
+            });
+        }
+
+        // Find the reviewer's assignment for this paper
+        const assignment = paper.reviewAssignments.find(
+            a => a.reviewer.toString() === reviewerId
+        );
+
+        if (!assignment) {
+            return res.status(403).json({
+                success: false,
+                message: 'You are not assigned to review this paper'
+            });
+        }
+
+        // Update assignment status to "Accepted" in Paper model
+        assignment.status = 'Accepted';
+        assignment.respondedAt = Date.now();
+        await paper.save();
+
+        // Also update in ReviewerAssignment collection if it exists
+        try {
+            await ReviewerAssignment.findOneAndUpdate(
+                { paperId: paper._id, reviewerId },
+                { status: 'Accepted', respondedAt: Date.now() }
+            );
+        } catch (err) {
+            // Ignore if ReviewerAssignment doesn't exist (legacy data)
+            console.log('Note: ReviewerAssignment not found for sync');
+        }
+
+        console.log(`✅ Reviewer ${reviewerId} accepted assignment for paper ${submissionId}`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Assignment accepted successfully!',
             assignment
         });
     } catch (error) {

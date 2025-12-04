@@ -1,5 +1,7 @@
 import { PaperSubmission } from '../models/Paper.js';
 import { UserSubmission } from '../models/UserSubmission.js';
+import { Revision } from '../models/Revision.js';
+import { User } from '../models/User.js';
 import { generateSubmissionId, generateBookingId } from '../utils/helpers.js';
 import { sendPaperSubmissionEmail, sendAdminNotificationEmail } from '../utils/emailService.js';
 import { uploadPdfToCloudinary, deletePdfFromCloudinary } from '../config/cloudinary-pdf.js';
@@ -392,24 +394,24 @@ export const getPaperById = async (req, res) => {
 // Submit revised paper
 export const submitRevision = async (req, res) => {
     console.log('Received revision submission request:', req.body);
-    console.log('File received:', req.file ? 'Yes, ' + req.file.originalname : 'No file');
+    console.log('Files received:', req.files ? Object.keys(req.files).length + ' files' : 'No files');
 
     try {
-        const { submissionId, paperTitle, authorName, email, category, topic, abstract, revisionNotes } = req.body;
+        const { submissionId, authorEmail } = req.body;
 
         // Validate required fields
-        if (!submissionId || !paperTitle || !authorName || !email || !category || !revisionNotes) {
+        if (!submissionId || !authorEmail) {
             return res.status(400).json({
                 success: false,
-                message: "Missing required fields: submissionId, paperTitle, authorName, email, category, revisionNotes"
+                message: "Missing required fields: submissionId, authorEmail"
             });
         }
 
-        // Check if PDF file was uploaded
-        if (!req.file) {
+        // Check if all three PDF files were uploaded
+        if (!req.files || !req.files.cleanPdf || !req.files.highlightedPdf || !req.files.responsePdf) {
             return res.status(400).json({
                 success: false,
-                message: "Revised PDF file is required"
+                message: "All three PDF files are required: Clean PDF, Highlighted PDF, and Response PDF"
             });
         }
 
@@ -423,133 +425,160 @@ export const submitRevision = async (req, res) => {
         }
 
         // Verify the user is the author
-        if (paper.email !== email) {
+        if (paper.email !== authorEmail) {
             return res.status(403).json({
                 success: false,
                 message: "Unauthorized: You can only revise your own paper"
             });
         }
 
-        // Delete old PDF from Cloudinary before uploading new one
-        if (paper.pdfPublicId) {
-            try {
-                await deletePdfFromCloudinary(paper.pdfPublicId);
-                console.log('Old PDF deleted from Cloudinary:', paper.pdfPublicId);
-            } catch (deleteError) {
-                console.warn('Warning: Could not delete old PDF from Cloudinary:', deleteError.message);
-                // Continue with upload even if delete fails
-            }
-        }
+        // Upload all three PDFs to Cloudinary
+        let cleanPdfUrl, cleanPdfPublicId, cleanPdfFileName;
+        let highlightedPdfUrl, highlightedPdfPublicId, highlightedPdfFileName;
+        let responsePdfUrl, responsePdfPublicId, responsePdfFileName;
 
-        // Upload revised PDF to Cloudinary
-        let revisionPdfUrl, revisionPdfPublicId, revisionPdfFileName;
         try {
-            const cloudinaryResult = await uploadPdfToCloudinary(req.file.buffer, req.file.originalname);
-            revisionPdfUrl = cloudinaryResult.url;
-            revisionPdfPublicId = cloudinaryResult.publicId;
-            revisionPdfFileName = cloudinaryResult.fileName;
-            
-            console.log('Revised PDF uploaded to Cloudinary:', { 
-                fileName: revisionPdfFileName, 
-                url: revisionPdfUrl,
-                publicId: revisionPdfPublicId
-            });
+            // Upload Clean PDF
+            let cloudinaryResult = await uploadPdfToCloudinary(req.files.cleanPdf[0].buffer, `${submissionId}_clean.pdf`);
+            cleanPdfUrl = cloudinaryResult.url;
+            cleanPdfPublicId = cloudinaryResult.publicId;
+            cleanPdfFileName = cloudinaryResult.fileName;
+            console.log('Clean PDF uploaded:', { fileName: cleanPdfFileName, url: cleanPdfUrl });
+
+            // Upload Highlighted PDF
+            cloudinaryResult = await uploadPdfToCloudinary(req.files.highlightedPdf[0].buffer, `${submissionId}_highlighted.pdf`);
+            highlightedPdfUrl = cloudinaryResult.url;
+            highlightedPdfPublicId = cloudinaryResult.publicId;
+            highlightedPdfFileName = cloudinaryResult.fileName;
+            console.log('Highlighted PDF uploaded:', { fileName: highlightedPdfFileName, url: highlightedPdfUrl });
+
+            // Upload Response PDF
+            cloudinaryResult = await uploadPdfToCloudinary(req.files.responsePdf[0].buffer, `${submissionId}_response.pdf`);
+            responsePdfUrl = cloudinaryResult.url;
+            responsePdfPublicId = cloudinaryResult.publicId;
+            responsePdfFileName = cloudinaryResult.fileName;
+            console.log('Response PDF uploaded:', { fileName: responsePdfFileName, url: responsePdfUrl });
         } catch (uploadError) {
-            console.error('Failed to upload revised PDF to Cloudinary:', uploadError.message);
+            console.error('Failed to upload PDFs to Cloudinary:', uploadError.message);
             return res.status(500).json({
                 success: false,
-                message: 'Failed to upload revised PDF: ' + uploadError.message
+                message: 'Failed to upload PDFs: ' + uploadError.message
             });
         }
 
-        // Update the paper with new revision
-        paper.paperTitle = paperTitle;
-        paper.authorName = authorName;
-        paper.category = category;
-        if (topic) {
-            paper.topic = topic;
-        }
-        if (abstract) {
-            paper.abstract = abstract;
-        }
-
-        // Add to versions history
-        const nextVersion = (paper.versions && paper.versions.length > 0) ? paper.versions.length + 1 : 1;
+        // Update or create revision record with all three PDFs
+        let revision = await Revision.findOne({ paperId: paper._id });
         
-        if (!paper.versions) {
-            paper.versions = [];
+        if (revision) {
+            // Update existing revision
+            revision.cleanPdfUrl = cleanPdfUrl;
+            revision.cleanPdfPublicId = cleanPdfPublicId;
+            revision.cleanPdfFileName = cleanPdfFileName;
+            
+            revision.highlightedPdfUrl = highlightedPdfUrl;
+            revision.highlightedPdfPublicId = highlightedPdfPublicId;
+            revision.highlightedPdfFileName = highlightedPdfFileName;
+            
+            revision.responsePdfUrl = responsePdfUrl;
+            revision.responsePdfPublicId = responsePdfPublicId;
+            revision.responsePdfFileName = responsePdfFileName;
+            
+            revision.revisionStatus = 'Submitted';
+            revision.revisedPaperSubmittedAt = new Date();
+        } else {
+            // Create new revision record
+            revision = new Revision({
+                submissionId: paper.submissionId,
+                paperId: paper._id,
+                authorEmail: paper.email,
+                authorName: paper.authorName,
+                editorEmail: paper.assignedEditor?.email || '',
+                editorName: paper.assignedEditor?.username || '',
+                cleanPdfUrl,
+                cleanPdfPublicId,
+                cleanPdfFileName,
+                highlightedPdfUrl,
+                highlightedPdfPublicId,
+                highlightedPdfFileName,
+                responsePdfUrl,
+                responsePdfPublicId,
+                responsePdfFileName,
+                revisionStatus: 'Submitted',
+                revisedPaperSubmittedAt: new Date()
+            });
         }
 
-        paper.versions.push({
-            version: nextVersion,
-            pdfUrl: revisionPdfUrl,
-            pdfPublicId: revisionPdfPublicId,
-            pdfFileName: revisionPdfFileName,
-            submittedAt: new Date()
-        });
+        await revision.save();
+        console.log('Revision record saved with all three PDFs');
 
-        // Update main PDF to the latest revision
-        paper.pdfUrl = revisionPdfUrl;
-        paper.pdfPublicId = revisionPdfPublicId;
-        paper.pdfFileName = revisionPdfFileName;
-
+        // Update paper status
+        paper.status = 'Revised Submitted';
+        paper.pdfUrl = cleanPdfUrl; // Main PDF is the clean version
+        paper.pdfPublicId = cleanPdfPublicId;
+        paper.pdfFileName = cleanPdfFileName;
+        
         // Increment revision count
         paper.revisionCount = (paper.revisionCount || 0) + 1;
 
-        // Update status to show revision submitted
-        if (paper.status === 'Revision Required') {
-            paper.status = 'Revised Submitted';
-        }
-
-        // Update the corresponding revision request status (if using new revision requests array)
-        if (paper.revisionRequests && paper.revisionRequests.length > 0) {
-            // Find the latest pending revision request and mark it as submitted
-            const latestRevision = paper.revisionRequests[paper.revisionRequests.length - 1];
-            if (latestRevision && latestRevision.status === 'Pending') {
-                latestRevision.status = 'Submitted';
-                latestRevision.submittedAt = new Date();
-                latestRevision.pdfUrl = revisionPdfUrl;
-                latestRevision.pdfPublicId = revisionPdfPublicId;
-                latestRevision.pdfFileName = revisionPdfFileName;
-            }
-        }
-
-        // Store revision notes (add to editorComments or create new field)
-        if (!paper.editorComments) {
-            paper.editorComments = '';
-        }
-        paper.editorComments += `\n\n[AUTHOR REVISION ${nextVersion}]: ${revisionNotes}`;
-
-        // Save the updated paper
         await paper.save();
+        console.log('Paper updated with revision status');
 
-        console.log('Paper revision saved successfully:', {
-            submissionId,
-            revisionVersion: nextVersion,
-            revisionCount: paper.revisionCount
-        });
-
-        // Send email notification to admin/editor
+        // Send email notification to editor
         try {
-            await sendAdminNotificationEmail({
-                subject: `Revised Paper Submitted - ${submissionId}`,
-                message: `${authorName} has submitted a revised version of their paper.\n\nSubmission ID: ${submissionId}\nTitle: ${paperTitle}\nRevision Version: ${nextVersion}\n\nRevision Notes:\n${revisionNotes}`,
-                recipientEmail: process.env.ADMIN_EMAIL || 'admin@example.com'
-            });
+            const editor = await User.findById(paper.assignedEditor);
+            if (editor) {
+                const nodemailer = (await import('nodemailer')).default;
+                const transporter = nodemailer.createTransport({
+                    service: "gmail",
+                    auth: {
+                        user: process.env.EMAIL_USER,
+                        pass: process.env.EMAIL_PASS
+                    }
+                });
+
+                const mailOptions = {
+                    from: process.env.EMAIL_USER,
+                    to: editor.email,
+                    subject: `Revised Paper Submitted - ${submissionId}`,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                            <div style="background-color: #d4edda; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #28a745;">
+                                <h2 style="margin: 0; color: #155724;">✓ Revised Paper Submitted</h2>
+                            </div>
+                            <p style="font-size: 14px; line-height: 1.6;">
+                                <strong>${paper.authorName}</strong> has submitted their revised paper for <strong>${paper.paperTitle}</strong> (${submissionId}).
+                            </p>
+                            <p style="font-size: 14px; line-height: 1.6; margin: 15px 0;">
+                                <strong>Documents submitted:</strong>
+                                <ul style="margin: 10px 0;">
+                                    <li><a href="${cleanPdfUrl}" style="color: #0066cc;">Clean PDF</a> - Final corrected paper</li>
+                                    <li><a href="${highlightedPdfUrl}" style="color: #0066cc;">Highlighted PDF</a> - Shows all corrections</li>
+                                    <li><a href="${responsePdfUrl}" style="color: #0066cc;">Response Document</a> - Explains corrections</li>
+                                </ul>
+                            </p>
+                            <p style="font-size: 13px; color: #666;">
+                                Please review the revised submission and proceed with your evaluation.
+                            </p>
+                        </div>
+                    `
+                };
+
+                await transporter.sendMail(mailOptions);
+                console.log('📧 Revision submission email sent to editor');
+            }
         } catch (emailError) {
-            console.error('Failed to send admin notification email:', emailError);
-            // Don't fail the submission if email fails
+            console.error('Failed to send editor notification email:', emailError);
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Revised paper submitted successfully',
-            paper: {
-                submissionId: paper.submissionId,
-                paperTitle: paper.paperTitle,
-                status: paper.status,
-                revisionVersion: nextVersion,
-                revisionCount: paper.revisionCount
+            message: 'Revised paper submitted successfully with all three PDFs',
+            revision: {
+                submissionId: revision.submissionId,
+                cleanPdfUrl,
+                highlightedPdfUrl,
+                responsePdfUrl,
+                status: 'Submitted'
             }
         });
 
@@ -558,6 +587,75 @@ export const submitRevision = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Error submitting revision",
+            error: error.message
+        });
+    }
+};
+
+// Get revision data for a paper (used by reviewers to see revision details)
+export const getRevisionData = async (req, res) => {
+    try {
+        const { submissionId } = req.params;
+        const { revisionNumber = 1 } = req.query;  // Get revision number from query params
+        console.log(`🔍 Looking for revision ${revisionNumber} with submissionId:`, submissionId);
+
+        // Find the specific revision
+        const revision = await Revision.findOne({ 
+            submissionId,
+            revisionNumber: parseInt(revisionNumber)
+        });
+        console.log('📋 Revision found:', !!revision, revision ? `Highlighted: ${revision.highlightedPdfUrl ? '✅' : '❌'}` : 'N/A');
+
+        if (!revision) {
+            return res.status(404).json({
+                success: false,
+                message: `No revision ${revisionNumber} found for this paper`
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            revision: {
+                submissionId: revision.submissionId,
+                revisionNumber: revision.revisionNumber,
+                revisionRound: revision.revisionRound,
+                cleanPdfUrl: revision.cleanPdfUrl,
+                highlightedPdfUrl: revision.highlightedPdfUrl,
+                responsePdfUrl: revision.responsePdfUrl,
+                revisionStatus: revision.revisionStatus,
+                submittedAt: revision.revisedPaperSubmittedAt
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching revision data:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching revision data',
+            error: error.message
+        });
+    }
+};
+
+// Get all revisions for a paper (to know how many revisions exist)
+export const getAllRevisions = async (req, res) => {
+    try {
+        const { submissionId } = req.params;
+
+        // Find all revisions for this submission
+        const revisions = await Revision.find({ submissionId })
+            .sort({ revisionNumber: 1 })
+            .select('submissionId revisionNumber revisionStatus submittedAt');
+
+        return res.status(200).json({
+            success: true,
+            totalRevisions: revisions.length,
+            revisions: revisions
+        });
+    } catch (error) {
+        console.error('Error fetching revisions:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching revisions',
             error: error.message
         });
     }

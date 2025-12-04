@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 // import React from "react";
 import Navbar from "./components/Navbar";
 import Home from "./components/Home";
@@ -90,6 +90,10 @@ const RouteWithLoading = ({
 
 // Separate component for the routes
 const AppRoutes = () => {
+  const location = useLocation();
+  const dashboardRoutes = ['/dashboard', '/reviewer', '/reviewer-dashboard', '/admin'];
+  const showFooter = !dashboardRoutes.includes(location.pathname);
+
   return (
     <>
       <Navbar />
@@ -197,7 +201,7 @@ const AppRoutes = () => {
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <Footer/>
+      {showFooter && <Footer/>}
     </>
   );
 };

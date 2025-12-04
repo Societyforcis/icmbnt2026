@@ -6,7 +6,9 @@ import {
     editSubmission,
     getAllPapers,
     getPaperById,
-    submitRevision
+    submitRevision,
+    getRevisionData,
+    getAllRevisions
 } from '../controllers/paperController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { uploadPaperPDF } from '../middleware/upload.js';
@@ -18,10 +20,16 @@ const router = express.Router();
 router.post('/submit', verifyJWT, uploadPaperPDF.single('pdf'), submitPaper);
 router.get('/my-submission', verifyJWT, getUserSubmission);
 router.put('/edit/:submissionId', verifyJWT, uploadPaperPDF.single('pdf'), editSubmission);
-router.post('/submit-revision', verifyJWT, uploadPaperPDF.single('pdf'), submitRevision);
+router.post('/submit-revision', verifyJWT, uploadPaperPDF.fields([
+    { name: 'cleanPdf', maxCount: 1 },
+    { name: 'highlightedPdf', maxCount: 1 },
+    { name: 'responsePdf', maxCount: 1 }
+]), submitRevision);
 
 // Public/semi-public routes
 router.get('/status/:submissionId', getPaperStatus);
+router.get('/revision/:submissionId', verifyJWT, getRevisionData);  // Allow authenticated reviewers to fetch revision data
+router.get('/revisions/:submissionId', verifyJWT, getAllRevisions);  // Get all revisions for a paper
 
 // Admin/Editor routes
 router.get('/all', verifyJWT, requireRole('Admin', 'Editor'), getAllPapers);
