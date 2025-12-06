@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Eye, Loader } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { CheckCircle, XCircle, Eye, Loader, Search } from 'lucide-react';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 
@@ -26,6 +26,8 @@ const AdminPaymentVerification: React.FC = () => {
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('pending');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchType, setSearchType] = useState<'email' | 'paperId' | 'all'>('all');
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     useEffect(() => {
@@ -184,6 +186,33 @@ const AdminPaymentVerification: React.FC = () => {
         setSelectedImage(url);
     };
 
+    // Filter registrations based on search term and search type
+    const filteredRegistrations = useMemo(() => {
+        if (!searchTerm.trim()) {
+            return registrations;
+        }
+
+        const lowerSearchTerm = searchTerm.toLowerCase().trim();
+
+        return registrations.filter((reg) => {
+            switch (searchType) {
+                case 'email':
+                    return reg.authorEmail.toLowerCase().includes(lowerSearchTerm);
+                case 'paperId':
+                    return reg.submissionId.toLowerCase().includes(lowerSearchTerm);
+                case 'all':
+                    return (
+                        reg.authorEmail.toLowerCase().includes(lowerSearchTerm) ||
+                        reg.submissionId.toLowerCase().includes(lowerSearchTerm) ||
+                        reg.authorName.toLowerCase().includes(lowerSearchTerm) ||
+                        reg.paperTitle.toLowerCase().includes(lowerSearchTerm)
+                    );
+                default:
+                    return true;
+            }
+        });
+    }, [registrations, searchTerm, searchType]);
+
     return (
         <div className="min-h-screen bg-gray-50 p-6">
             <div className="max-w-7xl mx-auto">
@@ -231,18 +260,51 @@ const AdminPaymentVerification: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Search Section */}
+                <div className="bg-white rounded-lg shadow mb-6 p-4">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search registrations..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                        </div>
+                        <select
+                            value={searchType}
+                            onChange={(e) => setSearchType(e.target.value as 'email' | 'paperId' | 'all')}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        >
+                            <option value="all">Search All Fields</option>
+                            <option value="email">Email Only</option>
+                            <option value="paperId">Paper ID Only</option>
+                        </select>
+                    </div>
+                    {searchTerm && (
+                        <div className="mt-3 text-sm text-gray-600">
+                            Found <strong>{filteredRegistrations.length}</strong> result{filteredRegistrations.length !== 1 ? 's' : ''}
+                            {searchType !== 'all' && ` in ${searchType === 'email' ? 'email' : 'paper ID'}`}
+                        </div>
+                    )}
+                </div>
+
                 {/* Registrations List */}
                 {loading ? (
                     <div className="flex items-center justify-center py-12">
                         <Loader className="animate-spin h-12 w-12 text-blue-500" />
                     </div>
-                ) : registrations.length === 0 ? (
+                ) : filteredRegistrations.length === 0 ? (
                     <div className="bg-white rounded-lg shadow p-8 text-center">
-                        <p className="text-gray-500">No registrations found</p>
+                        <p className="text-gray-500">
+                            {searchTerm ? 'No registrations found matching your search' : 'No registrations found'}
+                        </p>
                     </div>
                 ) : (
                     <div className="grid gap-6">
-                        {registrations.map((reg) => (
+                        {filteredRegistrations.map((reg) => (
                             <div key={reg._id} className="bg-white rounded-lg shadow-lg p-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Left Column - Details */}
