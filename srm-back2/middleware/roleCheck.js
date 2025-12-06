@@ -52,3 +52,6 @@ export const requireReviewer = (req, res, next) => {
     }
     next();
 };
+
+// Alias for backward compatibility
+export const isAdmin = requireAdmin;

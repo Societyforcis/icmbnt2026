@@ -53,3 +53,6 @@ export const uploadMemory = multer({
     },
     fileFilter: pdfFileFilter
 });
+
+// Default export for backward compatibility
+export default uploadPaperPDF;

@@ -1,19 +1,19 @@
 import PageTransition from './PageTransition';
 import { MapPin, Mail, Calendar } from 'lucide-react';
-import VenuePic from './images/srm_venue.jpeg';
-import MadrasHighCourt from './images/Madras_High_Court.jpg';
+import VenuePic from './images/bali/u.png';
+import MadrasHighCourt from './images/bali/c3.png';
 
 const Venue = () => {
   return (
     <PageTransition>
       <div className="min-h-screen flex flex-col bg-gray-100 text-gray-900">
-        {/* Header Section */}
+     
         <div className="bg-gradient-to-r from-blue-900 to-[#F5A051] text-white py-16 px-4">
           <div className="container mx-auto max-w-6xl">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Conference Venue</h1>
             <p className="text-xl md:text-2xl opacity-90 max-w-3xl">
-              International Conference on Multidisciplinary Breakthroughs and NextGen Technologies - ICMBNT 2026<br/>
-              <span className="text-lg">27-28 March 2026 | Bali, Indonesia</span>
+              International Conference on Multidisciplinary Breakthroughs and NextGen Technologies - ICMBNT 2026<br />
+              <span className="text-lg">12-13 March 2026 | Bali, Indonesia</span>
             </p>
           </div>
         </div>
@@ -22,72 +22,74 @@ const Venue = () => {
         <section className="py-12 bg-white">
           <div className="container mx-auto px-4 max-w-6xl">
             <h2 className="text-3xl font-bold text-center mb-8 text-[#F5A051]">Conference Location</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
               {/* Bali Venue Image */}
               <div className="relative overflow-hidden rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 group">
-                <img 
-                  src={VenuePic} 
-                  alt="Bali - Conference Venue" 
+                <img
+                  src={VenuePic}
+                  alt="Udayana University - Conference Venue"
                   className="w-full object-cover h-80 group-hover:scale-105 transition-transform duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent group-hover:opacity-75 transition-opacity duration-300"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white transform group-hover:-translate-y-2 transition-transform duration-300">
-                  <h3 className="text-2xl font-bold mb-1">BALI</h3>
-                  <p>Bali, Indonesia</p>
+                  <h3 className="text-2xl font-bold mb-1">UDAYANA UNIVERSITY</h3>
+                  <p>Jimbaran, Bali, Indonesia</p>
                 </div>
               </div>
 
               {/* Conference Dates Image */}
               <div className="relative overflow-hidden rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 group">
-                <img 
-                  src={MadrasHighCourt} 
-                  alt="Conference Dates - 27-28 March 2026" 
+                <img
+                  src={MadrasHighCourt}
+                  alt="Conference Dates - 12-13 March 2026"
                   className="w-full object-cover h-80 group-hover:scale-105 transition-transform duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent group-hover:opacity-75 transition-opacity duration-300"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white transform group-hover:-translate-y-2 transition-transform duration-300">
                   <h3 className="text-2xl font-bold mb-1">Conference Dates</h3>
-                  <p>27-28 March 2026</p>
+                  <p>12-13 March 2026</p>
                 </div>
               </div>
             </div>
 
             {/* Venue Details */}
             <div className="bg-gray-50 p-8 rounded-lg shadow-md mb-12">
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">BALI, INDONESIA</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">UDAYANA UNIVERSITY, BALI, INDONESIA</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                   <div className="flex items-start mb-4">
                     <MapPin className="w-5 h-5 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
                     <p className="text-gray-700">
-                      Bali, Indonesia<br/>
-                      A tropical paradise destination perfect for an international conference
+                      <strong>Udayana University</strong><br />
+                      Jimbaran, Bali, Indonesia<br />
+                      A premier university and world-class conference venue
                     </p>
                   </div>
-                  
+
                   <div className="flex items-start mb-4">
                     <Calendar className="w-5 h-5 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
-                    <p className="text-gray-700"><strong>27-28 March 2026</strong></p>
+                    <p className="text-gray-700"><strong>12-13 March 2026</strong></p>
                   </div>
                 </div>
-                
+
                 <div>
                   <h4 className="text-lg font-semibold text-gray-800 mb-3">About the Venue</h4>
                   <p className="text-gray-700 mb-4">
-                    Bali provides a unique and inspiring setting for ICMBNT 2026. The island's world-class 
-                    hospitality, modern conference facilities, and vibrant atmosphere create an ideal environment 
-                    for academic excellence and networking opportunities.
+                    Udayana University, located in the beautiful Jimbaran area of Bali, provides an exceptional
+                    setting for ICMBNT 2026. As one of Indonesia's leading universities, it offers state-of-the-art
+                    conference facilities combined with Bali's renowned hospitality and inspiring tropical environment,
+                    creating the perfect atmosphere for academic excellence and international networking.
                   </p>
-                  
+
                   <h4 className="text-lg font-semibold text-gray-800 mb-3">Facilities Include:</h4>
                   <ul className="list-disc pl-5 text-gray-700 space-y-1">
-                    <li>Modern conference halls with AV equipment</li>
-                    <li>High-speed internet connectivity</li>
-                    <li>Accommodations for international delegates</li>
-                    <li>Multiple dining options</li>
-                    <li>Business center services</li>
-                    <li>Beautiful tropical setting</li>
+                    <li>Modern conference halls with advanced AV equipment</li>
+                    <li>High-speed internet connectivity throughout campus</li>
+                    <li>Nearby accommodations for international delegates</li>
+                    <li>Multiple dining options and cafeterias</li>
+                    <li>Business center and academic support services</li>
+                    <li>Beautiful campus in tropical Bali setting</li>
                   </ul>
                 </div>
               </div>
@@ -101,20 +103,21 @@ const Venue = () => {
                   <div>
                     <h4 className="text-lg font-semibold text-gray-800 mb-3">Event Details</h4>
                     <ul className="space-y-3 text-gray-700">
-                      <li><strong>Location:</strong> Bali, Indonesia</li>
-                      <li><strong>Dates:</strong> 27-28 March 2026</li>
+                      <li><strong>Venue:</strong> Udayana University</li>
+                      <li><strong>Location:</strong> Jimbaran, Bali, Indonesia</li>
+                      <li><strong>Dates:</strong> 12-13 March 2026</li>
                       <li><strong>Conference Type:</strong> International Multi-disciplinary Conference</li>
                       <li><strong>Format:</strong> In-person + Virtual Hybrid</li>
                     </ul>
                   </div>
-                  
+
                   <div>
                     <h4 className="text-lg font-semibold text-gray-800 mb-3">Important Dates</h4>
                     <ul className="space-y-3 text-gray-700">
-                      <li><strong>Paper Submission:</strong> 15 February 2026</li>
-                      <li><strong>Acceptance Notification:</strong> 28 February 2026</li>
-                      <li><strong>Registration Deadline:</strong> 10 March 2026</li>
-                      <li><strong>Conference Days:</strong> 27-28 March 2026</li>
+                      <li><strong>Paper Submission:</strong> 5 January 2026</li>
+                      <li><strong>Acceptance Notification:</strong> 25 January 2026</li>
+                      <li><strong>Registration Deadline:</strong> 5 February 2026</li>
+                      <li><strong>Conference Days:</strong> 12-13 March 2026</li>
                     </ul>
                   </div>
                 </div>
@@ -123,39 +126,47 @@ const Venue = () => {
 
             {/* Travel Information */}
             <div className="bg-gray-50 p-8 rounded-lg shadow-md">
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">Getting to Bali</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Getting to Udayana University</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                   <h4 className="text-lg font-semibold text-gray-800 mb-3">By Air:</h4>
                   <p className="text-gray-700 mb-4">
-                    Bali is served by Ngurah Rai International Airport (DPS), which receives flights from 
-                    major cities worldwide. It's one of Southeast Asia's busiest airports with excellent 
-                    connectivity and modern facilities.
+                    Fly to Ngurah Rai International Airport (DPS) in Bali, which receives flights from
+                    major cities worldwide. The airport is approximately 15-20 minutes drive from Udayana University's
+                    Jimbaran campus, making it convenient for international delegates.
                   </p>
-                  
+
                   <h4 className="text-lg font-semibold text-gray-800 mb-3">Transportation from Airport:</h4>
                   <ul className="list-disc pl-5 text-gray-700 space-y-1">
-                    <li>Taxi services available at the airport</li>
+                    <li>Taxi services available at the airport (15-20 min to venue)</li>
                     <li>Car rental services</li>
                     <li>Pre-booked hotel shuttle (contact organizers)</li>
                     <li>Ride-sharing apps (Gojek, Grab)</li>
+                    <li>Airport shuttle to Jimbaran area</li>
                   </ul>
                 </div>
-                
+
                 <div>
                   <h4 className="text-lg font-semibold text-gray-800 mb-3">Visa & Travel Information:</h4>
                   <p className="text-gray-700 mb-4">
-                    Many countries enjoy visa-free or visa-on-arrival privileges to Indonesia. 
+                    Many countries enjoy visa-free or visa-on-arrival privileges to Indonesia.
                     Check the Indonesian embassy website for your country's requirements.
                   </p>
-                  
-                  <h4 className="text-lg font-semibold text-gray-800 mb-3">Local Attractions & Activities:</h4>
+
+                  <h4 className="text-lg font-semibold text-gray-800 mb-3">About Udayana University:</h4>
+                  <p className="text-gray-700 mb-3">
+                    Udayana University (Universitas Udayana) is one of Indonesia's most prestigious universities,
+                    founded in 1962. The Jimbaran campus features modern facilities and a beautiful setting,
+                    perfect for hosting international conferences.
+                  </p>
+
+                  <h4 className="text-lg font-semibold text-gray-800 mb-3">Local Attractions:</h4>
                   <ul className="list-disc pl-5 text-gray-700 space-y-1">
-                    <li>Beautiful beaches and water sports</li>
-                    <li>Ancient temples and cultural sites</li>
-                    <li>Rice terraces and natural landscapes</li>
-                    <li>Local cuisine and dining experiences</li>
-                    <li>Spa and wellness facilities</li>
+                    <li>Jimbaran Beach (famous for sunset seafood dining)</li>
+                    <li>Uluwatu Temple and Kecak Dance performances</li>
+                    <li>Traditional Balinese culture and arts</li>
+                    <li>Water sports and beach activities</li>
+                    <li>Local markets and shopping areas</li>
                   </ul>
                 </div>
               </div>
@@ -167,19 +178,19 @@ const Venue = () => {
         <section className="py-12 bg-gray-50">
           <div className="container mx-auto px-4 max-w-6xl">
             <h2 className="text-3xl font-bold text-center mb-8 text-[#F5A051]">Venue-Related Inquiries</h2>
-            
+
             <div className="text-center bg-white p-8 rounded-lg shadow-md">
               <p className="text-lg text-gray-700 mb-4">
                 For any questions related to the venue, accommodations, or travel assistance, please contact:
               </p>
-              
+
               <div className="inline-flex items-center justify-center bg-[#F5A051]/10 px-6 py-3 rounded-lg">
                 <Mail className="w-5 h-5 text-[#F5A051] mr-2" />
                 <a href="mailto:icmbnt2026@gmail.com" className="text-lg font-medium text-[#F5A051]">
                   icmbnt2026@gmail.com
                 </a>
               </div>
-              
+
               <p className="mt-4 text-gray-600">
                 The conference organizing committee will be happy to assist you with venue-related arrangements.
               </p>

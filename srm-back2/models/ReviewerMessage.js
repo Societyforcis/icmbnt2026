@@ -25,7 +25,6 @@ const reviewerMessageSchema = new mongoose.Schema(
             type: String,  // Can be ObjectId or email string
             required: true
         },
-        // Message thread - can be between editor-reviewer or editor-author
         conversation: [
             {
                 sender: {
@@ -73,5 +72,6 @@ const reviewerMessageSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
 
 export const ReviewerMessage = mongoose.model('ReviewerMessage', reviewerMessageSchema);

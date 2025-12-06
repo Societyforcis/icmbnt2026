@@ -79,25 +79,25 @@ const CallForPapers = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <DateCard
               title="Manuscript Submission Deadline"
-              date="15 February 2026"
+              date="5 January 2026"
               isHighlighted={true}
             />
             <DateCard
               title="Acceptance"
-              date="28 February 2026"
+              date="25 January 2026"
             />
             <DateCard
               title="Registration Date"
-              date="10 March 2026"
+              date="5 February 2026"
             />
             <DateCard
               title="Date of Conference"
-              date="27 March 2026 & 28 March 2026"
+              date="12 March 2026 & 13 March 2026"
             />
           </div>
         </section>
 
-        
+
         <section className="mb-16">
           <div className="flex items-center mb-6">
             <FaFileAlt className="text-[#F5A051] text-2xl mr-4" />
@@ -165,7 +165,7 @@ const CallForPapers = () => {
               </li>
             </ol>
             <div className="mt-6 py-2 px-4 bg-blue-50 border-l-4 border-[#F5A051] text-gray-700">
-              <p><strong>Manuscript Submission Deadline:</strong> 15 February 2026</p>
+              <p><strong>Manuscript Submission Deadline:</strong> 5 January 2026</p>
             </div>
           </div>
         </section>

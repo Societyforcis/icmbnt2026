@@ -8,22 +8,22 @@ try {
 
 const timelineData = [
   {
-    date: "15 February 2026",
+    date: "5 January 2026",
     title: "Manuscript Submission Deadline",
     description: "Last date to submit your research papers and manuscripts"
   },
   {
-    date: "28 February 2026",
+    date: "25 January 2026",
     title: "Acceptance Notification",
     description: "Authors will be notified about the acceptance of their papers"
   },
   {
-    date: "10 March 2026",
+    date: "5 February 2026",
     title: "Registration Deadline",
     description: "Last date for conference registration"
   },
   {
-    date: "27-28 March 2026",
+    date: "12-13 March 2026",
     title: "Conference Dates",
     description: "Main conference days"
   }
@@ -36,14 +36,13 @@ const Timeline = () => {
       <div className="relative w-full max-w-2xl">
         {/* Vertical line */}
         <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-1 bg-gray-200"></div>
-        
+
         {/* Timeline items */}
         {timelineData.map((item, index) => (
           <div
             key={index}
-            className={`relative mb-8 flex items-center w-full ${
-              typeof document !== 'undefined' ? 'animate__animated animate__fadeInUp' : ''
-            }`}
+            className={`relative mb-8 flex items-center w-full ${typeof document !== 'undefined' ? 'animate__animated animate__fadeInUp' : ''
+              }`}
             style={{ animationDelay: `${index * 0.2}s` }}
           >
             {index % 2 === 0 ? (

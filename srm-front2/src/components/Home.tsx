@@ -3,9 +3,15 @@
 import { Calendar, MapPin, Users, Target, Compass, Globe } from "lucide-react"
 import { useState, useEffect } from "react"
 import bali from "./images/bali.png"
-import con from "./images/c.png"
+import con from "./images/bali/u.png"
 import society from "./images/bali/society.png"
 import isius from "./images/bali/isius.png"
+import Timeline from "./Timeline"
+
+// Sponsor logos - placeholder imports (replace with actual logo paths)
+import udayanaLogo from "./images/bali/ul.png" // TODO: Replace with Udayana University logo
+import srmLogo from "./images/bali/srm2.png" // TODO: Replace with SRM University logo
+import pelitaBangsaLogo from "./images/bali/pelita.png" // TODO: Replace with Universitas Pelita Bangsa logo
 
 const Home = () => {
   const [showLogos, setShowLogos] = useState(false)
@@ -28,7 +34,7 @@ const Home = () => {
         <div className="absolute inset-0 backdrop-blur-md bg-black/20"></div>
 
         <div className="relative z-10 container mx-auto px-4 py-12 min-h-screen flex flex-col justify-center items-center text-center">
-          <h1 className="text-3xl md:text-5xl font-bold mb-6 leading-tight max-w-5xl drop-shadow-lg">
+          <h1 className="text-2xl md:text-5xl font-bold mb-6 leading-tight max-w-5xl ">
             International Conference on Multidisciplinary Breakthroughs and NextGen Technologies
           </h1>
           <h2 className="text-2xl md:text-3xl font-semibold mb-8 text-[#F5A051] drop-shadow-md">(ICMBNT–2026)</h2>
@@ -36,15 +42,15 @@ const Home = () => {
 
           <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-12">
             <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
-              <Calendar className="w-5 h-5 mr-2 text-[#F5A051]" />
-              <span>April 26 & 27, 2026</span>
+              <Calendar className="w-10 h-10 mr-2 text-[#F5A051]" />
+              <span>March 12 & 13, 2026</span>
             </div>
             <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
-              <MapPin className="w-5 h-5 mr-2 text-[#F5A051]" />
+              <MapPin className="w-10 h-10 mr-2 text-[#F5A051]" />
               <span>Bali, Indonesia</span>
             </div>
             <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
-              <Users className="w-5 h-5 mr-2 text-[#F5A051]" />
+              <Users className="w-10 h-10 mr-2 text-[#F5A051]" />
               <span>Hybrid Conference (In-person + Virtual)</span>
             </div>
           </div>
@@ -52,7 +58,7 @@ const Home = () => {
           {/* Left Logo - ISIUS - Show only on screens > 1500px */}
           {showLogos && (
             <div className="absolute left-4 xl:left-8 top-1/2 -translate-y-1/2 z-20">
-              <div className="flex flex-col items-center ml-[-60px]">
+              <div className="flex flex-col items-center ml-[-100px] mt-[-300px]">
                 <img
                   src={isius}
                   alt="ICSCS Logo"
@@ -69,7 +75,7 @@ const Home = () => {
           {/* Right Logo - Society - Show only on screens > 1500px */}
           {showLogos && (
             <div className="absolute right-4 xl:right-8 top-1/2 -translate-y-1/2 z-20">
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center mt-[-300px] ml-[100px]">
                 <img
                   src={society}
                   alt="Society CIS Logo"
@@ -83,22 +89,58 @@ const Home = () => {
             </div>
           )}
 
-          <div className="mb-8">
-            <p className="text-lg text-slate-200 mb-4">
-              Organized by
-              <br />
-              <span className="font-bold text-white">Society for Cyber Intelligent Systems</span>
-              <br />
-              Puducherry – India
-              <br></br>
-              &
-                <br />
-              <span className="font-bold text-white">
-                International Society of Intelligent Unmanned Systems
-              </span>
-              <br />
-           South Korea - Jimbaran Bali
+          <div className="mb-6">
+            <p className="text-xs text-slate-300 mb-2">Organized by</p>
+            <p className="text-sm text-white mb-1">
+              <span className="font-bold">Society for Cyber Intelligent Systems</span> <span className="text-slate-300">(Puducherry – India)</span>
+              <span className="mx-2">&</span>
+              <span className="font-bold">International Society of Intelligent Unmanned Systems</span> <span className="text-slate-300">(South Korea - Jimbaran Bali)</span>
             </p>
+          </div>
+
+          {/* Sponsor Logos Section - Above Register Button */}
+          <div className="mb-8 w-full max-w-4xl">
+            <p className="text-sm text-slate-300 mb-6 font-semibold uppercase tracking-wider">Sponsored By</p>
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-8 sm:gap-12 md:gap-16 px-6 py-4">
+              {/* Udayana University Logo */}
+              <div className="flex flex-col items-center">
+                <img
+                  src={udayanaLogo}
+                  alt="Udayana University, Bali, Indonesia"
+                  className="h-16 sm:h-20 md:h-24 object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                />
+                <p className="text-xs sm:text-sm text-white mt-3 text-center font-medium max-w-[140px]">
+                  Udayana University
+                </p>
+              </div>
+
+              {/* SRM University Logo */}
+              <div className="flex flex-col items-center">
+                <img
+                  src={srmLogo}
+                  alt="SRM University"
+                  className="h-16 sm:h-20 md:h-24 object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                />
+                <p className="text-xs sm:text-sm text-white mt-3 text-center font-medium max-w-[140px]">
+                  SRM University
+                </p>
+              </div>
+
+              {/* Universitas Pelita Bangsa Logo */}
+              <div className="flex flex-col items-center">
+                <img
+                  src={pelitaBangsaLogo}
+                  alt="Universitas Pelita Bangsa"
+                  className="h-16 sm:h-20 md:h-24 object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                />
+                <p className="text-xs sm:text-sm text-white mt-3 text-center font-medium max-w-[140px]">
+                  Universitas Pelita Bangsa
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Register Button - Now in center */}
@@ -232,6 +274,9 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {/* Timeline Section */}
+      <Timeline />
 
       <footer className="py-8 bg-white border-t border-gray-200 text-gray-600 text-center">
         <p>© 2026 ICMBNT. All rights reserved.</p>

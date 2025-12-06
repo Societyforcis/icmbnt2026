@@ -167,7 +167,7 @@ export const sendEditorAssignmentEmail = async (editorEmail, editorName, paperDa
 export const sendReviewerConfirmationEmail = async (reviewerEmail, reviewerName, paperData, assignmentId) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const confirmationLink = `${frontendUrl}/reviewer/confirm?assignmentId=${assignmentId}&email=${encodeURIComponent(reviewerEmail)}`;
-    
+
     // Abstract section - only show if abstract exists
     const abstractSection = paperData.abstract ? `
         <div style="background-color: #e8f4f8; border-left: 4px solid #0288d1; padding: 15px; margin: 20px 0; border-radius: 4px;">
@@ -177,7 +177,7 @@ export const sendReviewerConfirmationEmail = async (reviewerEmail, reviewerName,
             </p>
         </div>
     ` : '';
-    
+
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: reviewerEmail,
@@ -266,9 +266,9 @@ export const sendReviewerConfirmationEmail = async (reviewerEmail, reviewerName,
 // Send reviewer assignment notification (Step 2 - after acceptance)
 export const sendReviewerAssignmentEmail = async (reviewerEmail, reviewerName, paperData) => {
     const deadline = new Date(paperData.deadline);
-    const deadlineStr = deadline.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
+    const deadlineStr = deadline.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
         day: 'numeric'
     });
 
@@ -548,16 +548,16 @@ export const sendReviewerReminderEmail = async (reviewerEmail, reviewerName, pap
             <p style="margin: 0; color: #1f2937; font-weight: 600; font-size: 15px; word-break: break-word;">${paperTitle}</p>
           </div>
 
-          ${daysRemaining < 0 
-            ? `<div style="margin: 20px 0; padding: 15px; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+          ${daysRemaining < 0
+                ? `<div style="margin: 20px 0; padding: 15px; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
                 <p style="margin: 0; color: #92400e;"><strong style="color: #dc2626;">STATUS: OVERDUE</strong></p>
                 <p style="margin: 5px 0 0 0; color: #92400e;">The review deadline was ${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) !== 1 ? 's' : ''} ago. Your review is urgently needed.</p>
               </div>`
-            : `<div style="margin: 20px 0; padding: 15px; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+                : `<div style="margin: 20px 0; padding: 15px; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
                 <p style="margin: 0; color: #92400e;"><strong>Time Remaining: ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}</strong></p>
                 <p style="margin: 5px 0 0 0; color: #92400e;">Please submit your review before the deadline to ensure timely publication.</p>
               </div>`
-          }
+            }
 
           <div style="text-align: center; margin: 30px 0;">
             <a href="${reviewLink}" style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
@@ -574,14 +574,14 @@ export const sendReviewerReminderEmail = async (reviewerEmail, reviewerName, pap
             Your expert evaluation is crucial for maintaining the quality of our publication process. We appreciate your time and effort in reviewing this submission.
           </p>
 
-          ${reminderCount >= 2 
-            ? `<div style="padding: 15px; background-color: #fee2e2; border-left: 4px solid #dc2626; border-radius: 4px; margin: 20px 0;">
+          ${reminderCount >= 2
+                ? `<div style="padding: 15px; background-color: #fee2e2; border-left: 4px solid #dc2626; border-radius: 4px; margin: 20px 0;">
                 <p style="margin: 0; color: #991b1b; font-weight: 500;">
                   If you have any concerns about completing this review or need an extension, please contact the editor immediately.
                 </p>
               </div>`
-            : ''
-          }
+                : ''
+            }
 
           <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
             Thank you for your continued support of our publication.
@@ -698,10 +698,10 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
     try {
         const fs = (await import('fs')).default;
         const path = (await import('path')).default;
-        
+
         // Try to attach the copyright form PDF
         const copyrightFormPath = path.join(process.cwd(), 'public', 'documents', 'ICMBNT_Copyright_Form.pdf');
-        
+
         if (fs.existsSync(copyrightFormPath)) {
             attachments.push({
                 filename: 'ICMBNT_Copyright_Form.pdf',
@@ -757,7 +757,7 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
                 <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">📅 Conference Schedule:</p>
                     <div style="font-size: 14px; color: #333;">
-                        <p style="margin: 5px 0;"><strong>📌 Conference Dates:</strong> March 13-14, 2026</p>
+                        <p style="margin: 5px 0;"><strong>📌 Conference Dates:</strong> March 12-13, 2026</p>
                         <p style="margin: 5px 0;"><strong>🏛️ Venue:</strong> Bali, Indonesia</p>
                         <p style="margin: 5px 0;"><strong>🌐 Format:</strong> Hybrid (In-person + Virtual)</p>
                     </div>
@@ -767,7 +767,7 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: #2e7d32;">✅ Next Steps:</p>
                     <ol style="margin: 0; padding-left: 20px; color: #333; font-size: 13px;">
                         <li style="margin: 5px 0;">Review and sign the attached Copyright Form</li>
-                        <li style="margin: 5px 0;">Prepare your presentation slides for March 13-14, 2026</li>
+                        <li style="margin: 5px 0;">Prepare your presentation slides for March 12-13, 2026</li>
                         <li style="margin: 5px 0;">Arrange your travel to Bali, Indonesia</li>
                         <li style="margin: 5px 0;"><strong><a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/Registrations" style="color: #0066cc; text-decoration: none;">Click here to register for the conference</a></strong></li>
                         <li style="margin: 5px 0;">Join us for this exciting hybrid conference experience!</li>
@@ -805,9 +805,9 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
 // Send re-review request email (Review 2 after revision)
 export const sendReReviewEmail = async (reviewerEmail, reviewerName, paperData) => {
     const deadline = new Date(paperData.deadline);
-    const deadlineStr = deadline.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
+    const deadlineStr = deadline.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
         day: 'numeric'
     });
 
@@ -923,9 +923,9 @@ export const sendReviewerAssignmentWithAcceptance = async (reviewerEmail, review
     const acceptLink = `${frontendUrl}/reviewer-accept?token=${acceptanceToken}`;
     const rejectLink = `${frontendUrl}/reviewer-reject?token=${acceptanceToken}`;
     const deadline = new Date(paperData.deadline);
-    const deadlineStr = deadline.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
+    const deadlineStr = deadline.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
         day: 'numeric'
     });
 

@@ -17,7 +17,7 @@ const finalAcceptanceSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    
+
     // Author Information
     authorName: {
         type: String,
@@ -28,7 +28,7 @@ const finalAcceptanceSchema = new mongoose.Schema({
         required: true,
         index: true
     },
-    
+
     // Paper Link/URL - Clean PDF (editor-approved final version)
     pdfUrl: {
         type: String,
@@ -42,22 +42,22 @@ const finalAcceptanceSchema = new mongoose.Schema({
         type: String,
         required: false
     },
-    
+
     // REVISION PDFS - All three versions
     revisionPdfs: {
         cleanPdfUrl: String,        // Final corrected paper (not shown to reviewers)
         cleanPdfPublicId: String,
         cleanPdfFileName: String,
-        
+
         highlightedPdfUrl: String,  // Shows corrections (shown to reviewers in round 2)
         highlightedPdfPublicId: String,
         highlightedPdfFileName: String,
-        
+
         responsePdfUrl: String,     // Explains corrections made
         responsePdfPublicId: String,
         responsePdfFileName: String
     },
-    
+
     // REVIEWS BY ROUND - Store each review round separately
     reviewsByRound: [{
         round: Number,              // 1, 2, 3, etc.
@@ -80,7 +80,7 @@ const finalAcceptanceSchema = new mongoose.Schema({
         reviewedPdfUrl: String,      // Which PDF was reviewed in this round
         submittedAt: Date
     }],
-    
+
     // Category and Topic
     category: {
         type: String,
@@ -90,8 +90,8 @@ const finalAcceptanceSchema = new mongoose.Schema({
         type: String,
         required: false
     },
-    
-    
+
+
     // LEGACY: Old reviewers array (kept for backward compatibility)
     reviewers: [{
         reviewerId: {
@@ -107,54 +107,54 @@ const finalAcceptanceSchema = new mongoose.Schema({
         recommendation: String,
         submittedAt: Date
     }],
-    
+
     // Total Reviewers Count
     totalReviewers: {
         type: Number,
         default: 0
     },
-    
+
     // Average Rating (calculated from all reviews)
     averageRating: {
         type: Number,
         default: 0
     },
-    
+
     // Final Decision Info
     finalDecision: {
         type: String,
         enum: ['Accept', 'Reject', 'Revision Required'],
         default: 'Accept'
     },
-    
+
     // Editor who made the decision
     editorId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
     editorEmail: String,
-    
+
     // Decision Date/Time
     acceptanceDate: {
         type: Date,
         default: Date.now,
         index: true
     },
-    
+
     // Additional Info
     revisionCount: {
         type: Number,
         default: 0,
         description: 'Number of revisions requested before acceptance'
     },
-    
+
     // Acceptance Certificate/Number (optional)
     acceptanceCertificateNumber: {
         type: String,
         unique: true,
         sparse: true
     },
-    
+
     // Conference/Event Info
     conferenceYear: {
         type: Number,
@@ -164,14 +164,28 @@ const finalAcceptanceSchema = new mongoose.Schema({
         type: String,
         default: 'ICMBNT 2025'
     },
-    
+
+
+    // Payment/Registration Status
+    paymentStatus: {
+        type: String,
+        enum: ['pending', 'paid', 'verified'],
+        default: 'pending',
+        description: 'Payment status for conference registration'
+    },
+    paymentRegistrationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'PaymentRegistration',
+        required: false
+    },
+
     // Status
     status: {
         type: String,
         enum: ['Accepted', 'Certificate Generated', 'Published'],
         default: 'Accepted'
     },
-    
+
     // Additional Metadata
     metadata: {
         originalSubmissionDate: Date,
@@ -180,7 +194,7 @@ const finalAcceptanceSchema = new mongoose.Schema({
         lastRevisionDate: Date,
         notes: String
     },
-    
+
     // Timestamps
     createdAt: {
         type: Date,
@@ -204,11 +218,11 @@ finalAcceptanceSchema.pre('save', function (next) {
         const ratings = this.reviewers
             .map(r => r.overallRating)
             .filter(r => r !== undefined && r !== null);
-        
+
         if (ratings.length > 0) {
             this.averageRating = (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2);
         }
-        
+
         this.totalReviewers = this.reviewers.length;
     }
     next();

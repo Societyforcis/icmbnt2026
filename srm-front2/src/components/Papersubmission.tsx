@@ -1,17 +1,17 @@
-import  { useState,  useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { 
- 
-  FaFilePdf, 
- 
-  FaFileAlt, 
-  FaCheckCircle, 
+import {
+
+  FaFilePdf,
+
+  FaFileAlt,
+  FaCheckCircle,
   FaExclamationTriangle,
-  
+
   FaEnvelope,
-  
+
 
   FaQuoteRight,
   FaPaperPlane,
@@ -43,7 +43,7 @@ const PaperSubmission = () => {
   const [hasRevision, setHasRevision] = useState(false);
   const [showRevisionUpload, setShowRevisionUpload] = useState(false);
   const navigate = useNavigate();
-  
+
   // Check for authentication and existing submission when component mounts
   useEffect(() => {
     const checkUserSubmission = async () => {
@@ -60,7 +60,7 @@ const PaperSubmission = () => {
         });
         return;
       }
-      
+
       try {
         // Check for existing submission
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -69,7 +69,7 @@ const PaperSubmission = () => {
             'Authorization': `Bearer ${token}`
           }
         });
-        
+
         if (response.data.hasSubmission) {
           setHasExistingSubmission(true);
           setExistingSubmission(response.data.submission);
@@ -92,10 +92,10 @@ const PaperSubmission = () => {
         setLoading(false);
       }
     };
-    
+
     checkUserSubmission();
   }, [navigate]);
-  
+
   // Handler for submission success
   const handleSubmissionSuccess = () => {
     setSubmitSuccess(true);
@@ -104,7 +104,7 @@ const PaperSubmission = () => {
       behavior: "smooth"
     });
   };
-  
+
   // Format date for display
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -127,7 +127,7 @@ const PaperSubmission = () => {
             <div className="absolute bottom-10 right-10 w-24 h-24 md:w-40 md:h-40 border-4 border-white rounded-full hidden sm:block"></div>
             <div className="absolute top-1/2 left-1/4 w-16 h-16 md:w-24 md:h-24 border-4 border-white transform -translate-y-1/2 hidden md:block"></div>
           </div>
-          
+
           <div className="absolute inset-0 bg-black opacity-30"></div>
           <div className="relative z-10 container mx-auto px-4 text-center">
             <div className="inline-block mb-4 sm:mb-6">
@@ -146,7 +146,7 @@ const PaperSubmission = () => {
           {/* Decorative side elements */}
           <div className="hidden lg:block absolute top-20 left-0 w-32 border-t border-gray-200"></div>
           <div className="hidden lg:block absolute top-20 right-0 w-32 border-t border-gray-200"></div>
-          
+
           <div className="max-w-4xl mx-auto">
             {/* Success message displayed if submission successful */}
             {submitSuccess && (
@@ -157,10 +157,10 @@ const PaperSubmission = () => {
                   </div>
                   <h3 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Submission Successful!</h3>
                   <p className="text-lg sm:text-xl text-gray-600 mb-6 sm:mb-10 max-w-lg mx-auto">
-                    Thank you for your submission. We have received your paper and will review it shortly. 
+                    Thank you for your submission. We have received your paper and will review it shortly.
                     You will receive a confirmation email with further details.
                   </p>
-                  <button 
+                  <button
                     onClick={() => navigate('/dashboard')}
                     className="bg-[#F5A051] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-md hover:bg-[#e08c3e] transition-all duration-300 hover:shadow-lg text-base sm:text-lg font-medium"
                   >
@@ -186,13 +186,13 @@ const PaperSubmission = () => {
                   </div>
                   <span className="mt-1">Submit Your Research</span>
                 </h2>
-                
+
                 <p className="text-gray-700 text-base sm:text-lg mb-6 sm:mb-8 leading-relaxed">
-                  We invite scholars, researchers, and professionals to contribute to the multidisciplinary discourse 
-                  by submitting their insightful papers and abstracts. Join us in building a platform that celebrates 
+                  We invite scholars, researchers, and professionals to contribute to the multidisciplinary discourse
+                  by submitting their insightful papers and abstracts. Join us in building a platform that celebrates
                   diverse perspectives and fosters collaboration across a spectrum of research domains.
                 </p>
-                
+
                 <div className="mt-6 sm:mt-8 bg-gray-50 p-4 sm:p-6 md:p-8 rounded-lg border-l-4 border-blue-800">
                   <h3 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-gray-800">Instructions To Authors:</h3>
                   <ol className="list-decimal pl-4 sm:pl-5 space-y-3 sm:space-y-4 text-gray-700 text-sm sm:text-base">
@@ -217,7 +217,7 @@ const PaperSubmission = () => {
                     </p>
                   </div>
                 </div>
-                
+
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex items-center">
                   <FaFileAlt className="text-blue-800 mr-3" />
                   Your Paper Submission
@@ -229,51 +229,50 @@ const PaperSubmission = () => {
                       <p className="text-gray-500 text-sm mb-1">Submission ID</p>
                       <p className="text-gray-800 font-medium">{existingSubmission.submissionId}</p>
                     </div>
-                    
+
                     <div>
                       <p className="text-gray-500 text-sm mb-1">Booking ID</p>
                       <p className="text-gray-800 font-medium">{existingSubmission.bookingId}</p>
                     </div>
-                    
+
                     <div>
                       <p className="text-gray-500 text-sm mb-1">Paper Title</p>
                       <p className="text-gray-800 font-medium">{existingSubmission.paperTitle}</p>
                     </div>
-                    
+
                     <div>
                       <p className="text-gray-500 text-sm mb-1">Author Name</p>
                       <p className="text-gray-800 font-medium">{existingSubmission.authorName}</p>
                     </div>
-                    
+
                     <div>
                       <p className="text-gray-500 text-sm mb-1">Category</p>
                       <p className="text-gray-800 font-medium">{existingSubmission.category}</p>
                     </div>
-                    
+
                     <div>
                       <p className="text-gray-500 text-sm mb-1">Status</p>
                       <p>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          existingSubmission.status === 'Submitted' 
-                            ? 'bg-yellow-100 text-yellow-800' 
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${existingSubmission.status === 'Submitted'
+                            ? 'bg-yellow-100 text-yellow-800'
                             : existingSubmission.status === 'Under Review'
-                            ? 'bg-blue-100 text-blue-800'
-                            : existingSubmission.status === 'Accepted'
-                            ? 'bg-green-100 text-green-800'
-                            : existingSubmission.status === 'Rejected'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
+                              ? 'bg-blue-100 text-blue-800'
+                              : existingSubmission.status === 'Accepted'
+                                ? 'bg-green-100 text-green-800'
+                                : existingSubmission.status === 'Rejected'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-gray-100 text-gray-800'
+                          }`}>
                           {existingSubmission.status}
                         </span>
                       </p>
                     </div>
-                    
+
                     <div>
                       <p className="text-gray-500 text-sm mb-1">Submission Date</p>
                       <p className="text-gray-800 font-medium">{formatDate(existingSubmission.submissionDate)}</p>
                     </div>
-                    
+
                     {existingSubmission.topic && (
                       <div>
                         <p className="text-gray-500 text-sm mb-1">Topic</p>
@@ -281,7 +280,7 @@ const PaperSubmission = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   {existingSubmission.abstractFileUrl && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <p className="text-gray-500 text-sm mb-2">Submitted File</p>
@@ -292,9 +291,9 @@ const PaperSubmission = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row justify-center gap-4 mt-6">
-                  <button 
+                  <button
                     onClick={() => navigate('/dashboard')}
                     className="bg-blue-800 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center justify-center"
                   >
@@ -342,7 +341,7 @@ const PaperSubmission = () => {
                     {revisionStatus.reviewerComments && revisionStatus.reviewerComments.map((comment: any, index: number) => (
                       <div key={index} className="p-4 bg-gray-50 border-l-4 border-orange-400 rounded-md">
                         <h4 className="font-bold text-orange-700 mb-3">Reviewer {index + 1}</h4>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
                           <div>
                             <span className="font-semibold text-gray-600">Recommendation:</span>
@@ -426,16 +425,16 @@ const PaperSubmission = () => {
                   </div>
                 </div>
 
-                <div className="mb-8 bg-green-50 border-l-4 border-green-400 p-4 rounded-md">
+                <div className="mb-8 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md">
                   <div className="flex">
                     <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <svg className="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm text-green-800">
-                        <span className="font-bold">Good News!</span> The paper submission deadline has been extended from <span className="line-through">25 March 2026</span> to <span className="font-bold">15 April 2026</span>.
+                      <p className="text-sm text-blue-800">
+                        <span className="font-bold">Important:</span> Manuscript submission deadline is <span className="font-bold">5 January 2026</span>. Submit your paper before the deadline!
                       </p>
                     </div>
                   </div>
@@ -448,18 +447,18 @@ const PaperSubmission = () => {
                     </div>
                     <span className="mt-1">Submit Your Paper</span>
                   </h2>
-                  
+
                   {/* Embedded SubmitPaperForm component */}
-                  <SubmitPaperForm 
-                    isOpen={true} 
-                    onClose={() => {}} 
-                    embedded={true} 
-                    onSubmissionSuccess={handleSubmissionSuccess} 
+                  <SubmitPaperForm
+                    isOpen={true}
+                    onClose={() => { }}
+                    embedded={true}
+                    onSubmissionSuccess={handleSubmissionSuccess}
                   />
                 </section>
               </>
             )}
-            
+
             {/* Additional information */}
             <div className="mt-12 bg-blue-50 p-6 rounded-lg">
               <h3 className="text-xl font-semibold mb-3 text-blue-800">Contact for Submission Assistance</h3>

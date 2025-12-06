@@ -346,7 +346,7 @@ const Dashboard: React.FC = () => {
                               <span className="flex-1 w-0 truncate">Manuscript Submission Deadline</span>
                             </div>
                             <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium text-red-600">25 March 2026</span>
+                              <span className="font-medium text-red-600">5 January 2026</span>
                             </div>
                           </li>
                           <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
@@ -354,7 +354,7 @@ const Dashboard: React.FC = () => {
                               <span className="flex-1 w-0 truncate">Acceptance Notification</span>
                             </div>
                             <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium">5 April 2026</span>
+                              <span className="font-medium">25 January 2026</span>
                             </div>
                           </li>
                           <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
@@ -362,7 +362,7 @@ const Dashboard: React.FC = () => {
                               <span className="flex-1 w-0 truncate">Registration Deadline</span>
                             </div>
                             <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium">12 April 2026</span>
+                              <span className="font-medium">5 February 2026</span>
                             </div>
                           </li>
                           <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
@@ -370,7 +370,7 @@ const Dashboard: React.FC = () => {
                               <span className="flex-1 w-0 truncate">Conference Dates</span>
                             </div>
                             <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium">13-14 March 2026</span>
+                              <span className="font-medium">12-13 March 2026</span>
                             </div>
                           </li>
                         </ul>

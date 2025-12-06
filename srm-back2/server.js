@@ -14,6 +14,8 @@ import paperRoutes from './routes/paperRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import editorRoutes from './routes/editorRoutes.js';
 import reviewerRoutes from './routes/reviewerRoutes.js';
+import paymentRegistrationRoutes from './routes/paymentRegistration.js';
+import committeeRoutes from './routes/committee.js';
 
 
 dotenv.config();
@@ -28,10 +30,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/public', express.static('public'));
 
 const corsOptions = {
-  origin: ['https://icmbnt2026-yovz.vercel.app', 'http://localhost:5173','https://icmbnt2026.societycis.org'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+    origin: ['https://icmbnt2026-yovz.vercel.app', 'http://localhost:5173', 'https://icmbnt2026.societycis.org'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 };
 
 app.use(cors(corsOptions));
@@ -50,9 +52,9 @@ connectDatabase();
 const verifyJWT = (req, res, next) => {
     const token = req.headers["authorization"]?.replace('Bearer ', '');
     if (!token) {
-        return res.status(403).json({ 
-            success: false, 
-            message: "A token is required for authentication" 
+        return res.status(403).json({
+            success: false,
+            message: "A token is required for authentication"
         });
     }
     try {
@@ -60,9 +62,9 @@ const verifyJWT = (req, res, next) => {
         req.user = decoded;
         next();
     } catch (error) {
-        return res.status(401).json({ 
-            success: false, 
-            message: "Invalid token" 
+        return res.status(401).json({
+            success: false,
+            message: "Invalid token"
         });
     }
 };
@@ -99,6 +101,8 @@ app.use('/api/papers', paperRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/editor', editorRoutes);
 app.use('/api/reviewer', reviewerRoutes);
+app.use('/api/registration', paymentRegistrationRoutes);
+app.use('/api/committee', committeeRoutes);
 
 // ==================== AUTHOR SUBMISSION ROUTES ====================
 // Get user's paper submission (alias for /api/papers/my-submission)
@@ -106,7 +110,7 @@ app.get('/user-submission', verifyJWT, async (req, res) => {
     try {
         const userEmail = req.user.email;
         const submission = await PaperSubmission.findOne({ email: userEmail });
-        
+
         if (!submission) {
             return res.status(200).json({
                 success: true,
@@ -114,7 +118,7 @@ app.get('/user-submission', verifyJWT, async (req, res) => {
                 submission: null
             });
         }
-        
+
         return res.status(200).json({
             success: true,
             hasSubmission: true,
@@ -148,10 +152,10 @@ app.get('/revision-status', verifyJWT, async (req, res) => {
     try {
         const { Revision } = await import('./models/Revision.js');
         const userEmail = req.user.email;
-        
+
         const revision = await Revision.findOne({ authorEmail: userEmail })
             .populate('reviewerComments.reviewerId', 'username email');
-        
+
         if (!revision) {
             return res.status(200).json({
                 success: true,
@@ -159,7 +163,7 @@ app.get('/revision-status', verifyJWT, async (req, res) => {
                 revision: null
             });
         }
-        
+
         return res.status(200).json({
             success: true,
             hasRevision: true,
@@ -191,7 +195,7 @@ app.post('/submit-revised-paper', verifyJWT, async (req, res) => {
         // For now, store the PDF URL from the upload (this would come from Cloudinary in real implementation)
         // In production, you'd handle file upload to Cloudinary here
         const { Revision } = await import('./models/Revision.js');
-        
+
         const revision = await Revision.findOne({ submissionId, authorEmail: userEmail });
         if (!revision) {
             return res.status(404).json({
@@ -238,11 +242,11 @@ app.get('/test/paperfetch', async (req, res) => {
             .sort({ createdAt: -1 });
 
         console.log(`Found ${papers.length} papers in database`);
-        
+
         if (papers.length > 0) {
             console.log('First paper:', JSON.stringify(papers[0], null, 2));
         }
-        
+
         return res.status(200).json({
             success: true,
             count: papers.length,
@@ -262,11 +266,11 @@ app.get('/test/paperfetch', async (req, res) => {
 app.get('/test/pdf-fetch', async (req, res) => {
     try {
         const { url, publicId } = req.query;
-        
+
         if (!url && !publicId) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'PDF URL or publicId required' 
+            return res.status(400).json({
+                success: false,
+                message: 'PDF URL or publicId required'
             });
         }
 
@@ -301,11 +305,11 @@ app.get('/test/pdf-fetch', async (req, res) => {
 
         const contentType = response.headers.get('content-type') || 'application/pdf';
         const contentLength = response.headers.get('content-length');
-        
+
         res.setHeader('Content-Type', contentType);
         res.setHeader('Cache-Control', 'public, max-age=3600');
         res.setHeader('Accept-Ranges', 'bytes');
-        
+
         if (contentLength) {
             res.setHeader('Content-Length', contentLength);
         }
@@ -326,17 +330,17 @@ app.get('/test/pdf-fetch', async (req, res) => {
 app.get('/test/cloudinary-pdf', async (req, res) => {
     try {
         const { publicId } = req.query;
-        
+
         if (!publicId) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Cloudinary public ID required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Cloudinary public ID required'
             });
         }
 
         const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
         const pdfUrl = `https://res.cloudinary.com/${cloudName}/fl_attachment/v1/${publicId}`;
-        
+
         const response = await fetch(pdfUrl, {
             method: 'GET',
             headers: {
@@ -347,8 +351,8 @@ app.get('/test/cloudinary-pdf', async (req, res) => {
         });
 
         if (!response.ok) {
-            return res.status(response.status).json({ 
-                success: false, 
+            return res.status(response.status).json({
+                success: false,
                 message: 'Failed to fetch PDF from Cloudinary',
                 status: response.status
             });

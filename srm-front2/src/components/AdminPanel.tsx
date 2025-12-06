@@ -4,6 +4,7 @@ import { Plus, Trash2, Mail, User, Lock, AlertCircle, Check, Filter } from 'reac
 import Swal from 'sweetalert2';
 import axios from 'axios';
 import PageTransition from './PageTransition';
+import AdminPaymentVerification from './AdminPaymentVerification';
 
 const AdminPanel = () => {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ const AdminPanel = () => {
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
 
   // New states for Users management
-  const [activeTab, setActiveTab] = useState('editors'); // 'editors' or 'users'
+  const [activeTab, setActiveTab] = useState('editors'); // 'editors', 'users', or 'payments'
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [roleFilter, setRoleFilter] = useState('All'); // 'All', 'Admin', 'Editor', 'Reviewer', 'Author'
   const [searchTerm, setSearchTerm] = useState('');
@@ -74,7 +75,7 @@ const AdminPanel = () => {
       // Verify with backend
       console.log('Verifying with backend...');
       const response = await axios.get(`${apiUrl}/api/admin/users`, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
@@ -111,7 +112,7 @@ const AdminPanel = () => {
       console.log('Token available:', !!token);
 
       const response = await axios.get(`${apiUrl}/api/admin/editors`, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
@@ -120,7 +121,7 @@ const AdminPanel = () => {
       console.log('📡 Raw response:', response.data);
       console.log('Response count:', response.data.count);
       console.log('Response editors:', response.data.editors);
-      
+
       // Log debug info from backend
       if (response.data.debug) {
         console.log('🐛 Backend Debug Info:');
@@ -132,7 +133,7 @@ const AdminPanel = () => {
         const editorsList = response.data.editors || [];
         console.log(`✅ Successfully loaded ${editorsList.length} editors`);
         setEditors(editorsList);
-        
+
         // If no editors found but DB has users, log warning
         if (editorsList.length === 0 && response.data.debug?.totalUsers > 0) {
           console.warn('⚠️  WARNING: Database has users but no editors found!');
@@ -152,7 +153,7 @@ const AdminPanel = () => {
       console.error('  Message:', error.message);
       console.error('  Status:', error.response?.status);
       console.error('  Data:', error.response?.data);
-      
+
       Swal.fire({
         icon: 'error',
         title: 'Failed to Fetch Editors',
@@ -170,7 +171,7 @@ const AdminPanel = () => {
       const token = localStorage.getItem('token');
 
       const response = await axios.get(`${apiUrl}/api/admin/users`, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
@@ -290,10 +291,10 @@ const AdminPanel = () => {
       );
 
       if (response.data.success) {
-        const emailMessage = response.data.emailSent 
-          ? `\n\n✅ Credentials email has been sent to ${createFormData.email}` 
+        const emailMessage = response.data.emailSent
+          ? `\n\n✅ Credentials email has been sent to ${createFormData.email}`
           : `\n\n⚠️  Note: Email could not be sent (editor created successfully)`;
-        
+
         Swal.fire({
           icon: 'success',
           title: 'Editor Created Successfully',
@@ -397,23 +398,30 @@ const AdminPanel = () => {
           <div className="mb-8 flex gap-4 border-b border-gray-200">
             <button
               onClick={() => { setActiveTab('editors'); fetchEditors(); }}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${
-                activeTab === 'editors'
-                  ? 'border-[#F5A051] text-[#F5A051]'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'editors'
+                ? 'border-[#F5A051] text-[#F5A051]'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
             >
               👥 Editors Management
             </button>
             <button
               onClick={() => { setActiveTab('users'); fetchAllUsers(); }}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${
-                activeTab === 'users'
-                  ? 'border-[#F5A051] text-[#F5A051]'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'users'
+                ? 'border-[#F5A051] text-[#F5A051]'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
             >
               👤 All Users
+            </button>
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'payments'
+                ? 'border-[#F5A051] text-[#F5A051]'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+            >
+              💳 Payment Verification
             </button>
           </div>
 
@@ -497,9 +505,8 @@ const AdminPanel = () => {
                       <button
                         type="submit"
                         disabled={isLoading}
-                        className={`px-6 py-2 bg-[#F5A051] text-white rounded-lg font-medium transition-colors ${
-                          isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[#e08c3e]'
-                        }`}
+                        className={`px-6 py-2 bg-[#F5A051] text-white rounded-lg font-medium transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[#e08c3e]'
+                          }`}
                       >
                         {isLoading ? 'Creating...' : 'Create Editor'}
                       </button>
@@ -593,11 +600,10 @@ const AdminPanel = () => {
                       <button
                         key={role}
                         onClick={() => setRoleFilter(role)}
-                        className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${
-                          roleFilter === role
-                            ? 'bg-[#F5A051] text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                        className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${roleFilter === role
+                          ? 'bg-[#F5A051] text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
                       >
                         <Filter className="w-4 h-4 inline mr-2" />
                         {role}
@@ -641,12 +647,11 @@ const AdminPanel = () => {
                         .map((user) => (
                           <div
                             key={user._id}
-                            className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
-                              user.role === 'Admin' ? 'bg-red-50 border-red-200' :
+                            className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${user.role === 'Admin' ? 'bg-red-50 border-red-200' :
                               user.role === 'Editor' ? 'bg-blue-50 border-blue-200' :
-                              user.role === 'Reviewer' ? 'bg-green-50 border-green-200' :
-                              'bg-yellow-50 border-yellow-200'
-                            }`}
+                                user.role === 'Reviewer' ? 'bg-green-50 border-green-200' :
+                                  'bg-yellow-50 border-yellow-200'
+                              }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -655,12 +660,11 @@ const AdminPanel = () => {
                                     <h3 className="font-semibold text-gray-900">{user.username}</h3>
                                     <p className="text-sm text-gray-600">{user.email}</p>
                                   </div>
-                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
-                                    user.role === 'Admin' ? 'bg-red-100 text-red-800' :
+                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${user.role === 'Admin' ? 'bg-red-100 text-red-800' :
                                     user.role === 'Editor' ? 'bg-blue-100 text-blue-800' :
-                                    user.role === 'Reviewer' ? 'bg-green-100 text-green-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                  }`}>
+                                      user.role === 'Reviewer' ? 'bg-green-100 text-green-800' :
+                                        'bg-yellow-100 text-yellow-800'
+                                    }`}>
                                     {user.role}
                                   </span>
                                 </div>
@@ -695,6 +699,11 @@ const AdminPanel = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Payment Verification Tab */}
+          {activeTab === 'payments' && (
+            <AdminPaymentVerification />
           )}
         </div>
       </div>
