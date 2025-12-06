@@ -6,7 +6,6 @@ import {
   Check,
   CreditCard,
   FileText,
-  Mail,
   Building,
   GraduationCap,
   Briefcase,
@@ -75,34 +74,12 @@ const Registrations: React.FC = () => {
   // Define ALL state hooks FIRST
   const [activeTab, setActiveTab] = useState<'fee' | 'form'>('fee');
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [paymentProof, setPaymentProof] = useState<File | null>(null);
-  const [paymentProofName, setPaymentProofName] = useState("No file selected");
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isAccepted, setIsAccepted] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    institution: '',
-    address: '',
-    country: '',
-    paperTitle: '',
-    transactionId: '',
-    date: '',
-    amount: '',
-  });
 
   const bankDetailsRef = useRef<HTMLDivElement>(null);
 
   // Define ALL callback hooks SECOND
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setPaymentProof(file);
-      setPaymentProofName(file.name);
-    }
-  }, []);
-
   const copyAllBankDetails = useCallback(() => {
     if (bankDetailsRef.current) {
       const allDetails = bankDetailsRef.current.innerText;
@@ -110,18 +87,6 @@ const Registrations: React.FC = () => {
       setCopiedField('all');
       setTimeout(() => setCopiedField(null), 2000);
     }
-  }, []);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prevData => ({
-      ...prevData,
-      [name]: value
-    }));
-  }, []);
-
-  const handleCategoryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedCategory(e.target.value);
   }, []);
 
   const handleDownload = useCallback((url: string, filename: string) => {
@@ -175,17 +140,7 @@ const Registrations: React.FC = () => {
       });
   }, []);
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Form submitted:', formData, 'Category:', selectedCategory);
 
-    Swal.fire({
-      icon: 'success',
-      title: 'Registration Successful',
-      text: 'Your registration has been submitted successfully!',
-      confirmButtonColor: '#3085d6'
-    });
-  }, [formData, selectedCategory]);
 
   // Define effect hook THIRD
   useEffect(() => {
