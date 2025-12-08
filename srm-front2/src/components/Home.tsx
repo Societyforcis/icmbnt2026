@@ -100,7 +100,7 @@ const Home = () => {
 
           {/* Sponsor Logos Section - Above Register Button */}
           <div className="mb-8 w-full max-w-4xl">
-            <p className="text-sm text-slate-300 mb-6 font-semibold uppercase tracking-wider">Sponsored By</p>
+            <p className="text-sm text-slate-300 mb-6 font-semibold uppercase tracking-wider">in association with</p>
             <div className="flex flex-col sm:flex-row justify-center items-center gap-8 sm:gap-12 md:gap-16 px-6 py-4">
               {/* Udayana University Logo */}
               <div className="flex flex-col items-center">
