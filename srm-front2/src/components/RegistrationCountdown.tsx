@@ -1,97 +1,24 @@
 import { useState, useEffect, memo } from 'react';
-import { Calendar, AlertCircle, CalendarIcon, FileText } from 'lucide-react';
-
-// Define the structure for deadline data
-interface Deadline {
-  name: string;
-  date: Date;
-  icon: React.ReactNode;
-  description: string;
-  status: 'passed' | 'today' | 'upcoming';
-}
 
 const RegistrationCountdown = () => {
-  const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [timeRemaining, setTimeRemaining] = useState<{ days: number, hours: number, minutes: number, seconds: number }>({
     days: 0,
     hours: 0,
     minutes: 0,
     seconds: 0
   });
-  const [nextDeadline, setNextDeadline] = useState<Deadline | null>(null);
 
-  // This effect should ONLY run once on mount
+  // Conference date - March 12, 2026
+  const conferenceDate = new Date('2026-03-12T09:00:00');
+
+  // Update countdown timer
   useEffect(() => {
-    // Define important dates - aligned with Timeline.tsx
-    const initialDeadlines: Deadline[] = [
-      {
-        name: 'Manuscript Submission Deadline',
-        date: new Date('2026-01-05T23:59:59'), // Updated to Jan 5
-        icon: <FileText className="text-blue-600" />,
-        description: 'Last date for submitting your research papers',
-        status: 'upcoming'
-      },
-      {
-        name: 'Acceptance Notification',
-        date: new Date('2026-01-25T23:59:59'), // Updated to Jan 25
-        icon: <AlertCircle className="text-purple-600" />,
-        description: 'Authors will be notified about acceptance',
-        status: 'upcoming'
-      },
-      {
-        name: 'Registration Deadline',
-        date: new Date('2026-02-05T23:59:59'), // Updated to Feb 5
-        icon: <CalendarIcon className="text-yellow-600" />,
-        description: 'Last date for conference registration',
-        status: 'upcoming'
-      },
-      {
-        name: 'Conference Dates',
-        date: new Date('2026-03-12T09:00:00'), // Updated to Mar 12
-        icon: <Calendar className="text-red-600" />,
-        description: 'ICMBNT-2026 Conference (March 12-13)',
-        status: 'upcoming'
-      }
-    ];
-
-    // Update status of each deadline
-    const now = new Date();
-    const updatedDeadlines = initialDeadlines.map(deadline => {
-      const deadlineDate = new Date(deadline.date);
-      const isToday =
-        deadlineDate.getDate() === now.getDate() &&
-        deadlineDate.getMonth() === now.getMonth() &&
-        deadlineDate.getFullYear() === now.getFullYear();
-
-      const isPassed = deadlineDate < now && !isToday;
-
-      return {
-        ...deadline,
-        status: (isPassed ? 'passed' : isToday ? 'today' : 'upcoming') as 'passed' | 'today' | 'upcoming'
-      };
-    });
-
-    setDeadlines(updatedDeadlines);
-
-    // Find the next upcoming deadline
-    const upcomingDeadlines = updatedDeadlines.filter(d => d.status === 'upcoming');
-    if (upcomingDeadlines.length > 0) {
-      // Sort by date and get the closest one
-      upcomingDeadlines.sort((a, b) => a.date.getTime() - b.date.getTime());
-      setNextDeadline(upcomingDeadlines[0]);
-    }
-  }, []); // Empty dependency array ensures this runs ONCE on mount
-
-  // Update countdown timer - this is the only effect that should run regularly
-  useEffect(() => {
-    if (!nextDeadline) return;
-
     const calculateTimeRemaining = () => {
       const now = new Date();
-      const difference = nextDeadline.date.getTime() - now.getTime();
+      const difference = conferenceDate.getTime() - now.getTime();
 
       if (difference <= 0) {
-        // Deadline has passed
+        // Conference has started or passed
         setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0 });
         return;
       }
@@ -110,84 +37,82 @@ const RegistrationCountdown = () => {
     // Set up interval for countdown
     const intervalId = setInterval(calculateTimeRemaining, 1000);
 
-    // Clean up interval
+
     return () => clearInterval(intervalId);
-  }, [nextDeadline]); // Only depends on nextDeadline
+  }, []); // Run once on mount
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-800 to-[#F5A051] text-white p-4">
-        <h2 className="text-lg font-semibold">Important Dates</h2>
-      </div>
+    <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+      {/* Gradient Background */}
+      <div className="bg-gray-900 px-8 py-12">
+        {/* Title */}
+        <h2 className="text-white text-2xl md:text-3xl font-bold text-center mb-8">
+          Time Until Conference
+        </h2>
 
-      <div className="p-4">
-        {nextDeadline && (
-          <div className="mb-6">
-            <h3 className="font-semibold text-lg text-gray-800 mb-2 flex items-center">
-              Next Deadline: <span className="text-blue-800 ml-1">{nextDeadline.name}</span>
-            </h3>
-
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <div className="flex items-center text-blue-800 mb-2">
-                {nextDeadline.icon}
-                <span className="ml-2 font-medium">{new Intl.DateTimeFormat('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                }).format(nextDeadline.date)}</span>
+        {/* Countdown Boxes */}
+        <div className="flex justify-center items-center gap-4 md:gap-6">
+          {/* Days */}
+          <div className="flex flex-col items-center">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 py-4 md:px-8 md:py-6 min-w-[80px] md:min-w-[100px] shadow-lg">
+              <div className="text-white text-4xl md:text-5xl font-bold text-center">
+                {String(timeRemaining.days).padStart(2, '0')}
               </div>
-
-              <div className="grid grid-cols-4 gap-2 mb-3">
-                <div className="bg-white p-2 rounded text-center shadow-sm">
-                  <div className="text-xl font-bold text-blue-800">{timeRemaining.days}</div>
-                  <div className="text-xs text-gray-500">Days</div>
-                </div>
-                <div className="bg-white p-2 rounded text-center shadow-sm">
-                  <div className="text-xl font-bold text-blue-800">{timeRemaining.hours}</div>
-                  <div className="text-xs text-gray-500">Hours</div>
-                </div>
-                <div className="bg-white p-2 rounded text-center shadow-sm">
-                  <div className="text-xl font-bold text-blue-800">{timeRemaining.minutes}</div>
-                  <div className="text-xs text-gray-500">Minutes</div>
-                </div>
-                <div className="bg-white p-2 rounded text-center shadow-sm">
-                  <div className="text-xl font-bold text-blue-800">{timeRemaining.seconds}</div>
-                  <div className="text-xs text-gray-500">Seconds</div>
-                </div>
-              </div>
-
-              <p className="text-sm text-blue-700">{nextDeadline.description}</p>
+            </div>
+            <div className="text-white text-xs md:text-sm font-medium mt-2 uppercase tracking-wider">
+              Days
             </div>
           </div>
-        )}
 
-        <h3 className="font-medium text-gray-700 mb-2">All Important Dates:</h3>
-        <ul className="space-y-2">
-          {deadlines.map((deadline, index) => (
-            <li key={index} className={`flex items-center text-sm ${deadline.status === 'passed' ? 'text-gray-500' :
-                deadline.status === 'today' ? 'text-blue-800 font-medium' :
-                  'text-gray-700'
-              }`}>
-              <div className="mr-2">
-                {deadline.icon}
+          {/* Hours */}
+          <div className="flex flex-col items-center">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 py-4 md:px-8 md:py-6 min-w-[80px] md:min-w-[100px] shadow-lg">
+              <div className="text-white text-4xl md:text-5xl font-bold text-center">
+                {String(timeRemaining.hours).padStart(2, '0')}
               </div>
-              <div>
-                <span className="font-medium">{deadline.name}:</span>{' '}
-                {new Intl.DateTimeFormat('en-US', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric'
-                }).format(deadline.date)}
-                {deadline.status === 'passed' && <span className="ml-1 text-gray-500">(Passed)</span>}
-                {deadline.status === 'today' && <span className="ml-1 text-red-500 font-bold">(Today)</span>}
+            </div>
+            <div className="text-white text-xs md:text-sm font-medium mt-2 uppercase tracking-wider">
+              Hours
+            </div>
+          </div>
+
+          {/* Minutes */}
+          <div className="flex flex-col items-center">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 py-4 md:px-8 md:py-6 min-w-[80px] md:min-w-[100px] shadow-lg">
+              <div className="text-white text-4xl md:text-5xl font-bold text-center">
+                {String(timeRemaining.minutes).padStart(2, '0')}
               </div>
-            </li>
-          ))}
-        </ul>
+            </div>
+            <div className="text-white text-xs md:text-sm font-medium mt-2 uppercase tracking-wider">
+              Minutes
+            </div>
+          </div>
+
+          {/* Seconds */}
+          <div className="flex flex-col items-center">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 py-4 md:px-8 md:py-6 min-w-[80px] md:min-w-[100px] shadow-lg">
+              <div className="text-white text-4xl md:text-5xl font-bold text-center">
+                {String(timeRemaining.seconds).padStart(2, '0')}
+              </div>
+            </div>
+            <div className="text-white text-xs md:text-sm font-medium mt-2 uppercase tracking-wider">
+              Seconds
+            </div>
+          </div>
+        </div>
+
+        {/* Conference Date Info */}
+        <div className="mt-8 text-center">
+          <p className="text-white/90 text-sm md:text-base">
+            ICMBNT 2026 Conference
+          </p>
+          <p className="text-white/80 text-xs md:text-sm mt-1">
+            March 12-13, 2026 | Bali, Indonesia
+          </p>
+        </div>
       </div>
     </div>
   );
 };
-
 // Export as memoized component to prevent unnecessary re-renders
 export default memo(RegistrationCountdown);

@@ -169,6 +169,75 @@ const CallForPapers = () => {
             </div>
           </div>
         </section>
+
+        {/* Registration Fee Details Section */}
+        <section className="mb-16">
+          <div className="flex items-center mb-6">
+            <FaCalendarAlt className="text-[#F5A051] text-2xl mr-4" />
+            <h2 className="text-3xl font-bold text-[#F5A051]">REGISTRATION FEE DETAILS</h2>
+          </div>
+
+          <div className="overflow-x-auto bg-white rounded-lg shadow-md">
+            <table className="w-full border-collapse">
+              {/* Table Header */}
+              <thead>
+                <tr className="bg-red-500 text-white">
+                  <th className="border border-gray-300 px-4 py-3 text-left font-bold">Category</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left font-bold">Type</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left font-bold">IEEE COMSOC Members</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left font-bold">IEEE Members</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left font-bold">Non-IEEE Members</th>
+                </tr>
+              </thead>
+              {/* Table Body */}
+              <tbody>
+                {/* Indian Participant Section */}
+                <tr className="bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <td rowSpan={3} className="border border-gray-300 px-4 py-3 font-bold text-gray-800 bg-gray-100">
+                    Indian Participant
+                  </td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700">Students</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">9650 INR</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">10150 INR</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">10650 INR</td>
+                </tr>
+                <tr className="bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700">Faculty/Research Scholars</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">10750 INR</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">11250 INR</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">11750 INR</td>
+                </tr>
+                <tr className="bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700">Listeners</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">6500 INR</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">7500 INR</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">8500 INR</td>
+                </tr>
+                
+                {/* Foreign Participant Section */}
+                <tr className="bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <td rowSpan={2} className="border border-gray-300 px-4 py-3 font-bold text-gray-800 bg-gray-100">
+                    Foreign Participant
+                  </td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700">Authors</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">135 USD</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">155 USD</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">175 USD</td>
+                </tr>
+                <tr className="bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700">Listeners</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">100 USD</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">130 USD</td>
+                  <td className="border border-gray-300 px-4 py-3 text-gray-700 font-medium">150 USD</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-6 p-4 bg-blue-50 border-l-4 border-[#F5A051] text-gray-700 rounded">
+            <p className="text-sm"><strong>Note:</strong> Registration fees include conference kit, certificate, proceedings, and refreshments (excluding accommodation and publication fees).</p>
+          </div>
+        </section>
       </div>
     </div>
   );

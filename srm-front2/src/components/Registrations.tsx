@@ -24,7 +24,8 @@ const MemoizedRegistrationCountdown = React.memo(RegistrationCountdown);
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 
-const AccessDeniedPage: React.FC = () => (
+
+const RegistrationInfoPage: React.FC = () => (
   <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
     <div className="relative bg-gradient-to-r from-blue-900 via-blue-800 to-[#F5A051] text-white py-12 sm:py-16 md:py-24 overflow-hidden">
       <div className="absolute inset-0 bg-black opacity-30"></div>
@@ -41,19 +42,147 @@ const AccessDeniedPage: React.FC = () => (
     </div>
 
     <div className="container mx-auto px-4 py-16">
-      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8 text-center">
-        <Lock className="mx-auto h-16 w-16 text-red-500 mb-4" />
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Access Denied</h2>
-        <p className="text-gray-600 mb-4">
-          Registration is only available for <span className="font-semibold">accepted authors</span>.
-        </p>
-        <p className="text-gray-600 mb-6">
-          Your paper has not been accepted yet. Please wait for the final acceptance decision from the conference organizers.
-        </p>
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-left">
-          <p className="text-sm text-yellow-700">
-            <span className="font-medium">Note:</span> Once your paper is accepted, you will be able to access the registration page to complete your registration for ICMBNT 2026.
+      {/* Information Banner */}
+      <div className="max-w-4xl mx-auto mb-12">
+        <div className="bg-gradient-to-r from-blue-50 to-orange-50 border-l-4 border-[#F5A051] p-6 rounded-lg shadow-md">
+          <div className="flex items-start">
+            <AlertCircle className="h-6 w-6 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
+            <div>
+              <h3 className="text-lg font-bold text-gray-800 mb-2">How to Register for ICMBNT 2026</h3>
+              <p className="text-gray-700 mb-3">
+                Registration for the conference is available to all participants. To complete your registration:
+              </p>
+              <ol className="list-decimal pl-5 space-y-2 text-gray-700">
+                <li><span className="font-semibold">Submit your research paper</span> through our submission portal</li>
+                <li><span className="font-semibold">Wait for acceptance notification</span> from our review committee</li>
+                <li><span className="font-semibold">Once accepted</span>, you can access the registration form and complete payment</li>
+              </ol>
+              <p className="text-sm text-gray-600 mt-4 italic">
+                💡 Below you'll find all the registration fees and payment details to help you prepare for your registration.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Registration Fee Table */}
+      <div className="max-w-6xl mx-auto mb-12">
+        <div className="flex items-center mb-6">
+          <CreditCard className="text-[#F5A051] text-2xl mr-4" />
+          <h2 className="text-3xl font-bold text-[#F5A051]">REGISTRATION FEE DETAILS</h2>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-blue-900 to-blue-800 text-white">
+                <tr>
+                  <th scope="col" className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">
+                    Category
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-right text-sm font-bold uppercase tracking-wider">
+                    Fee
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
+                    <GraduationCap className="mr-2 text-blue-800" size={20} />
+                    Research Scholars/Students
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">2750 INR</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
+                    <Building className="mr-2 text-blue-800" size={20} />
+                    Academicians
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">3500 INR</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
+                    <Briefcase className="mr-2 text-blue-800" size={20} />
+                    Industry and Others
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">4000 INR</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
+                    <Globe className="mr-2 text-blue-800" size={20} />
+                    Foreign Authors
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">100 USD</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Fee Includes Section */}
+          <div className="bg-gray-50 p-6 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">Conference fee includes:</h3>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-gray-700">
+              <li className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Conference kit
+              </li>
+              <li className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Certificate
+              </li>
+              <li className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Proceedings
+              </li>
+              <li className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Non-Scopus Journal
+              </li>
+              <li className="flex items-center">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                Lunch with refreshments
+              </li>
+            </ul>
+            <p className="mt-4 text-sm text-gray-600 italic">
+              * These fees do not include accommodation or Scopus/WOS publication fees.
+            </p>
+          </div>
+        </div>
+
+        {/* Note about Scopus */}
+        <div className="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+          <div className="flex items-start">
+            <AlertCircle className="text-yellow-400 mt-1 mr-3" size={20} />
+            <p className="text-sm text-yellow-700">
+              <span className="font-medium">Note:</span> Authors interested in publishing their articles in Scopus/WOS indexed journals will be charged additional fees based on the journal.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Call to Action */}
+      <div className="max-w-4xl mx-auto text-center">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <FileText className="mx-auto h-16 w-16 text-[#F5A051] mb-4" />
+          <h3 className="text-2xl font-bold text-gray-800 mb-4">Ready to Submit Your Paper?</h3>
+          <p className="text-gray-600 mb-6">
+            Submit your research paper to participate in ICMBNT 2026. Once your paper is accepted, you'll be able to complete your registration.
           </p>
+          <a
+            href="/call-for-papers"
+            className="inline-flex items-center bg-gradient-to-r from-blue-800 to-[#F5A051] text-white px-8 py-3 rounded-lg font-medium transition-all hover:shadow-lg"
+          >
+            View Call for Papers
+            <ArrowRight size={20} className="ml-2" />
+          </a>
         </div>
       </div>
     </div>
@@ -186,7 +315,7 @@ const Registrations: React.FC = () => {
   }
 
   if (!isAccepted) {
-    return <AccessDeniedPage />;
+    return <RegistrationInfoPage />;
   }
 
   // Main component JSX

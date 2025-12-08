@@ -69,9 +69,10 @@ const ConferenceCommittee: React.FC = () => {
   })
 
   useEffect(() => {
-    // Check if user is admin
+    // Check if user is admin AND has a valid token (logged in)
     const role = localStorage.getItem('role');
-    setIsAdmin(role === 'Admin');
+    const token = localStorage.getItem('token');
+    setIsAdmin(role === 'Admin' && !!token);
 
     fetchCommitteeMembers();
   }, []);
@@ -82,12 +83,14 @@ const ConferenceCommittee: React.FC = () => {
       const token = localStorage.getItem('token');
       const role = localStorage.getItem('role');
 
-      // Admin sees all members, others see only active
-      const endpoint = role === 'Admin'
+      // Only use admin endpoint if BOTH role is Admin AND token exists
+      const isAdminWithToken = role === 'Admin' && token;
+
+      const endpoint = isAdminWithToken
         ? '/api/committee/admin/all'
         : '/api/committee';
 
-      const config = role === 'Admin' && token
+      const config = isAdminWithToken
         ? { headers: { Authorization: `Bearer ${token}` } }
         : {};
 
@@ -505,8 +508,8 @@ const ConferenceCommittee: React.FC = () => {
                           <button
                             onClick={() => member._id && handleToggleActive(member._id, member.active || false)}
                             className={`ml-2 text-xs px-2 py-0.5 rounded ${member.active
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
                               }`}
                           >
                             {member.active ? 'Active' : 'Inactive'}

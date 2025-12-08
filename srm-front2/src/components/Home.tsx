@@ -7,6 +7,7 @@ import con from "./images/bali/u.png"
 import society from "./images/bali/society.png"
 import isius from "./images/bali/isius.png"
 import Timeline from "./Timeline"
+import RegistrationCountdown from "./RegistrationCountdown"
 
 // Sponsor logos - placeholder imports (replace with actual logo paths)
 import udayanaLogo from "./images/bali/ul.png" // TODO: Replace with Udayana University logo
@@ -35,10 +36,10 @@ const Home = () => {
 
         <div className="relative z-10 container mx-auto px-4 py-12 min-h-screen flex flex-col justify-center items-center text-center">
           <h1 className="text-2xl md:text-5xl font-bold mb-6 leading-tight max-w-5xl ">
-            International Conference on Multidisciplinary Breakthroughs and NextGen Technologies
+            2nd International Conference on Multidisciplinary Breakthroughs and NextGen Technologies
           </h1>
-          <h2 className="text-2xl md:text-3xl font-semibold mb-8 text-[#F5A051] drop-shadow-md">(ICMBNT–2026)</h2>
-          {/* <p className="text-2xl md:text-4xl mb-4 text-black drop-shadow-md font-bold animate-pulse">2nd International Conference</p> */}
+          <h2 className="text-2xl md:text-3xl font-semibold mb-2 text-[#F5A051] drop-shadow-md">(ICMBNT–2026)</h2>
+          <p className="text-lg md:text-xl mb-8 text-white/90 font-medium">Conference Date: March 12-13, 2026</p>
 
           <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-12">
             <div className="flex items-center bg-white/10 backdrop-blur-md px-4 py-3 rounded-full border border-white/20 animate-bounce">
@@ -94,7 +95,7 @@ const Home = () => {
             <p className="text-sm text-white mb-1">
               <span className="font-bold">Society for Cyber Intelligent Systems</span> <span className="text-slate-300">(Puducherry – India)</span>
               <span className="mx-2">&</span>
-              <span className="font-bold">International Society of Intelligent Unmanned Systems</span> <span className="text-slate-300">(South Korea - Jimbaran Bali)</span>
+              <span className="font-bold"> International Society of Intelligent Unmanned Systems</span> <span className="text-slate-300">(South Korea - Jimbaran Bali)</span>
             </p>
           </div>
 
@@ -157,6 +158,12 @@ const Home = () => {
         </div>
       </div>
 
+      {/* Registration Countdown Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <RegistrationCountdown />
+        </div>
+      </section>
 
       <section id="conference-venue" className="py-16 bg-white scroll-mt-20 relative">
         <div className="relative z-10 container mx-auto px-4">
