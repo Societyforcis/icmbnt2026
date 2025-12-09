@@ -11,8 +11,7 @@ import {
   Briefcase,
   Globe,
   ExternalLink,
-  AlertCircle,
-  Lock
+  AlertCircle
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import axios from 'axios';
@@ -80,46 +79,109 @@ const RegistrationInfoPage: React.FC = () => (
                   <th scope="col" className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">
                     Category
                   </th>
+                  <th scope="col" className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">
+                    Type
+                  </th>
                   <th scope="col" className="px-6 py-4 text-right text-sm font-bold uppercase tracking-wider">
-                    Fee
+                    SCIS Members
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-right text-sm font-bold uppercase tracking-wider">
+                    Non-SCIS Members
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 <tr className="hover:bg-gray-50 transition-colors">
+                  <td rowSpan={3} className="px-6 py-4 whitespace-nowrap text-base font-bold text-gray-800 bg-gray-100">
+                    Indian Participant
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
                     <GraduationCap className="mr-2 text-blue-800" size={20} />
-                    Research Scholars/Students
+                    Students
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">2750 INR</span>
+                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">4500 INR (50 USD)</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">5850 INR (65 USD)</span>
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
                     <Building className="mr-2 text-blue-800" size={20} />
-                    Academicians
+                    Faculty/Research Scholars
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">6750 INR (75 USD)</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">7500 INR (85 USD)</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
+                    <Briefcase className="mr-2 text-blue-800" size={20} />
+                    Listeners
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">2500 INR</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
                     <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">3500 INR</span>
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
+                  <td rowSpan={2} className="px-6 py-4 whitespace-nowrap text-base font-bold text-gray-800 bg-gray-100">
+                    Foreign Participant
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
-                    <Briefcase className="mr-2 text-blue-800" size={20} />
-                    Industry and Others
+                    <Globe className="mr-2 text-blue-800" size={20} />
+                    Authors
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">4000 INR</span>
+                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">300 USD</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">350 USD</span>
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
-                    <Globe className="mr-2 text-blue-800" size={20} />
-                    Foreign Authors
+                    <Briefcase className="mr-2 text-blue-800" size={20} />
+                    Listeners
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">100 USD</span>
+                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">100 USD</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">150 USD</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td rowSpan={2} className="px-6 py-4 whitespace-nowrap text-base font-bold text-gray-800 bg-gray-100">
+                    Indonesian Participant
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
+                    <Globe className="mr-2 text-blue-800" size={20} />
+                    Authors
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">17,00,000 IDR</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">26,00,000 IDR</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
+                    <Briefcase className="mr-2 text-blue-800" size={20} />
+                    Listeners
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">12,00,000 IDR</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
+                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">15,00,000 IDR</span>
                   </td>
                 </tr>
               </tbody>
@@ -142,14 +204,14 @@ const RegistrationInfoPage: React.FC = () => (
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Proceedings
               </li>
-              <li className="flex items-center">
+              {/* <li className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Non-Scopus Journal
               </li>
               <li className="flex items-center">
                 <Check className="w-4 h-4 text-green-600 mr-2" />
                 Lunch with refreshments
-              </li>
+              </li> */}
             </ul>
             <p className="mt-4 text-sm text-gray-600 italic">
               * These fees do not include accommodation or Scopus/WOS publication fees.
@@ -205,6 +267,8 @@ const Registrations: React.FC = () => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isAccepted, setIsAccepted] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [membershipStatus, setMembershipStatus] = useState<any>(null);
+  const [loadingMembership, setLoadingMembership] = useState(true);
 
   const bankDetailsRef = useRef<HTMLDivElement>(null);
 
@@ -306,7 +370,35 @@ const Registrations: React.FC = () => {
       }
     };
 
+    const checkMembershipStatus = async () => {
+      try {
+        setLoadingMembership(true);
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+          setLoadingMembership(false);
+          return;
+        }
+
+        const response = await axios.get(
+          `${API_URL}/api/membership/check-membership`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+
+        console.log('Membership check response:', response.data);
+        setMembershipStatus(response.data);
+      } catch (error) {
+        console.error('Error checking membership status:', error);
+        setMembershipStatus({ isMember: false });
+      } finally {
+        setLoadingMembership(false);
+      }
+    };
+
     checkAcceptanceStatus();
+    checkMembershipStatus();
   }, []);
 
   // NOW render based on state - all hooks have been called
@@ -348,6 +440,48 @@ const Registrations: React.FC = () => {
         <div className="mb-12">
           <MemoizedRegistrationCountdown />
         </div>
+
+        {/* SCIS Membership Status Banner */}
+        {!loadingMembership && membershipStatus && (
+          <div className={`mb-6 border-l-4 p-4 rounded ${membershipStatus.isMember
+              ? 'bg-green-50 border-green-500'
+              : 'bg-yellow-50 border-yellow-500'
+            }`}>
+            <div className="flex">
+              <div className="flex-shrink-0">
+                {membershipStatus.isMember ? (
+                  <Check className="h-5 w-5 text-green-500" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-yellow-500" />
+                )}
+              </div>
+              <div className="ml-3">
+                {membershipStatus.isMember ? (
+                  <>
+                    <p className="text-sm font-bold text-green-800">
+                      ✅ SCIS Member - Discount Applied!
+                    </p>
+                    <p className="text-xs text-green-700 mt-1">
+                      Membership ID: <span className="font-mono font-semibold">{membershipStatus.membershipId}</span>
+                    </p>
+                    <p className="text-xs text-green-700 mt-1">
+                      You are eligible for SCIS member discounted registration fees. Your discount will be automatically applied during registration.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-bold text-yellow-800">
+                      Not a SCIS Member
+                    </p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      You will be charged non-member registration fees. Consider becoming a SCIS member to enjoy discounted rates!
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4">
           <div className="flex">
@@ -410,49 +544,118 @@ const Registrations: React.FC = () => {
                       <th scope="col" className="px-6 py-4 text-left text-xs sm:text-sm font-medium uppercase tracking-wider">
                         Category
                       </th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs sm:text-sm font-medium uppercase tracking-wider">
+                        Type
+                      </th>
                       <th scope="col" className="px-6 py-4 text-right text-xs sm:text-sm font-medium uppercase tracking-wider">
-                        Fee
+                        SCIS Members
+                      </th>
+                      <th scope="col" className="px-6 py-4 text-right text-xs sm:text-sm font-medium uppercase tracking-wider">
+                        Non-SCIS Members
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
+                    {/* Indian Participant Section */}
                     <tr className="hover:bg-gray-50 transition-colors">
+                      <td rowSpan={3} className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-bold text-gray-800 bg-gray-100">
+                        Indian Participant
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
                         <GraduationCap className="mr-2 text-blue-800" size={18} />
-                        Research Scholars/Students
+                        Students
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">2750 INR</span>
+                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">4500 INR (50 USD)</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">5850 INR (65 USD)</span>
                       </td>
                     </tr>
 
                     <tr className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
                         <Building className="mr-2 text-blue-800" size={18} />
-                        Academicians
+                        Faculty/Research Scholars
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">3500 INR</span>
+                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">6750 INR (75 USD)</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">7500 INR (85 USD)</span>
                       </td>
                     </tr>
 
                     <tr className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
                         <Briefcase className="mr-2 text-blue-800" size={18} />
-                        Industry and Others
+                        Listeners
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">4000 INR</span>
+                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">2500 INR</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">3500 INR</span>
+                      </td>
+                    </tr>
+
+                    {/* Foreign Participant Section */}
+                    <tr className="hover:bg-gray-50 transition-colors">
+                      <td rowSpan={2} className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-bold text-gray-800 bg-gray-100">
+                        Foreign Participant
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
+                        <Globe className="mr-2 text-blue-800" size={18} />
+                        Authors
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">300 USD</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">350 USD</span>
                       </td>
                     </tr>
 
                     <tr className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
-                        <Globe className="mr-2 text-blue-800" size={18} />
-                        Foreign Authors
+                        <Briefcase className="mr-2 text-blue-800" size={18} />
+                        Listeners
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">100 USD</span>
+                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">100 USD</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">150 USD</span>
+                      </td>
+                    </tr>
+
+                    {/* Indonesian Participant Section */}
+                    <tr className="hover:bg-gray-50 transition-colors">
+                      <td rowSpan={2} className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-bold text-gray-800 bg-gray-100">
+                        Indonesian Participant
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
+                        <Globe className="mr-2 text-blue-800" size={18} />
+                        Authors
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">17,00,000 IDR</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">26,00,000 IDR</span>
+                      </td>
+                    </tr>
+
+                    <tr className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
+                        <Briefcase className="mr-2 text-blue-800" size={18} />
+                        Listeners
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">12,00,000 IDR</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
+                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">15,00,000 IDR</span>
                       </td>
                     </tr>
                   </tbody>

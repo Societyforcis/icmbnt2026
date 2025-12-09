@@ -802,6 +802,111 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
     }
 };
 
+// Send registration confirmation email after payment verification
+export const sendRegistrationConfirmationEmail = async (registrationData) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: registrationData.authorEmail,
+        subject: `✅ Registration Confirmed - ICMBNT 2026`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #28a745;">
+                    <h2 style="margin: 0; color: #155724;">✅ Registration Confirmed!</h2>
+                    <p style="margin: 5px 0 0 0; color: #155724; font-weight: bold;">Your payment has been verified</p>
+                </div>
+
+                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear <strong>${registrationData.authorName}</strong>,
+                </p>
+
+                <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 20px;">
+                    Congratulations! Your registration for <strong>ICMBNT 2026</strong> has been successfully confirmed. 
+                    We are excited to have you join us for this prestigious conference.
+                </p>
+
+                <div style="background-color: #cfe2ff; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #0066cc;">📋 Registration Details:</p>
+                    <table style="width: 100%; font-size: 13px;">
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold; width: 150px;">Registration Number:</td>
+                            <td style="padding: 8px 0; color: #333; font-family: monospace; font-weight: bold; font-size: 14px;">${registrationData.registrationNumber}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Paper Title:</td>
+                            <td style="padding: 8px 0; color: #333;">${registrationData.paperTitle}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Submission ID:</td>
+                            <td style="padding: 8px 0; color: #333;">${registrationData.submissionId}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Category:</td>
+                            <td style="padding: 8px 0; color: #333;">${registrationData.registrationCategory}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Amount Paid:</td>
+                            <td style="padding: 8px 0; color: #28a745; font-weight: bold;">${registrationData.currency} ${registrationData.amount}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">📅 Conference Information:</p>
+                    <div style="font-size: 14px; color: #333;">
+                        <p style="margin: 5px 0;"><strong>📌 Conference Dates:</strong> March 12-13, 2026</p>
+                        <p style="margin: 5px 0;"><strong>🏛️ Venue:</strong> Bali, Indonesia</p>
+                        <p style="margin: 5px 0;"><strong>🌐 Format:</strong> Hybrid (In-person + Virtual)</p>
+                        <p style="margin: 5px 0;"><strong>🎤 Event:</strong> International Conference on Multidisciplinary Breakthroughs and NextGen Technologies</p>
+                    </div>
+                </div>
+
+                <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #2e7d32;">✅ What's Next:</p>
+                    <ol style="margin: 0; padding-left: 20px; color: #333; font-size: 13px;">
+                        <li style="margin: 5px 0;">Mark your calendar for <strong>March 12-13, 2026</strong></li>
+                        <li style="margin: 5px 0;">Prepare your presentation for the conference</li>
+                        <li style="margin: 5px 0;">If attending in-person, arrange your travel to Bali, Indonesia</li>
+                        <li style="margin: 5px 0;">You will receive further details about the conference schedule and virtual access links closer to the event date</li>
+                        <li style="margin: 5px 0;">Keep this email for your records</li>
+                    </ol>
+                </div>
+
+                <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #495057;">📞 Need Help?</p>
+                    <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">
+                        For any queries or further information, please contact us at:<br>
+                        <strong>Email:</strong> <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc; text-decoration: none;">icmbnt2026@gmail.com</a><br>
+                        <strong>Website:</strong> <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a>
+                    </p>
+                </div>
+
+                <p style="font-size: 13px; line-height: 1.6; color: #666; margin-top: 25px; margin-bottom: 10px;">
+                    We look forward to welcoming you to ICMBNT 2026 in Bali!
+                </p>
+
+                <p style="font-size: 13px; color: #999; margin: 15px 0 0 0; border-top: 1px solid #ddd; padding-top: 15px;">
+                    <strong>ICMBNT 2026 Organizing Committee</strong><br>
+                    Society for Cyber Intelligent Systems<br>
+                    Puducherry, India<br>
+                    Email: icmbnt2026@gmail.com<br>
+                    Website: <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a>
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log("📧 Registration confirmation email sent to:", registrationData.authorEmail, "- Message ID:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Error sending registration confirmation email:", error);
+        throw error;
+    }
+};
+
 // Send re-review request email (Review 2 after revision)
 export const sendReReviewEmail = async (reviewerEmail, reviewerName, paperData) => {
     const deadline = new Date(paperData.deadline);

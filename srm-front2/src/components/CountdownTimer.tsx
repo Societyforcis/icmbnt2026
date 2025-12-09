@@ -16,6 +16,7 @@ const CountdownTimer: React.FC = () => {
       const difference = conferenceDate - now;
 
       if (difference > 0) {
+        
         setTimeLeft({
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
           hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),

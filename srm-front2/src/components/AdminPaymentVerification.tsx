@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckCircle, XCircle, Eye, Loader, Search } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, Loader, Search, Award } from 'lucide-react';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 
@@ -20,6 +20,11 @@ interface Registration {
     registrationDate: string;
     verifiedAt?: string;
     rejectionReason?: string;
+    membershipStatus?: {
+        isMember: boolean;
+        membershipId?: string;
+        membershipType?: string;
+    };
 }
 
 const AdminPaymentVerification: React.FC = () => {
@@ -58,7 +63,31 @@ const AdminPaymentVerification: React.FC = () => {
             });
 
             if (response.data.success) {
-                setRegistrations(response.data.registrations);
+                const regs = response.data.registrations;
+                // Fetch membership status for each registration
+                const regsWithMembership = await Promise.all(
+                    regs.map(async (reg: Registration) => {
+                        try {
+                            // Create a temporary token with the user's email to check membership
+                            const membershipResponse = await axios.post(
+                                `${API_URL}/api/membership/check-user-membership`,
+                                { email: reg.authorEmail },
+                                { headers: { Authorization: `Bearer ${token}` } }
+                            );
+                            return {
+                                ...reg,
+                                membershipStatus: membershipResponse.data
+                            };
+                        } catch (error) {
+                            console.error(`Error fetching membership for ${reg.authorEmail}:`, error);
+                            return {
+                                ...reg,
+                                membershipStatus: { isMember: false }
+                            };
+                        }
+                    })
+                );
+                setRegistrations(regsWithMembership);
             }
         } catch (error: any) {
             console.error('Error fetching registrations:', error);
@@ -310,6 +339,18 @@ const AdminPaymentVerification: React.FC = () => {
                                     {/* Left Column - Details */}
                                     <div className="space-y-3">
                                         <h3 className="text-xl font-bold text-gray-900">{reg.authorName}</h3>
+
+                                        {/* SCIS Membership Badge */}
+                                        {reg.membershipStatus?.isMember && (
+                                            <div className="inline-flex items-center bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg px-3 py-2">
+                                                <Award className="h-5 w-5 text-green-600 mr-2" />
+                                                <div>
+                                                    <p className="text-sm font-bold text-green-800">SCIS Member</p>
+                                                    <p className="text-xs text-green-600">ID: {reg.membershipStatus.membershipId}</p>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="space-y-2 text-sm">
                                             <p><strong>Email:</strong> {reg.authorEmail}</p>
                                             <p><strong>Paper:</strong> {reg.paperTitle}</p>
@@ -317,7 +358,54 @@ const AdminPaymentVerification: React.FC = () => {
                                             <p><strong>Category:</strong> {reg.registrationCategory}</p>
                                             <p><strong>Payment Method:</strong> {reg.paymentMethod}</p>
                                             <p><strong>Transaction ID:</strong> {reg.transactionId || 'N/A'}</p>
-                                            <p><strong>Amount:</strong> ₹{reg.amount}</p>
+
+                                            {/* Amount with Membership Discount Info */}
+                                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                                <p className="font-semibold text-gray-800 mb-1">Payment Amount:</p>
+                                                {reg.membershipStatus?.isMember ? (
+                                                    <div>
+                                                        <p className="text-lg font-bold text-green-600">₹{reg.amount}</p>
+                                                        <p className="text-xs text-green-600 mt-1">
+                                                            <span className="bg-green-100 px-2 py-0.5 rounded">SCIS Member Rate</span>
+                                                        </p>
+                                                        {(() => {
+                                                            // Calculate what non-member would have paid
+                                                            const category = reg.registrationCategory.toLowerCase();
+                                                            let nonMemberFee = reg.amount;
+                                                            let discount = 0;
+
+                                                            if (category.includes('student')) {
+                                                                nonMemberFee = 5850;
+                                                                discount = nonMemberFee - 4500;
+                                                            } else if (category.includes('faculty') || category.includes('scholar')) {
+                                                                nonMemberFee = 7500;
+                                                                discount = nonMemberFee - 6750;
+                                                            } else if (category.includes('foreign')) {
+                                                                nonMemberFee = 350;
+                                                                discount = 50;
+                                                            } else if (category.includes('indonesian')) {
+                                                                nonMemberFee = 2600000;
+                                                                discount = 900000;
+                                                            }
+
+                                                            return discount > 0 ? (
+                                                                <p className="text-xs text-gray-600 mt-1">
+                                                                    Non-member rate: <span className="line-through">₹{nonMemberFee}</span>
+                                                                    <span className="ml-2 text-green-600 font-semibold">Saved: ₹{discount}</span>
+                                                                </p>
+                                                            ) : null;
+                                                        })()}
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <p className="text-lg font-bold text-gray-800">₹{reg.amount}</p>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            <span className="bg-gray-200 px-2 py-0.5 rounded">Non-Member Rate</span>
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+
                                             <p><strong>Submitted:</strong> {new Date(reg.registrationDate).toLocaleString()}</p>
                                             {reg.verifiedAt && (
                                                 <p><strong>Verified:</strong> {new Date(reg.verifiedAt).toLocaleString()}</p>
@@ -328,7 +416,7 @@ const AdminPaymentVerification: React.FC = () => {
                                         </div>
 
                                         {/* Status Badge */}
-                                        <div className="mt-4">
+                                        <div className="mt-4 flex gap-2">
                                             <span className={`px-3 py-1 rounded-full text-sm font-semibold ${reg.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                                 reg.paymentStatus === 'verified' ? 'bg-green-100 text-green-800' :
                                                     'bg-red-100 text-red-800'

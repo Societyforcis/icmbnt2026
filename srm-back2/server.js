@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import hpp from 'hpp';
+import mongoSanitize from 'express-mongo-sanitize';
 import { connectDatabase } from './config/database.js';
 import { User } from './models/User.js';
 import { PaperSubmission } from './models/Paper.js';
@@ -16,6 +18,7 @@ import editorRoutes from './routes/editorRoutes.js';
 import reviewerRoutes from './routes/reviewerRoutes.js';
 import paymentRegistrationRoutes from './routes/paymentRegistration.js';
 import committeeRoutes from './routes/committee.js';
+import membershipRoutes from './routes/membershipRoutes.js';
 
 
 dotenv.config();
@@ -23,29 +26,86 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// 2. Data Sanitization against NoSQL Injection
+app.use(mongoSanitize({
+    replaceWith: '_',
+    onSanitize: ({ req, key }) => {
+        console.warn(`⚠️ Sanitized potentially malicious data in ${key}`);
+    }
+}));
 
-app.use('/public', express.static('public'));
+// 3. Prevent HTTP Parameter Pollution attacks
+app.use(hpp({
+    whitelist: ['email', 'category', 'status', 'role', 'participantType', 'isInternational']
+}));
 
+// 4. Security Headers
+app.use((req, res, next) => {
+    // Prevent clickjacking
+    res.setHeader('X-Frame-Options', 'DENY');
+
+    // Prevent MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    // Enable XSS protection
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+
+    // Referrer Policy
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+    // Permissions Policy (formerly Feature Policy)
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+
+    // Remove X-Powered-By header to hide Express
+    res.removeHeader('X-Powered-By');
+
+    next();
+});
+
+// 5. CORS Configuration with strict origin checking
 const corsOptions = {
-    origin: ['https://icmbnt2026-yovz.vercel.app', 'http://localhost:5173', 'https://icmbnt2026.societycis.org'],
+    origin: function (origin, callback) {
+        const allowedOrigins = [
+            'https://icmbnt2026-yovz.vercel.app',
+            'http://localhost:5173',
+            'https://icmbnt2026.societycis.org'
+        ];
+
+        // Allow requests with no origin (mobile apps, Postman, etc.)
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            console.warn(`⚠️ Blocked CORS request from unauthorized origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    maxAge: 600 // Cache preflight requests for 10 minutes
 };
 
 app.use(cors(corsOptions));
-
-
-
 app.options('*', cors(corsOptions));
-app.use(express.urlencoded({ extended: true }));
 
+// 6. Static files with security
+app.use('/public', express.static('public', {
+    maxAge: '1d',
+    etag: true,
+    lastModified: true,
+    setHeaders: (res, path) => {
+        // Add security headers for static files
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+}));
 
-
-
+// ============================================
+// DATABASE CONNECTION
+// ============================================
 connectDatabase();
 
 
@@ -94,8 +154,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-// ==================== API ROUTES ====================
-// All auth routes handled by authRoutes module
+
 app.use('/api/auth', authRoutes);
 app.use('/api/papers', paperRoutes);
 app.use('/api/admin', adminRoutes);
@@ -103,9 +162,10 @@ app.use('/api/editor', editorRoutes);
 app.use('/api/reviewer', reviewerRoutes);
 app.use('/api/registration', paymentRegistrationRoutes);
 app.use('/api/committee', committeeRoutes);
+app.use('/api/membership', membershipRoutes);
 
-// ==================== AUTHOR SUBMISSION ROUTES ====================
-// Get user's paper submission (alias for /api/papers/my-submission)
+
+
 app.get('/user-submission', verifyJWT, async (req, res) => {
     try {
         const userEmail = req.user.email;

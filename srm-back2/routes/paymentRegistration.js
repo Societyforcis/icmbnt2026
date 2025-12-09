@@ -107,6 +107,7 @@ router.post('/submit', authMiddleware, async (req, res) => {
             paperId: acceptedPaper._id,
             submissionId: acceptedPaper.submissionId,
             paperTitle: acceptedPaper.paperTitle,
+            paperUrl: acceptedPaper.pdfUrl || acceptedPaper.revisionPdfs?.cleanPdfUrl || '',
             institution: 'To be updated', // Can be updated later if needed
             address: 'To be updated',
             country: 'To be updated',
@@ -328,6 +329,7 @@ router.put('/admin/:id/verify', authMiddleware, adminMiddleware, async (req, res
             paperId: registration.paperId,
             submissionId: registration.submissionId,
             paperTitle: registration.paperTitle,
+            paperUrl: registration.paperUrl || '',
             institution: registration.institution,
             address: registration.address,
             country: registration.country,
@@ -346,6 +348,25 @@ router.put('/admin/:id/verify', authMiddleware, adminMiddleware, async (req, res
         });
 
         await finalUser.save();
+
+        // Send registration confirmation email to the author
+        try {
+            const { sendRegistrationConfirmationEmail } = await import('../utils/emailService.js');
+            await sendRegistrationConfirmationEmail({
+                authorEmail: finalUser.authorEmail,
+                authorName: finalUser.authorName,
+                paperTitle: finalUser.paperTitle,
+                submissionId: finalUser.submissionId,
+                registrationNumber: finalUser.registrationNumber,
+                registrationCategory: finalUser.registrationCategory,
+                amount: finalUser.amount,
+                currency: finalUser.currency
+            });
+            console.log('✅ Registration confirmation email sent successfully');
+        } catch (emailError) {
+            console.error('⚠️ Failed to send registration confirmation email:', emailError);
+            // Don't fail the verification if email fails
+        }
 
         console.log('✅ Payment verified and final user created:', {
             registrationId: id,

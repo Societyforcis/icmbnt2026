@@ -6,22 +6,18 @@ import { generateSubmissionId, generateBookingId } from '../utils/helpers.js';
 import { sendPaperSubmissionEmail, sendAdminNotificationEmail } from '../utils/emailService.js';
 import { uploadPdfToCloudinary, deletePdfFromCloudinary } from '../config/cloudinary-pdf.js';
 
-// Submit new paper
 export const submitPaper = async (req, res) => {
     console.log('Received paper submission request:', req.body);
     console.log('File received:', req.file ? 'Yes, ' + req.file.originalname : 'No file');
 
     try {
-        // Get email from request body or from JWT token
         let { email, paperTitle, authorName, category, topic, abstract } = req.body;
         
-        // If email not provided in request, get it from JWT token
         if (!email && req.user && req.user.email) {
             email = req.user.email;
             console.log('Email extracted from token:', email);
         }
 
-        // Check if user has already submitted a paper
         const existingSubmission = await UserSubmission.findOne({ email });
         if (existingSubmission) {
             return res.status(400).json({

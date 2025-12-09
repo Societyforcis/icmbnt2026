@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Building, CheckCircle, Globe } from 'lucide-react';
+import { CreditCard, Building, CheckCircle, Globe, Check, AlertCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
 import axios from 'axios';
-import upiqr from "./images/bali/qr.png"
+import upiqr from "./images/bali/qr2.png"
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// Image compression function
 const compressImage = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -65,11 +64,13 @@ const SimplifiedRegistrationForm: React.FC = () => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [amount, setAmount] = useState(0);
     const [registrationStatus, setRegistrationStatus] = useState<any>(null);
+    const [membershipStatus, setMembershipStatus] = useState<any>(null);
+    const [loadingMembership, setLoadingMembership] = useState(true);
 
-    // Fetch paper details and registration status on mount
     useEffect(() => {
         fetchPaperDetails();
         checkRegistrationStatus();
+        checkMembershipStatus();
     }, []);
 
     const fetchPaperDetails = async () => {
@@ -112,6 +113,33 @@ const SimplifiedRegistrationForm: React.FC = () => {
             if (error.response?.status !== 404) {
                 console.error('Error checking registration status:', error);
             }
+        }
+    };
+
+    const checkMembershipStatus = async () => {
+        try {
+            setLoadingMembership(true);
+            const token = localStorage.getItem('token');
+
+            if (!token) {
+                setLoadingMembership(false);
+                return;
+            }
+
+            const response = await axios.get(
+                `${API_URL}/api/membership/check-membership`,
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            console.log('Membership status in form:', response.data);
+            setMembershipStatus(response.data);
+        } catch (error) {
+            console.error('Error checking membership status:', error);
+            setMembershipStatus({ isMember: false });
+        } finally {
+            setLoadingMembership(false);
         }
     };
 
@@ -323,35 +351,153 @@ const SimplifiedRegistrationForm: React.FC = () => {
                 </div>
             </div>
 
+            {/* SCIS Membership Status */}
+            {!loadingMembership && membershipStatus && (
+                <div className={`border-l-4 p-4 rounded mb-6 ${membershipStatus.isMember
+                    ? 'bg-green-50 border-green-500'
+                    : 'bg-yellow-50 border-yellow-500'
+                    }`}>
+                    <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                            {membershipStatus.isMember ? (
+                                <Check className="h-5 w-5 text-green-500 mt-0.5" />
+                            ) : (
+                                <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
+                            )}
+                        </div>
+                        <div className="ml-3">
+                            {membershipStatus.isMember ? (
+                                <>
+                                    <p className="text-sm font-bold text-green-800">
+                                        ✅ SCIS Member - Discount Applied!
+                                    </p>
+                                    <p className="text-xs text-green-700 mt-1">
+                                        Membership ID: <span className="font-mono font-semibold">{membershipStatus.membershipId}</span>
+                                    </p>
+                                    <p className="text-xs text-green-700 mt-1">
+                                        You will see discounted member rates below.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-bold text-yellow-800">
+                                        Non-SCIS Member
+                                    </p>
+                                    <p className="text-xs text-yellow-700 mt-1">
+                                        Standard registration fees apply. Become a SCIS member to save on registration!
+                                    </p>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-8">
                 {/* Registration Category */}
                 <div>
                     <label className="block text-sm font-semibold text-gray-800 mb-4">
                         Select Registration Category <span className="text-red-500">*</span>
                     </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {/* Indian Student */}
                         <button
                             type="button"
-                            onClick={() => handleCategoryChange('indian-author', 3500)}
-                            className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-author'
+                            onClick={() => handleCategoryChange('indian-student', membershipStatus?.isMember ? 4500 : 5850)}
+                            className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-student'
                                 ? 'border-blue-500 bg-blue-50 shadow-lg'
                                 : 'border-gray-200 hover:border-blue-300'
                                 }`}
                         >
-                            <h3 className="font-bold text-lg mb-1">Indian Author</h3>
-                            <p className="text-2xl font-bold text-blue-600">₹3,500</p>
+                            <h3 className="font-bold text-lg mb-1">Indian Student</h3>
+                            <p className="text-2xl font-bold text-blue-600">
+                                ₹{membershipStatus?.isMember ? '4,500' : '5,850'}
+                            </p>
+                            {membershipStatus?.isMember && (
+                                <p className="text-xs text-green-600 mt-2">
+                                    <span className="line-through text-gray-400">₹5,850</span> Save ₹1,350!
+                                </p>
+                            )}
                         </button>
 
+                        {/* Indian Faculty */}
                         <button
                             type="button"
-                            onClick={() => handleCategoryChange('foreign-author', 150)}
+                            onClick={() => handleCategoryChange('indian-faculty', membershipStatus?.isMember ? 6750 : 7500)}
+                            className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-faculty'
+                                ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                : 'border-gray-200 hover:border-blue-300'
+                                }`}
+                        >
+                            <h3 className="font-bold text-lg mb-1">Indian Faculty</h3>
+                            <p className="text-2xl font-bold text-blue-600">
+                                ₹{membershipStatus?.isMember ? '6,750' : '7,500'}
+                            </p>
+                            {membershipStatus?.isMember && (
+                                <p className="text-xs text-green-600 mt-2">
+                                    <span className="line-through text-gray-400">₹7,500</span> Save ₹750!
+                                </p>
+                            )}
+                        </button>
+
+                        {/* Indian Scholar */}
+                        <button
+                            type="button"
+                            onClick={() => handleCategoryChange('indian-scholar', membershipStatus?.isMember ? 6750 : 7500)}
+                            className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-scholar'
+                                ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                : 'border-gray-200 hover:border-blue-300'
+                                }`}
+                        >
+                            <h3 className="font-bold text-lg mb-1">Research Scholar</h3>
+                            <p className="text-2xl font-bold text-blue-600">
+                                ₹{membershipStatus?.isMember ? '6,750' : '7,500'}
+                            </p>
+                            {membershipStatus?.isMember && (
+                                <p className="text-xs text-green-600 mt-2">
+                                    <span className="line-through text-gray-400">₹7,500</span> Save ₹750!
+                                </p>
+                            )}
+                        </button>
+
+                        {/* Foreign Author */}
+                        <button
+                            type="button"
+                            onClick={() => handleCategoryChange('foreign-author', membershipStatus?.isMember ? 300 : 350)}
                             className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'foreign-author'
                                 ? 'border-blue-500 bg-blue-50 shadow-lg'
                                 : 'border-gray-200 hover:border-blue-300'
                                 }`}
                         >
                             <h3 className="font-bold text-lg mb-1">Foreign Author</h3>
-                            <p className="text-2xl font-bold text-blue-600">$150</p>
+                            <p className="text-2xl font-bold text-blue-600">
+                                ${membershipStatus?.isMember ? '300' : '350'}
+                            </p>
+                            {membershipStatus?.isMember && (
+                                <p className="text-xs text-green-600 mt-2">
+                                    <span className="line-through text-gray-400">$350</span> Save $50!
+                                </p>
+                            )}
+                        </button>
+
+                        {/* Indonesian Author */}
+                        <button
+                            type="button"
+                            onClick={() => handleCategoryChange('indonesian-author', membershipStatus?.isMember ? 1700000 : 2600000)}
+                            className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indonesian-author'
+                                ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                : 'border-gray-200 hover:border-blue-300'
+                                }`}
+                        >
+                            <h3 className="font-bold text-lg mb-1">Indonesian Author</h3>
+                            <p className="text-xl font-bold text-blue-600">
+                                {membershipStatus?.isMember ? '17L' : '26L'} IDR
+                            </p>
+                            {membershipStatus?.isMember && (
+                                <p className="text-xs text-green-600 mt-2">
+                                    <span className="line-through text-gray-400">26L IDR</span> Save 9L!
+                                </p>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -472,23 +618,31 @@ const SimplifiedRegistrationForm: React.FC = () => {
                                         <div className="space-y-4 max-w-md mx-auto">
                                             <div className="flex justify-between items-center p-4 bg-white rounded-lg">
                                                 <span className="font-semibold text-gray-600">Account Name:</span>
-                                                <span className="font-bold">Society for Cyber</span>
+                                                <span className="font-bold">Melange Publications</span>
                                             </div>
                                             <div className="flex justify-between items-center p-4 bg-white rounded-lg">
                                                 <span className="font-semibold text-gray-600">Account Number:</span>
-                                                <span className="font-bold">8067349218</span>
+                                                <span className="font-bold">736805000791</span>
                                             </div>
                                             <div className="flex justify-between items-center p-4 bg-white rounded-lg">
-                                                <span className="font-semibold text-gray-600">IFSC Code:</span>
-                                                <span className="font-bold">IDIB000R076</span>
+                                                <span className="font-semibold text-gray-600">Account Type:</span>
+                                                <span className="font-bold">Current Account</span>
                                             </div>
                                             <div className="flex justify-between items-center p-4 bg-white rounded-lg">
                                                 <span className="font-semibold text-gray-600">Bank Name:</span>
-                                                <span className="font-bold">Indian Bank</span>
+                                                <span className="font-bold">ICICI Bank</span>
                                             </div>
                                             <div className="flex justify-between items-center p-4 bg-white rounded-lg">
-                                                <span className="font-semibold text-gray-600">UPI ID:</span>
-                                                <span className="font-bold">societyforcyber@indianbk</span>
+                                                <span className="font-semibold text-gray-600">IFSC Code:</span>
+                                                <span className="font-bold">ICIC0007368</span>
+                                            </div>
+                                            <div className="flex justify-between items-center p-4 bg-white rounded-lg">
+                                                <span className="font-semibold text-gray-600">SWIFT Code:</span>
+                                                <span className="font-bold">ICICINBBCTS</span>
+                                            </div>
+                                            <div className="flex justify-between items-center p-4 bg-white rounded-lg">
+                                                <span className="font-semibold text-gray-600">Branch:</span>
+                                                <span className="font-bold">Villianur, Puducherry</span>
                                             </div>
                                         </div>
                                     </div>

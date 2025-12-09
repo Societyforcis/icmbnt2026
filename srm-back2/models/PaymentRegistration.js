@@ -32,6 +32,10 @@ const paymentRegistrationSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    paperUrl: {
+        type: String,
+        required: false
+    },
 
     // Registration Details
     institution: {
@@ -107,7 +111,18 @@ const paymentRegistrationSchema = new mongoose.Schema({
     // Registration Category
     registrationCategory: {
         type: String,
-        enum: ['indian-author', 'foreign-author', 'indian-listener', 'foreign-listener'],
+        enum: [
+            'indian-student',
+            'indian-faculty',
+            'indian-scholar',
+            'indian-listener',
+            'foreign-author',
+            'foreign-listener',
+            'indonesian-author',
+            'indonesian-listener',
+            // Legacy values for backward compatibility
+            'indian-author'
+        ],
         required: true
     },
 
