@@ -93,6 +93,8 @@ const EnhancedUniversalRegistrationForm: React.FC = () => {
     const [loadingMembership, setLoadingMembership] = useState(true);
     const [institution, setInstitution] = useState('');
     const [address, setAddress] = useState('');
+    const [listenerRegistration, setListenerRegistration] = useState<any>(null);
+    const [loadingListenerStatus, setLoadingListenerStatus] = useState(true);
 
     // Get registration categories based on country and type
     const getRegistrationCategories = (): RegistrationCategory[] => {
@@ -279,7 +281,7 @@ const EnhancedUniversalRegistrationForm: React.FC = () => {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
-                if (response.data.success) {
+                if (response.data && response.data.success) {
                     setPaperDetails(response.data.paperDetails);
                     const authorInfo = {
                         name: response.data.paperDetails.authorName,
@@ -312,7 +314,10 @@ const EnhancedUniversalRegistrationForm: React.FC = () => {
                 }
             }
         } catch (error: any) {
-            // Fallback to listener if anything fails
+            // Fallback to listener if anything fails (404 is normal for users without papers)
+            if (error.response?.status !== 404) {
+                console.error('Error fetching paper details:', error);
+            }
             const fallbackInfo = {
                 name: localStorage.getItem('username') || localStorage.getItem('email') || 'User',
                 email: localStorage.getItem('email') || '',
@@ -332,7 +337,7 @@ const EnhancedUniversalRegistrationForm: React.FC = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            if (response.data.success) {
+            if (response.data && response.data.success) {
                 setRegistrationStatus(response.data.registration);
             }
         } catch (error: any) {
@@ -368,9 +373,48 @@ const EnhancedUniversalRegistrationForm: React.FC = () => {
         }
     };
 
+    const checkListenerRegistrationStatus = async () => {
+        try {
+            setLoadingListenerStatus(true);
+            const token = localStorage.getItem('token');
+            const email = localStorage.getItem('email');
+
+            console.log('🔍 Checking listener registration...', { email, hasToken: !!token });
+
+            if (!token) {
+                console.log('❌ No token found');
+                setLoadingListenerStatus(false);
+                return;
+            }
+
+            const response = await axios.get(
+                `${API_URL}/api/listener/my-listener-registration`,
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            console.log('✅ Listener registration response:', response.data);
+
+            if (response.data && response.data.registration) {
+                console.log('📋 Listener registration found:', response.data.registration);
+                setListenerRegistration(response.data.registration);
+            }
+        } catch (error: any) {
+            if (error.response?.status === 404) {
+                console.log('ℹ️ No listener registration found (404)');
+            } else {
+                console.error('❌ Error checking listener registration:', error.response?.data || error.message);
+            }
+        } finally {
+            setLoadingListenerStatus(false);
+        }
+    };
+
     useEffect(() => {
         if (userInfo) {
             checkRegistrationStatus();
+            checkListenerRegistrationStatus();
         }
     }, [userInfo]);
 
@@ -824,6 +868,226 @@ const EnhancedUniversalRegistrationForm: React.FC = () => {
                 </div>
             )}
 
+            {/* Listener Registration Status */}
+            {!loadingListenerStatus && listenerRegistration && registrationType === 'listener' && (
+                <div className={`border-l-4 p-4 rounded mb-6 ${
+                    listenerRegistration.paymentStatus === 'verified'
+                        ? 'bg-green-50 border-green-500'
+                        : listenerRegistration.paymentStatus === 'rejected'
+                        ? 'bg-red-50 border-red-500'
+                        : 'bg-blue-50 border-blue-500'
+                }`}>
+                    <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                            {listenerRegistration.paymentStatus === 'verified' ? (
+                                <Check className="h-5 w-5 text-green-500 mt-0.5" />
+                            ) : listenerRegistration.paymentStatus === 'rejected' ? (
+                                <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                            ) : (
+                                <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+                            )}
+                        </div>
+                        <div className="ml-3 flex-1">
+                            {listenerRegistration.paymentStatus === 'verified' ? (
+                                <>
+                                    <p className="text-sm font-bold text-green-800">
+                                        ✅ Listener Registration Verified
+                                    </p>
+                                    <p className="text-xs text-green-700 mt-1">
+                                        Your registration and payment have been verified. Thank you for registering as a listener!
+                                    </p>
+                                    <p className="text-xs text-green-700 mt-2">
+                                        <strong>Registration Number:</strong> {listenerRegistration.registrationNumber}
+                                    </p>
+                                </>
+                            ) : listenerRegistration.paymentStatus === 'rejected' ? (
+                                <>
+                                    <p className="text-sm font-bold text-red-800">
+                                        ❌ Payment Rejected
+                                    </p>
+                                    <p className="text-xs text-red-700 mt-1">
+                                        <strong>Reason:</strong> {listenerRegistration.rejectionReason || 'Please contact admin for details'}
+                                    </p>
+                                    <p className="text-xs text-red-700 mt-2">
+                                        You can submit a new registration with corrected payment details. Your previous payment amount was ₹{listenerRegistration.amount}.
+                                    </p>
+                                    <button
+                                        onClick={() => {
+                                            setListenerRegistration(null);
+                                            Swal.fire({
+                                                icon: 'info',
+                                                title: 'Resubmit Registration',
+                                                text: 'You can now resubmit your listener registration with the corrected payment details.',
+                                                confirmButtonColor: '#2563eb',
+                                            });
+                                        }}
+                                        className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition"
+                                    >
+                                        Resubmit Registration
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-bold text-blue-800">
+                                        ⏳ Registration Pending
+                                    </p>
+                                    <p className="text-xs text-blue-700 mt-1">
+                                        Your listener registration is under review. We will notify you once your payment is verified.
+                                    </p>
+                                    <p className="text-xs text-blue-700 mt-2">
+                                        <strong>Payment Status:</strong> Awaiting Verification
+                                    </p>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Verified Listener Registration Details */}
+            {!loadingListenerStatus && listenerRegistration && listenerRegistration.paymentStatus === 'verified' && registrationType === 'listener' && (
+                <div className="mb-8 rounded-xl overflow-hidden shadow-lg border border-green-200">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 text-white">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <div className="bg-white bg-opacity-20 rounded-full p-3 mr-4">
+                                    <CheckCircle className="text-white" size={28} />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-bold">Registration Confirmed</h3>
+                                    <p className="text-green-100 text-sm mt-1">Your listener registration is verified and active</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-8 bg-white">
+                        {/* Registration Number - Highlight */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-6 mb-8">
+                            <p className="text-sm text-gray-600 font-medium uppercase tracking-wide">Registration Number</p>
+                            <p className="text-3xl font-bold text-blue-600 font-mono mt-2">{listenerRegistration.registrationNumber}</p>
+                            <p className="text-xs text-gray-500 mt-2">Use this number for all conference communications</p>
+                        </div>
+
+                        {/* Details Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                            {/* Personal Information Card */}
+                            <div>
+                                <h4 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b-2 border-blue-500">
+                                    👤 Personal Information
+                                </h4>
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Full Name</p>
+                                        <p className="text-base text-gray-800 font-medium mt-1">{listenerRegistration.name}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Email Address</p>
+                                        <p className="text-base text-blue-600 font-medium mt-1">{listenerRegistration.email}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Country</p>
+                                        <p className="text-base text-gray-800 font-medium mt-1">{listenerRegistration.country}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Institution Card */}
+                            <div>
+                                <h4 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b-2 border-purple-500">
+                                    🏢 Organization Details
+                                </h4>
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Institution/Organization</p>
+                                        <p className="text-base text-gray-800 font-medium mt-1">{listenerRegistration.institution}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Complete Address</p>
+                                        <p className="text-base text-gray-800 font-medium mt-1 leading-relaxed">{listenerRegistration.address}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Payment & Registration Info */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                            {/* Payment Card */}
+                            <div>
+                                <h4 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b-2 border-green-500">
+                                    💳 Payment Information
+                                </h4>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center bg-gray-50 p-3 rounded">
+                                        <p className="text-sm text-gray-600">Amount Paid:</p>
+                                        <p className="text-2xl font-bold text-green-600">₹{listenerRegistration.amount}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Payment Method</p>
+                                        <p className="text-base text-gray-800 font-medium mt-1 bg-blue-50 p-2 rounded">
+                                            {listenerRegistration.paymentMethod?.replace('-', ' ').toUpperCase()}
+                                        </p>
+                                    </div>
+                                    {listenerRegistration.transactionId && (
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-500 uppercase">Transaction ID</p>
+                                            <p className="text-sm text-gray-800 font-mono mt-1 bg-gray-100 p-2 rounded break-all">{listenerRegistration.transactionId}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Registration Category Card */}
+                            <div>
+                                <h4 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b-2 border-orange-500">
+                                    📋 Registration Details
+                                </h4>
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Category</p>
+                                        <p className="text-base text-gray-800 font-medium mt-1 bg-orange-50 p-2 rounded">
+                                            {listenerRegistration.registrationCategory?.replace(/-/g, ' ').toUpperCase()}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase">Membership Status</p>
+                                        <p className="text-base font-medium mt-1">
+                                            {listenerRegistration.isScisMember ? (
+                                                <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">✓ SCIS Member</span>
+                                            ) : (
+                                                <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">Non-SCIS Member</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Verification Status */}
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <p className="text-sm text-gray-600 font-medium">Status</p>
+                                    <p className="text-lg font-bold text-green-600 mt-1">✅ Verified</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600 font-medium">Verified On</p>
+                                    <p className="text-lg font-bold text-gray-800 mt-1">{new Date(listenerRegistration.verifiedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                </div>
+                                {listenerRegistration.certificateNumber && (
+                                    <div>
+                                        <p className="text-sm text-gray-600 font-medium">Certificate</p>
+                                        <p className="text-sm font-mono text-blue-600 mt-1 break-all">{listenerRegistration.certificateNumber}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Paper Details for Authors */}
             {registrationType === 'author' && paperDetails && (
                 <div className="bg-green-50 border-l-4 border-green-500 p-6 mb-8 rounded">
@@ -840,7 +1104,7 @@ const EnhancedUniversalRegistrationForm: React.FC = () => {
             )}
 
             {/* Listener Details Form */}
-            {registrationType === 'listener' && !userInfo?.isAuthor && (
+            {registrationType === 'listener' && !userInfo?.isAuthor && (!listenerRegistration || listenerRegistration.paymentStatus === 'rejected') && (
                 <div className="mb-8 space-y-4">
                     <h3 className="text-lg font-semibold">Listener Details</h3>
                     <div>
@@ -869,7 +1133,7 @@ const EnhancedUniversalRegistrationForm: React.FC = () => {
             )}
 
             {/* Rest of the form continues... */}
-            {registrationType && userCountry && (
+            {registrationType && userCountry && (!listenerRegistration || listenerRegistration.paymentStatus !== 'verified') && (
                 <form onSubmit={handleSubmit} className="space-y-8">
                     {/* Category Selection */}
                     <div>

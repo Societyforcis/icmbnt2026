@@ -3,13 +3,15 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
-// Set up PDF.js worker
+
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+
 
 interface PDFViewerProps {
     pdfUrl: string;
     title?: string;
 }
+
 
 const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl, title }) => {
     const [numPages, setNumPages] = useState<number | null>(null);
@@ -18,11 +20,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl, title }) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [loading, setLoading] = useState(true);
 
+
     const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
         setNumPages(numPages);
         setLoading(false);
     };
 
+    
     const onDocumentLoadError = (error: Error) => {
         console.error('PDF Load Error:', error);
         setLoading(false);

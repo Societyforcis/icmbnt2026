@@ -40,6 +40,7 @@ const Registrations: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [membershipStatus, setMembershipStatus] = useState<any>(null);
   const [loadingMembership, setLoadingMembership] = useState(true);
+  const [listenerRegistration, setListenerRegistration] = useState<any>(null);
 
   const bankDetailsRef = useRef<HTMLDivElement>(null);
 
@@ -168,8 +169,35 @@ const Registrations: React.FC = () => {
       }
     };
 
+    const checkListenerRegistrationStatus = async () => {
+      try {
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+          return;
+        }
+
+        const response = await axios.get(
+          `${API_URL}/api/listener/my-listener-registration`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+
+        console.log('Listener registration check response:', response.data);
+        if (response.data && response.data.registration) {
+          setListenerRegistration(response.data.registration);
+        }
+      } catch (error: any) {
+        if (error.response?.status !== 404) {
+          console.error('Error checking listener registration:', error);
+        }
+      }
+    };
+
     checkAcceptanceStatus();
     checkMembershipStatus();
+    checkListenerRegistrationStatus();
   }, []);
 
   // NOW render based on state - all hooks have been called
@@ -279,31 +307,43 @@ const Registrations: React.FC = () => {
           </div>
         </div>
 
-        {/* Prominent Register Button - Show for everyone */}
-        <div className="mb-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-3">Ready to Register?</h2>
-          <p className="text-blue-100 mb-6 text-lg">
-            {isLoggedIn && isAccepted
-              ? "Your paper has been accepted! Register now to present at the conference."
-              : "Register as a listener/attendee to participate in the conference."}
-          </p>
-          <button
-            onClick={handleRegisterClick}
-            className="bg-white text-blue-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-blue-50 transition-all transform hover:scale-105 shadow-lg flex items-center mx-auto"
-          >
-            <ArrowRight className="mr-2" size={24} />
-            {isLoggedIn
-              ? (isAccepted ? "Register as Author" : "Register as Listener")
-              : "Login to Register"}
-          </button>
-          <p className="text-blue-100 text-sm mt-4">
-            {isLoggedIn
-              ? (isAccepted
-                ? "Complete your author registration to present your accepted paper at the conference"
-                : "Register as a listener to attend the conference")
-              : "Please login or create an account to complete your registration"}
-          </p>
-        </div>
+        {/* Prominent Register Button - Show for everyone EXCEPT verified listeners */}
+        {!listenerRegistration || listenerRegistration.paymentStatus !== 'verified' ? (
+          <div className="mb-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-8 text-center">
+            <h2 className="text-3xl font-bold text-white mb-3">Ready to Register?</h2>
+            <p className="text-blue-100 mb-6 text-lg">
+              {isLoggedIn && isAccepted
+                ? "Your paper has been accepted! Register now to present at the conference."
+                : "Register as a listener/attendee to participate in the conference."}
+            </p>
+            <button
+              onClick={handleRegisterClick}
+              className="bg-white text-blue-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-blue-50 transition-all transform hover:scale-105 shadow-lg flex items-center mx-auto"
+            >
+              <ArrowRight className="mr-2" size={24} />
+              {isLoggedIn
+                ? (isAccepted ? "Register as Author" : "Register as Listener")
+                : "Login to Register"}
+            </button>
+            <p className="text-blue-100 text-sm mt-4">
+              {isLoggedIn
+                ? (isAccepted
+                  ? "Complete your author registration to present your accepted paper at the conference"
+                  : "Register as a listener to attend the conference")
+                : "Please login or create an account to complete your registration"}
+            </p>
+          </div>
+        ) : (
+          <div className="mb-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg p-8 text-center">
+            <h2 className="text-3xl font-bold text-white mb-3">✅ Registration Confirmed</h2>
+            <p className="text-green-100 mb-4 text-lg">
+              Your listener registration has been verified and confirmed!
+            </p>
+            <p className="text-green-100 text-sm">
+              Registration Number: <span className="font-mono font-bold">{listenerRegistration.registrationNumber}</span>
+            </p>
+          </div>
+        )}
 
         {/* Tab buttons */}
         <div className="flex mb-8 border-b border-gray-200">
