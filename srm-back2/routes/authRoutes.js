@@ -7,7 +7,8 @@ import {
     forgotPassword,
     resetPassword,
     getCurrentUser,
-    checkAcceptanceStatus
+    checkAcceptanceStatus,
+    updateUserCountry
 } from '../controllers/authController.js';
 import { verifyJWT } from '../middleware/auth.js';
 
@@ -31,5 +32,7 @@ router.post('/reset-password', resetPassword);
 // Protected routes
 router.get('/me', verifyJWT, getCurrentUser);
 router.get('/check-acceptance-status', verifyJWT, checkAcceptanceStatus);
+router.put('/update-country', verifyJWT, updateUserCountry);
 
 export default router;
+

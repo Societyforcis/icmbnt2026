@@ -17,7 +17,7 @@ const rejectedPaperSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    
+
     // Author Information
     authorName: {
         type: String,
@@ -28,7 +28,7 @@ const rejectedPaperSchema = new mongoose.Schema({
         required: true,
         index: true
     },
-    
+
     // Paper PDF
     pdfUrl: {
         type: String,
@@ -42,22 +42,22 @@ const rejectedPaperSchema = new mongoose.Schema({
         type: String,
         required: false
     },
-    
+
     // REVISION PDFS (if paper was revised before rejection)
     revisionPdfs: {
         cleanPdfUrl: String,
         cleanPdfPublicId: String,
         cleanPdfFileName: String,
-        
+
         highlightedPdfUrl: String,
         highlightedPdfPublicId: String,
         highlightedPdfFileName: String,
-        
+
         responsePdfUrl: String,
         responsePdfPublicId: String,
         responsePdfFileName: String
     },
-    
+
     // REVIEWS BY ROUND - Store each review round separately
     reviewsByRound: [{
         round: Number,              // 1, 2, 3, etc.
@@ -80,7 +80,7 @@ const rejectedPaperSchema = new mongoose.Schema({
         reviewedPdfUrl: String,
         submittedAt: Date
     }],
-    
+
     // Category and Topic
     category: {
         type: String,
@@ -90,7 +90,7 @@ const rejectedPaperSchema = new mongoose.Schema({
         type: String,
         required: false
     },
-    
+
     // LEGACY: Old reviewers array
     reviewers: [{
         reviewerId: {
@@ -106,19 +106,19 @@ const rejectedPaperSchema = new mongoose.Schema({
         recommendation: String,
         submittedAt: Date
     }],
-    
+
     // Total Reviewers Count
     totalReviewers: {
         type: Number,
         default: 0
     },
-    
+
     // Average Rating
     averageRating: {
         type: Number,
         default: 0
     },
-    
+
     // Rejection Reason
     rejectionReason: {
         type: String,
@@ -137,13 +137,13 @@ const rejectedPaperSchema = new mongoose.Schema({
         ],
         default: 'Quality Issues'
     },
-    
+
     // Detailed rejection comments from editor
     rejectionComments: {
         type: String,
         required: true
     },
-    
+
     // Editor who made the decision
     editorId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -152,21 +152,21 @@ const rejectedPaperSchema = new mongoose.Schema({
     },
     editorEmail: String,
     editorName: String,
-    
+
     // Rejection Date/Time
     rejectionDate: {
         type: Date,
         default: Date.now,
         index: true
     },
-    
+
     // Additional Info
     revisionCount: {
         type: Number,
         default: 0,
         description: 'Number of revisions attempted before rejection'
     },
-    
+
     // Conference/Event Info
     conferenceYear: {
         type: Number,
@@ -176,7 +176,7 @@ const rejectedPaperSchema = new mongoose.Schema({
         type: String,
         default: 'ICMBNT 2025'
     },
-    
+
     // Additional Metadata
     metadata: {
         originalSubmissionDate: Date,
@@ -185,7 +185,7 @@ const rejectedPaperSchema = new mongoose.Schema({
         lastRevisionDate: Date,
         notes: String
     },
-    
+
     // Timestamps
     createdAt: {
         type: Date,
@@ -209,11 +209,11 @@ rejectedPaperSchema.pre('save', function (next) {
         const ratings = this.reviewers
             .map(r => r.overallRating)
             .filter(r => r !== undefined && r !== null);
-        
+
         if (ratings.length > 0) {
             this.averageRating = (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2);
         }
-        
+
         this.totalReviewers = this.reviewers.length;
     }
     this.updatedAt = Date.now();

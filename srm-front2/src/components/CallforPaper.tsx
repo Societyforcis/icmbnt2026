@@ -276,6 +276,153 @@ const CallForPapers = () => {
             <p className="text-sm mt-2"><strong>SCIS Members:</strong> Must have an active SCIS membership with admin approval to qualify for member rates.</p>
           </div>
         </section>
+
+        {/* Listener Registration Section */}
+        <section className="mb-16">
+          <div className="flex items-center mb-6">
+            <FaFileAlt className="text-[#F5A051] text-2xl mr-4" />
+            <h2 className="text-3xl font-bold text-[#F5A051]">LISTENER REGISTRATION</h2>
+          </div>
+          
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-[#F5A051] p-6 rounded-lg">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">👥 Not an Author? Register as a Listener!</h3>
+            <p className="text-gray-700 mb-4">
+              If you're interested in attending ICMBNT 2026 as a listener without submitting a research paper, you can still register for the conference. Listeners get access to all conference sessions, materials, and networking opportunities.
+            </p>
+            <div className="bg-white p-4 rounded mb-4 border-l-4 border-blue-500">
+              <h4 className="font-semibold text-gray-800 mb-2">✓ What's Included for Listeners:</h4>
+              <ul className="text-sm text-gray-700 space-y-1">
+                <li>• Access to all conference sessions and presentations</li>
+                <li>• Conference kit and materials</li>
+                <li>• Certificate of participation</li>
+                <li>• Networking opportunities with researchers and industry professionals</li>
+                <li>• Refreshments during the conference</li>
+              </ul>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={() => navigate('/registrations')}
+                className="px-6 py-3 bg-gradient-to-r from-blue-900 to-[#F5A051] text-white font-semibold rounded-lg hover:shadow-lg transition-all"
+              >
+                Register as Listener
+              </button>
+              <button
+                onClick={handleSubmissionClick}
+                className="px-6 py-3 bg-white text-[#F5A051] font-semibold rounded-lg border-2 border-[#F5A051] hover:bg-orange-50 transition-all"
+              >
+                Submit Paper as Author
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Payment Methods Section */}
+        <section className="mb-16">
+          <div className="flex items-center mb-6">
+            <FaCalendarAlt className="text-[#F5A051] text-2xl mr-4" />
+            <h2 className="text-3xl font-bold text-[#F5A051]">PAYMENT METHODS</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Melange Publications */}
+            <div className="bg-white rounded-lg shadow-lg p-6 border-t-4 border-purple-500 hover:shadow-xl transition-all">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mr-4">
+                  �
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">Melange Publications</h3>
+              </div>
+              <p className="text-gray-700 mb-4">
+                Visit Melange Publications official payment portal for comprehensive payment and banking details.
+              </p>
+              <div className="bg-purple-50 p-3 rounded mb-4 text-sm">
+                <p className="font-semibold text-purple-900">All Payment Options Available</p>
+                <p className="text-purple-800">Complete banking information</p>
+              </div>
+              <a
+                href="https://melangepublications.com/payment_details.php"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-all w-full justify-center"
+              >
+                Visit Portal
+                <span className="ml-2">→</span>
+              </a>
+            </div>
+
+            {/* PayPal */}
+            <div className="bg-white rounded-lg shadow-lg p-6 border-t-4 border-blue-500 hover:shadow-xl transition-all">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                  🔵
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">PayPal</h3>
+              </div>
+              <p className="text-gray-700 mb-4">
+                Secure international payment option. Click below to proceed to our PayPal payment portal.
+              </p>
+              <div className="bg-blue-50 p-3 rounded mb-4 text-sm">
+                <p className="font-semibold text-blue-900">Fast & Secure</p>
+                <p className="text-blue-800">Accepted worldwide</p>
+              </div>
+              <a
+                href="https://www.paypal.com/ncp/payment/3Q9N4H9ZKX24A"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all w-full justify-center"
+              >
+                Pay with PayPal
+                <span className="ml-2">→</span>
+              </a>
+            </div>
+
+            {/* Bank Transfer / UPI */}
+            <div className="bg-white rounded-lg shadow-lg p-6 border-t-4 border-red-500 hover:shadow-xl transition-all">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                  �
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">Bank Transfer / UPI</h3>
+              </div>
+              <p className="text-gray-700 mb-4">
+                Pay directly through bank transfer or UPI using Melange Publications account details or scan the QR code below.
+              </p>
+              <div className="bg-red-50 p-3 rounded mb-4 text-sm">
+                <p className="font-semibold text-red-900">Account: Melange Publications</p>
+                <p className="text-red-800">Account No: 736805000791</p>
+                <p className="text-red-800">IFSC: ICIC0007368</p>
+              </div>
+              <a
+                href="https://melangepublications.com/payment_details.php"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all w-full justify-center"
+              >
+                View Full Details
+                <span className="ml-2">→</span>
+              </a>
+            </div>
+          </div>
+
+          {/* QR Code Section */}
+          <div className="mt-8 flex justify-center">
+            <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-orange-300">
+              <h3 className="text-center font-bold text-gray-800 mb-4">💳 Scan & Pay with UPI</h3>
+              <img 
+                src="/image/bali/qr2.png" 
+                alt="UPI QR Code for Payment" 
+                className="w-48 h-48 object-contain mx-auto rounded-lg border-2 border-orange-300"
+              />
+              <p className="text-center text-sm text-gray-600 mt-4">
+                Scan this QR code with any UPI app to make payment instantly
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+            <p className="text-sm text-yellow-900"><strong>⚠️ Important:</strong> After making your payment through any method, please complete your registration on our platform to confirm your participation.</p>
+          </div>
+        </section>
       </div>
     </div>
   );

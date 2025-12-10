@@ -1323,4 +1323,146 @@ export const sendReviewerThankYouEmail = async (reviewerEmail, reviewerName, pap
     }
 };
 
+// Send listener payment verification confirmation email
+export const sendListenerPaymentVerificationEmail = async (listenerData) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: listenerData.email,
+        subject: `✅ Registration Confirmed - ICMBNT 2026 Listener`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #28a745;">
+                    <h2 style="margin: 0; color: #155724; font-size: 22px;">✅ Payment Verified!</h2>
+                    <p style="margin: 5px 0 0 0; color: #155724; font-weight: bold;">Your registration has been confirmed</p>
+                </div>
+
+                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear <strong>${listenerData.name}</strong>,
+                </p>
+
+                <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 20px;">
+                    We are pleased to confirm that your payment for ICMBNT 2026 listener registration has been successfully verified by our admin team. 
+                    Your registration is now <strong style="color: #28a745;">CONFIRMED</strong>, and you are all set to join us at the conference!
+                </p>
+
+                <div style="background-color: #cfe2ff; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #0066cc; font-size: 15px;">📋 Your Registration Details:</p>
+                    <table style="width: 100%; font-size: 13px;">
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold; width: 140px;">Name:</td>
+                            <td style="padding: 8px 0; color: #333;">${listenerData.name}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Email:</td>
+                            <td style="padding: 8px 0; color: #333;">${listenerData.email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Institution:</td>
+                            <td style="padding: 8px 0; color: #333;">${listenerData.institution}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Location:</td>
+                            <td style="padding: 8px 0; color: #333;">${listenerData.address}, ${listenerData.country}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Registration Category:</td>
+                            <td style="padding: 8px 0; color: #333;">${listenerData.registrationCategory}</td>
+                        </tr>
+                        <tr style="background-color: #d4edda;">
+                            <td style="padding: 8px; font-weight: bold; color: #155724;">Amount Paid:</td>
+                            <td style="padding: 8px; font-weight: bold; color: #28a745;">${listenerData.currency || 'USD'} ${listenerData.amount}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                ${listenerData.isScisMember ? `
+                <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0; font-weight: bold; color: #2e7d32;">
+                        🎖️ SCIS Member Status: <span style="color: #4caf50;">VERIFIED</span>
+                    </p>
+                    <p style="margin: 5px 0 0 0; font-size: 13px; color: #2e7d32;">
+                        Membership ID: ${listenerData.scisMembershipId}
+                    </p>
+                </div>
+                ` : ''}
+
+                <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404; font-size: 15px;">📅 Conference Information:</p>
+                    <div style="font-size: 14px; color: #333;">
+                        <p style="margin: 5px 0;"><strong>📌 Conference Name:</strong> International Conference on Multidisciplinary Breakthroughs and NextGen Technologies (ICMBNT 2026)</p>
+                        <p style="margin: 5px 0;"><strong>📍 Date:</strong> March 12-13, 2026</p>
+                        <p style="margin: 5px 0;"><strong>🏛️ Venue:</strong> Bali, Indonesia</p>
+                        <p style="margin: 5px 0;"><strong>🌐 Format:</strong> Hybrid (In-person + Virtual)</p>
+                    </div>
+                </div>
+
+                <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #2e7d32; font-size: 15px;">✅ What's Next:</p>
+                    <ol style="margin: 0; padding-left: 20px; color: #333; font-size: 13px; line-height: 1.8;">
+                        <li style="margin: 8px 0;"><strong>Mark your calendar</strong> for <strong>March 12-13, 2026</strong></li>
+                        <li style="margin: 8px 0;"><strong>If attending in-person:</strong> Plan your travel to Bali, Indonesia</li>
+                        <li style="margin: 8px 0;"><strong>Virtual access information:</strong> You will receive a separate email with the Zoom/streaming link and instructions for virtual attendance</li>
+                        <li style="margin: 8px 0;"><strong>Conference program and agenda:</strong> Will be shared 2 weeks before the conference</li>
+                        <li style="margin: 8px 0;"><strong>Keep this email</strong> as your registration confirmation receipt</li>
+                        <li style="margin: 8px 0;"><strong>Monitor your email</strong> for further updates and pre-conference information</li>
+                    </ol>
+                </div>
+
+                <div style="background-color: #f0f0f0; border: 1px solid #d0d0d0; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #333; font-size: 14px;">📞 Important Information:</p>
+                    <p style="margin: 5px 0; font-size: 13px; color: #666; line-height: 1.6;">
+                        ✓ <strong>Registration Status:</strong> Your listener registration is now <span style="color: #28a745; font-weight: bold;">CONFIRMED AND ACTIVE</span><br>
+                        ✓ <strong>Payment Verification:</strong> Your payment has been successfully verified by the admin team<br>
+                        ✓ <strong>Attendance:</strong> You can attend the conference in-person, virtually, or both<br>
+                        ✓ <strong>Certificate:</strong> You will receive a certificate of attendance after the conference<br>
+                    </p>
+                </div>
+
+                <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #495057; font-size: 14px;">❓ Need Help or Have Questions?</p>
+                    <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">
+                        Please feel free to reach out to us for any questions or assistance:<br>
+                        📧 <strong>Email:</strong> <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc; text-decoration: none;">icmbnt2026@gmail.com</a><br>
+                        🌐 <strong>Website:</strong> <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a><br>
+                    </p>
+                </div>
+
+                <div style="background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 8px 0; font-weight: bold; color: #0c5460; font-size: 14px;">💡 Tips for Conference Attendees:</p>
+                    <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #0c5460;">
+                        <li style="margin: 5px 0;">Plan your schedule in advance</li>
+                        <li style="margin: 5px 0;">Join the conference community on social media</li>
+                        <li style="margin: 5px 0;">Prepare questions for the speakers and sessions</li>
+                        <li style="margin: 5px 0;">Network with other participants and professionals</li>
+                        <li style="margin: 5px 0;">Take notes and share your learning experience</li>
+                    </ul>
+                </div>
+
+                <p style="font-size: 13px; line-height: 1.6; color: #666; margin-top: 25px; margin-bottom: 10px; text-align: center;">
+                    Thank you for registering for ICMBNT 2026! We look forward to seeing you in Bali or joining us virtually.
+                </p>
+
+                <p style="font-size: 13px; color: #999; margin: 15px 0 0 0; border-top: 1px solid #ddd; padding-top: 15px; text-align: center;">
+                    <strong>ICMBNT 2026 Organizing Committee</strong><br>
+                    Society for Cyber Intelligent Systems<br>
+                    Puducherry, India<br>
+                    Email: <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc; text-decoration: none;">icmbnt2026@gmail.com</a><br>
+                    Website: <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a>
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log("📧 Listener payment verification email sent to:", listenerData.email, "- Message ID:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Error sending listener payment verification email:", error);
+        throw error;
+    }
+};
+
 export default transporter;

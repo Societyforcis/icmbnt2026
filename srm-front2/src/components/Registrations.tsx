@@ -7,8 +7,6 @@ import {
   CreditCard,
   FileText,
   Building,
-  GraduationCap,
-  Briefcase,
   Globe,
   ExternalLink,
   AlertCircle
@@ -16,7 +14,8 @@ import {
 import Swal from 'sweetalert2';
 import axios from 'axios';
 import RegistrationCountdown from './RegistrationCountdown';
-import SimplifiedRegistrationForm from './SimplifiedRegistrationForm';
+import EnhancedUniversalRegistrationForm from './EnhancedUniversalRegistrationForm';
+import EnhancedFeeTable from './EnhancedFeeTable';
 
 const MemoizedRegistrationCountdown = React.memo(RegistrationCountdown);
 
@@ -24,234 +23,6 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 
 
-const RegistrationInfoPage: React.FC = () => (
-  <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-    <div className="relative bg-gradient-to-r from-blue-900 via-blue-800 to-[#F5A051] text-white py-12 sm:py-16 md:py-24 overflow-hidden">
-      <div className="absolute inset-0 bg-black opacity-30"></div>
-      <div className="relative z-10 container mx-auto px-4 text-center">
-        <div className="inline-block mb-6">
-          <div className="w-16 h-1 bg-[#F5A051] mx-auto mb-2"></div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">Registration</h1>
-          <div className="w-16 h-1 bg-[#F5A051] mx-auto mt-2"></div>
-        </div>
-        <p className="text-lg md:text-xl max-w-3xl mx-auto font-light">
-          International Conference on Multidisciplinary Breakthroughs and NextGen Technologies
-        </p>
-      </div>
-    </div>
-
-    <div className="container mx-auto px-4 py-16">
-      {/* Information Banner */}
-      <div className="max-w-4xl mx-auto mb-12">
-        <div className="bg-gradient-to-r from-blue-50 to-orange-50 border-l-4 border-[#F5A051] p-6 rounded-lg shadow-md">
-          <div className="flex items-start">
-            <AlertCircle className="h-6 w-6 text-[#F5A051] mt-1 mr-3 flex-shrink-0" />
-            <div>
-              <h3 className="text-lg font-bold text-gray-800 mb-2">How to Register for ICMBNT 2026</h3>
-              <p className="text-gray-700 mb-3">
-                Registration for the conference is available to all participants. To complete your registration:
-              </p>
-              <ol className="list-decimal pl-5 space-y-2 text-gray-700">
-                <li><span className="font-semibold">Submit your research paper</span> through our submission portal</li>
-                <li><span className="font-semibold">Wait for acceptance notification</span> from our review committee</li>
-                <li><span className="font-semibold">Once accepted</span>, you can access the registration form and complete payment</li>
-              </ol>
-              <p className="text-sm text-gray-600 mt-4 italic">
-                💡 Below you'll find all the registration fees and payment details to help you prepare for your registration.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Registration Fee Table */}
-      <div className="max-w-6xl mx-auto mb-12">
-        <div className="flex items-center mb-6">
-          <CreditCard className="text-[#F5A051] text-2xl mr-4" />
-          <h2 className="text-3xl font-bold text-[#F5A051]">REGISTRATION FEE DETAILS</h2>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gradient-to-r from-blue-900 to-blue-800 text-white">
-                <tr>
-                  <th scope="col" className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th scope="col" className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th scope="col" className="px-6 py-4 text-right text-sm font-bold uppercase tracking-wider">
-                    SCIS Members
-                  </th>
-                  <th scope="col" className="px-6 py-4 text-right text-sm font-bold uppercase tracking-wider">
-                    Non-SCIS Members
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td rowSpan={3} className="px-6 py-4 whitespace-nowrap text-base font-bold text-gray-800 bg-gray-100">
-                    Indian Participant
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
-                    <GraduationCap className="mr-2 text-blue-800" size={20} />
-                    Students
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">4500 INR (50 USD)</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">5850 INR (65 USD)</span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
-                    <Building className="mr-2 text-blue-800" size={20} />
-                    Faculty/Research Scholars
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">6750 INR (75 USD)</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">7500 INR (85 USD)</span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
-                    <Briefcase className="mr-2 text-blue-800" size={20} />
-                    Listeners
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">2500 INR</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">3500 INR</span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td rowSpan={2} className="px-6 py-4 whitespace-nowrap text-base font-bold text-gray-800 bg-gray-100">
-                    Foreign Participant
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
-                    <Globe className="mr-2 text-blue-800" size={20} />
-                    Authors
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">300 USD</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">350 USD</span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
-                    <Briefcase className="mr-2 text-blue-800" size={20} />
-                    Listeners
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">100 USD</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">150 USD</span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td rowSpan={2} className="px-6 py-4 whitespace-nowrap text-base font-bold text-gray-800 bg-gray-100">
-                    Indonesian Participant
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
-                    <Globe className="mr-2 text-blue-800" size={20} />
-                    Authors
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">17,00,000 IDR</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">26,00,000 IDR</span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-800 flex items-center">
-                    <Briefcase className="mr-2 text-blue-800" size={20} />
-                    Listeners
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-md">12,00,000 IDR</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-right font-semibold text-gray-800">
-                    <span className="bg-blue-100 text-blue-800 py-1 px-3 rounded-md">15,00,000 IDR</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Fee Includes Section */}
-          <div className="bg-gray-50 p-6 border-t border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Conference fee includes:</h3>
-            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-gray-700">
-              <li className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Conference kit
-              </li>
-              <li className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Certificate
-              </li>
-              <li className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Proceedings
-              </li>
-              {/* <li className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Non-Scopus Journal
-              </li>
-              <li className="flex items-center">
-                <Check className="w-4 h-4 text-green-600 mr-2" />
-                Lunch with refreshments
-              </li> */}
-            </ul>
-            <p className="mt-4 text-sm text-gray-600 italic">
-              * These fees do not include accommodation or Scopus/WOS publication fees.
-            </p>
-          </div>
-        </div>
-
-        {/* Note about Scopus */}
-        <div className="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-          <div className="flex items-start">
-            <AlertCircle className="text-yellow-400 mt-1 mr-3" size={20} />
-            <p className="text-sm text-yellow-700">
-              <span className="font-medium">Note:</span> Authors interested in publishing their articles in Scopus/WOS indexed journals will be charged additional fees based on the journal.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Call to Action */}
-      <div className="max-w-4xl mx-auto text-center">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <FileText className="mx-auto h-16 w-16 text-[#F5A051] mb-4" />
-          <h3 className="text-2xl font-bold text-gray-800 mb-4">Ready to Submit Your Paper?</h3>
-          <p className="text-gray-600 mb-6">
-            Submit your research paper to participate in ICMBNT 2026. Once your paper is accepted, you'll be able to complete your registration.
-          </p>
-          <a
-            href="/call-for-papers"
-            className="inline-flex items-center bg-gradient-to-r from-blue-800 to-[#F5A051] text-white px-8 py-3 rounded-lg font-medium transition-all hover:shadow-lg"
-          >
-            View Call for Papers
-            <ArrowRight size={20} className="ml-2" />
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-// Loading Component
 const LoadingPage: React.FC = () => (
   <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
     <div className="text-center">
@@ -406,11 +177,23 @@ const Registrations: React.FC = () => {
     return <LoadingPage />;
   }
 
-  if (!isAccepted) {
-    return <RegistrationInfoPage />;
-  }
+  // Check if user is logged in
+  const isLoggedIn = !!localStorage.getItem('token');
 
-  // Main component JSX
+  // Handler for register button click
+  const handleRegisterClick = () => {
+    if (!isLoggedIn) {
+      // Save current URL to return after login
+      localStorage.setItem('returnUrl', '/registrations');
+      // Redirect to login
+      window.location.href = '/login';
+    } else {
+      // User is logged in, switch to form tab
+      setActiveTab('form');
+    }
+  };
+
+  // Main component JSX - Show for everyone (logged in or not)
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       {/* Rest of your component remains the same */}
@@ -444,8 +227,8 @@ const Registrations: React.FC = () => {
         {/* SCIS Membership Status Banner */}
         {!loadingMembership && membershipStatus && (
           <div className={`mb-6 border-l-4 p-4 rounded ${membershipStatus.isMember
-              ? 'bg-green-50 border-green-500'
-              : 'bg-yellow-50 border-yellow-500'
+            ? 'bg-green-50 border-green-500'
+            : 'bg-yellow-50 border-yellow-500'
             }`}>
             <div className="flex">
               <div className="flex-shrink-0">
@@ -496,6 +279,32 @@ const Registrations: React.FC = () => {
           </div>
         </div>
 
+        {/* Prominent Register Button - Show for everyone */}
+        <div className="mb-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-8 text-center">
+          <h2 className="text-3xl font-bold text-white mb-3">Ready to Register?</h2>
+          <p className="text-blue-100 mb-6 text-lg">
+            {isLoggedIn && isAccepted
+              ? "Your paper has been accepted! Register now to present at the conference."
+              : "Register as a listener/attendee to participate in the conference."}
+          </p>
+          <button
+            onClick={handleRegisterClick}
+            className="bg-white text-blue-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-blue-50 transition-all transform hover:scale-105 shadow-lg flex items-center mx-auto"
+          >
+            <ArrowRight className="mr-2" size={24} />
+            {isLoggedIn
+              ? (isAccepted ? "Register as Author" : "Register as Listener")
+              : "Login to Register"}
+          </button>
+          <p className="text-blue-100 text-sm mt-4">
+            {isLoggedIn
+              ? (isAccepted
+                ? "Complete your author registration to present your accepted paper at the conference"
+                : "Register as a listener to attend the conference")
+              : "Please login or create an account to complete your registration"}
+          </p>
+        </div>
+
         {/* Tab buttons */}
         <div className="flex mb-8 border-b border-gray-200">
           <button
@@ -536,144 +345,10 @@ const Registrations: React.FC = () => {
                 Participants are requested to register the Conference. The Conference fee must be paid either through Demand Draft (DD) or online payment with the following bank A/c details.
               </p>
 
-              {/* Fee Table */}
-              <div className="overflow-x-auto mb-8">
-                <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg overflow-hidden">
-                  <thead className="bg-gradient-to-r from-blue-900 to-blue-800 text-white">
-                    <tr>
-                      <th scope="col" className="px-6 py-4 text-left text-xs sm:text-sm font-medium uppercase tracking-wider">
-                        Category
-                      </th>
-                      <th scope="col" className="px-6 py-4 text-left text-xs sm:text-sm font-medium uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th scope="col" className="px-6 py-4 text-right text-xs sm:text-sm font-medium uppercase tracking-wider">
-                        SCIS Members
-                      </th>
-                      <th scope="col" className="px-6 py-4 text-right text-xs sm:text-sm font-medium uppercase tracking-wider">
-                        Non-SCIS Members
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {/* Indian Participant Section */}
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td rowSpan={3} className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-bold text-gray-800 bg-gray-100">
-                        Indian Participant
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
-                        <GraduationCap className="mr-2 text-blue-800" size={18} />
-                        Students
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">4500 INR (50 USD)</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">5850 INR (65 USD)</span>
-                      </td>
-                    </tr>
+              {/* Enhanced Fee Table with country highlighting */}
+              <EnhancedFeeTable membershipStatus={membershipStatus} />
 
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
-                        <Building className="mr-2 text-blue-800" size={18} />
-                        Faculty/Research Scholars
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">6750 INR (75 USD)</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">7500 INR (85 USD)</span>
-                      </td>
-                    </tr>
-
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
-                        <Briefcase className="mr-2 text-blue-800" size={18} />
-                        Listeners
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">2500 INR</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">3500 INR</span>
-                      </td>
-                    </tr>
-
-                    {/* Foreign Participant Section */}
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td rowSpan={2} className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-bold text-gray-800 bg-gray-100">
-                        Foreign Participant
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
-                        <Globe className="mr-2 text-blue-800" size={18} />
-                        Authors
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">300 USD</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">350 USD</span>
-                      </td>
-                    </tr>
-
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
-                        <Briefcase className="mr-2 text-blue-800" size={18} />
-                        Listeners
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">100 USD</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">150 USD</span>
-                      </td>
-                    </tr>
-
-                    {/* Indonesian Participant Section */}
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td rowSpan={2} className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-bold text-gray-800 bg-gray-100">
-                        Indonesian Participant
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
-                        <Globe className="mr-2 text-blue-800" size={18} />
-                        Authors
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">17,00,000 IDR</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">26,00,000 IDR</span>
-                      </td>
-                    </tr>
-
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-800 flex items-center">
-                        <Briefcase className="mr-2 text-blue-800" size={18} />
-                        Listeners
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-green-100 text-green-800 py-1 px-2 rounded-md">12,00,000 IDR</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm sm:text-base text-right font-semibold text-gray-800">
-                        <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-md">15,00,000 IDR</span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Note */}
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
-                <div className="flex items-start">
-                  <AlertCircle className="text-yellow-400 mt-1" size={20} />
-                  <p className="ml-3 text-sm text-yellow-700">
-                    <span className="font-medium">Note:</span> The authors who are interested to publish their articles in
-                    Scopus / WOS extra payment will be charged based on the journal.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-4 sm:p-6 rounded-lg mb-8 border border-gray-100">
+              <div className="bg-gray-50 p-4 sm:p-6 rounded-lg mb-8 border border-gray-100 mt-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">Conference fee includes:</h3>
                 <ul className="list-disc pl-5 space-y-1 text-gray-600">
                   <li>Conference kit</li>
@@ -797,7 +472,7 @@ const Registrations: React.FC = () => {
 
         {/* Registration Form Tab - renders conditionally */}
         {activeTab === 'form' && (
-          <SimplifiedRegistrationForm />
+          <EnhancedUniversalRegistrationForm />
         )}
 
         {/* More Information */}

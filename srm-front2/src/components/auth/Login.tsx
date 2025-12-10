@@ -126,6 +126,7 @@ const Login = () => {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('role', response.data.role); // Store role
         localStorage.setItem('email', response.data.email); // Store email for registration check
+        localStorage.setItem('username', response.data.username); // Store username for display
         localStorage.setItem('user', JSON.stringify({
           email: response.data.email,
           username: response.data.username,
@@ -134,12 +135,23 @@ const Login = () => {
 
         window.dispatchEvent(new Event('authStateChanged'));
 
-        // Redirect based on role
-        let redirectPath = '/dashboard';
-        if (response.data.role === 'Reviewer') {
-          redirectPath = '/reviewer';
-        } else if (response.data.role === 'Editor' || response.data.role === 'Admin') {
-          redirectPath = '/dashboard';
+        // Check if there's a return URL (from registration page)
+        const returnUrl = localStorage.getItem('returnUrl');
+
+        // Redirect based on returnUrl or role
+        let redirectPath = returnUrl || '/dashboard';
+
+        if (!returnUrl) {
+          if (response.data.role === 'Reviewer') {
+            redirectPath = '/reviewer';
+          } else if (response.data.role === 'Editor' || response.data.role === 'Admin') {
+            redirectPath = '/dashboard';
+          }
+        }
+
+        // Clear returnUrl after using it
+        if (returnUrl) {
+          localStorage.removeItem('returnUrl');
         }
 
         Swal.fire({
@@ -357,8 +369,8 @@ const Login = () => {
           {/* Display verification status message if present */}
           {verificationStatus.message && (
             <div className={`mb-4 p-4 rounded-md ${verificationStatus.success
-                ? 'bg-green-50 border border-green-200 text-green-800'
-                : 'bg-red-50 border border-red-200 text-red-800'
+              ? 'bg-green-50 border border-green-200 text-green-800'
+              : 'bg-red-50 border border-red-200 text-red-800'
               }`}>
               <div className="flex">
                 {verificationStatus.success ? (

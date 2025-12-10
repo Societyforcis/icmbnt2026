@@ -1,0 +1,1348 @@
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Building, CheckCircle, Globe, FileText, AlertCircle, Check } from 'lucide-react';
+import Swal from 'sweetalert2';
+import axios from 'axios';
+import upiqr from "./images/bali/qr2.png"
+import CountrySelector from './CountrySelector';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+const compressImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 800;
+                const MAX_HEIGHT = 800;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                resolve(compressedBase64);
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
+};
+
+interface PaperDetails {
+    submissionId: string;
+    paperTitle: string;
+    authorName: string;
+    authorEmail: string;
+    category: string;
+    paymentStatus: string;
+}
+
+interface UserInfo {
+    name: string;
+    email: string;
+    country?: string;
+    isAuthor: boolean;
+    userType?: 'student' | 'faculty' | 'scholar' | null;
+}
+
+interface RegistrationCategory {
+    id: string;
+    label: string;
+    memberPrice: number;
+    nonMemberPrice: number;
+    currency: string;
+    description: string;
+}
+
+const EnhancedUniversalRegistrationForm: React.FC = () => {
+    const [registrationType, setRegistrationType] = useState<'author' | 'listener' | ''>('');
+    const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+    const [paperDetails, setPaperDetails] = useState<PaperDetails | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [userCountry, setUserCountry] = useState<string>(() => {
+        // Initialize from localStorage immediately
+        return localStorage.getItem('userCountry') || localStorage.getItem('country') || '';
+    });
+    const [paymentMethod, setPaymentMethod] = useState<'bank-transfer' | 'paypal' | 'external' | ''>('');
+    const [paymentSubMethod, setPaymentSubMethod] = useState<'upi' | 'bank-account' | ''>('');
+    const [transactionId, setTransactionId] = useState('');
+    const [paymentScreenshot, setPaymentScreenshot] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [amount, setAmount] = useState(0);
+    const [registrationStatus, setRegistrationStatus] = useState<any>(null);
+    const [membershipStatus, setMembershipStatus] = useState<any>(null);
+    const [loadingMembership, setLoadingMembership] = useState(true);
+    const [institution, setInstitution] = useState('');
+    const [address, setAddress] = useState('');
+
+    // Get registration categories based on country and type
+    const getRegistrationCategories = (): RegistrationCategory[] => {
+        if (!userCountry) return [];
+
+        const categories: RegistrationCategory[] = [];
+
+        if (userCountry === 'India') {
+            if (registrationType === 'author') {
+                categories.push(
+                    {
+                        id: 'indian-student',
+                        label: 'Indian Student',
+                        memberPrice: 4500,
+                        nonMemberPrice: 5850,
+                        currency: 'INR',
+                        description: 'For undergraduate and postgraduate students'
+                    },
+                    {
+                        id: 'indian-faculty',
+                        label: 'Indian Faculty',
+                        memberPrice: 6750,
+                        nonMemberPrice: 7500,
+                        currency: 'INR',
+                        description: 'For faculty members and professors'
+                    },
+                    {
+                        id: 'indian-scholar',
+                        label: 'Indian Research Scholar',
+                        memberPrice: 6750,
+                        nonMemberPrice: 7500,
+                        currency: 'INR',
+                        description: 'For research scholars and PhD candidates'
+                    }
+                );
+            } else {
+                categories.push({
+                    id: 'indian-listener',
+                    label: 'Indian Listener/Attendee',
+                    memberPrice: 2500,
+                    nonMemberPrice: 3500,
+                    currency: 'INR',
+                    description: 'For conference attendees without paper presentation'
+                });
+            }
+        } else if (userCountry === 'Indonesia') {
+            if (registrationType === 'author') {
+                categories.push({
+                    id: 'indonesian-author',
+                    label: 'Indonesian Author',
+                    memberPrice: 1700000,
+                    nonMemberPrice: 2600000,
+                    currency: 'IDR',
+                    description: 'For Indonesian authors presenting papers'
+                });
+            } else {
+                categories.push({
+                    id: 'indonesian-listener',
+                    label: 'Indonesian Listener/Attendee',
+                    memberPrice: 1200000,
+                    nonMemberPrice: 1500000,
+                    currency: 'IDR',
+                    description: 'For Indonesian conference attendees'
+                });
+            }
+        } else { // Other countries
+            if (registrationType === 'author') {
+                categories.push({
+                    id: 'foreign-author',
+                    label: 'International Author',
+                    memberPrice: 300,
+                    nonMemberPrice: 350,
+                    currency: 'USD',
+                    description: 'For international authors presenting papers'
+                });
+            } else {
+                categories.push({
+                    id: 'foreign-listener',
+                    label: 'International Listener/Attendee',
+                    memberPrice: 100,
+                    nonMemberPrice: 150,
+                    currency: 'USD',
+                    description: 'For international conference attendees'
+                });
+            }
+        }
+
+        return categories;
+    };
+
+    useEffect(() => {
+        fetchUserInfo();
+        checkMembershipStatus();
+    }, []);
+
+    // Auto-set registration type based on whether user has accepted paper
+    useEffect(() => {
+        if (userInfo) {
+            if (userInfo.isAuthor) {
+                if (registrationType !== 'author') {
+                    setRegistrationType('author');
+                }
+            } else {
+                if (registrationType !== 'listener') {
+                    setRegistrationType('listener');
+                }
+            }
+        }
+    }, [userInfo]);
+
+    // Auto-select category based on userType and country
+    useEffect(() => {
+        if (userInfo && userCountry && registrationType) {
+            const categories = getRegistrationCategories();
+            if (categories.length > 0) {
+                // Determine best matching category based on userType
+                let selectedCategoryId = categories[0].id;
+
+                if (registrationType === 'author' && userCountry === 'India') {
+                    if (userInfo.userType === 'student') {
+                        selectedCategoryId = 'indian-student';
+                    } else if (userInfo.userType === 'faculty') {
+                        selectedCategoryId = 'indian-faculty';
+                    } else if (userInfo.userType === 'scholar') {
+                        selectedCategoryId = 'indian-scholar';
+                    }
+                }
+                // For other countries or listeners, use the default (first) category
+
+                // Find the matching category and call handleCategoryChange to set amount
+                const matchingCategory = categories.find(c => c.id === selectedCategoryId);
+                if (matchingCategory) {
+                    handleCategoryChange(matchingCategory);
+                } else {
+                    // Fallback if no matching category found
+                    setSelectedCategory(selectedCategoryId);
+                    const price = membershipStatus?.isMember ? categories[0].memberPrice : categories[0].nonMemberPrice;
+                    setAmount(price);
+                }
+            }
+        }
+    }, [userInfo, userCountry, registrationType, membershipStatus]);
+
+    const fetchUserInfo = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const email = localStorage.getItem('email');
+
+            // First, fetch user's complete info from backend
+            let userCountry = 'India'; // Default
+            let actualUserName = '';
+
+            try {
+                const userResponse = await axios.get(`${API_URL}/api/auth/me`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (userResponse.data.success && userResponse.data.user) {
+                    const user = userResponse.data.user;
+
+                    // Get username from backend
+                    actualUserName = user.username || '';
+
+                    // Get country
+                    if (user.country) {
+                        userCountry = user.country;
+                        setUserCountry(user.country);
+                        localStorage.setItem('userCountry', user.country);
+                    }
+                }
+            } catch (error) {
+                // Fallback to localStorage
+                const storedCountry = localStorage.getItem('userCountry') || localStorage.getItem('country');
+                if (storedCountry) {
+                    userCountry = storedCountry;
+                    setUserCountry(storedCountry);
+                }
+                actualUserName = localStorage.getItem('username') || '';
+            }
+
+            // Then check if user has submitted papers
+            try {
+                const response = await axios.get(`${API_URL}/api/registration/my-paper-details`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (response.data.success) {
+                    setPaperDetails(response.data.paperDetails);
+                    const authorInfo = {
+                        name: response.data.paperDetails.authorName,
+                        email: response.data.paperDetails.authorEmail,
+                        country: userCountry,
+                        isAuthor: true
+                    };
+                    setUserInfo(authorInfo);
+                }
+            } catch (error: any) {
+                // 404 means no accepted paper - user can register as listener (expected case)
+                if (error.response?.status === 404) {
+                    const listenerInfo = {
+                        name: actualUserName || email || 'User',
+                        email: email || '',
+                        country: userCountry,
+                        isAuthor: false
+                    };
+                    setUserInfo(listenerInfo);
+                } else {
+                    // Other errors should be logged
+                    console.error('Error fetching paper details:', error);
+                    const listenerInfo = {
+                        name: actualUserName || email || 'User',
+                        email: email || '',
+                        country: userCountry,
+                        isAuthor: false
+                    };
+                    setUserInfo(listenerInfo);
+                }
+            }
+        } catch (error: any) {
+            // Fallback to listener if anything fails
+            const fallbackInfo = {
+                name: localStorage.getItem('username') || localStorage.getItem('email') || 'User',
+                email: localStorage.getItem('email') || '',
+                country: localStorage.getItem('userCountry') || 'India',
+                isAuthor: false
+            };
+            setUserInfo(fallbackInfo);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const checkRegistrationStatus = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`${API_URL}/api/registration/my-registration`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.data.success) {
+                setRegistrationStatus(response.data.registration);
+            }
+        } catch (error: any) {
+            if (error.response?.status !== 404) {
+                console.error('Error checking registration status:', error);
+            }
+        }
+    };
+
+    const checkMembershipStatus = async () => {
+        try {
+            setLoadingMembership(true);
+            const token = localStorage.getItem('token');
+
+            if (!token) {
+                setLoadingMembership(false);
+                return;
+            }
+
+            const response = await axios.get(
+                `${API_URL}/api/membership/check-membership`,
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            setMembershipStatus(response.data);
+        } catch (error) {
+            console.error('Error checking membership status:', error);
+            setMembershipStatus({ isMember: false });
+        } finally {
+            setLoadingMembership(false);
+        }
+    };
+
+    useEffect(() => {
+        if (userInfo) {
+            checkRegistrationStatus();
+        }
+    }, [userInfo]);
+
+    const handleCountryChange = (country: string) => {
+        setUserCountry(country);
+        localStorage.setItem('userCountry', country);
+        // Reset category selection when country changes
+        setSelectedCategory('');
+        setAmount(0);
+    };
+
+    const handleCategoryChange = (category: RegistrationCategory) => {
+        setSelectedCategory(category.id);
+        const price = membershipStatus?.isMember ? category.memberPrice : category.nonMemberPrice;
+        setAmount(price);
+    };
+
+    const handlePayPalPayment = () => {
+        window.open('https://www.paypal.com/ncp/payment/3Q9N4H9ZKX24A', '_blank');
+    };
+
+    const handleExternalPayment = () => {
+        window.open('https://melangepublications.com/payment_details.php', '_blank');
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        // Validation
+        if (!userCountry) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Country Required',
+                text: 'Please select your country first',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        if (!registrationType) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Registration Type Required',
+                text: 'Please select whether you are registering as an author or listener',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        if (!selectedCategory) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Category Required',
+                text: 'Please select a registration category',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        if (registrationType === 'listener') {
+            if (!institution || institution.trim() === '') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Institution Required',
+                    text: 'Please enter your institution or organization name',
+                    confirmButtonColor: '#dc2626',
+                });
+                return;
+            }
+            
+            if (!address || address.trim() === '') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Address Required',
+                    text: 'Please enter your complete address',
+                    confirmButtonColor: '#dc2626',
+                });
+                return;
+            }
+        }
+
+        if (!paymentMethod) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Payment Method Required',
+                text: 'Please select a payment method',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        if (paymentMethod === 'bank-transfer' && !paymentSubMethod) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Payment Option Required',
+                text: 'Please select UPI or Bank Account',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        if (paymentMethod === 'bank-transfer' && !paymentScreenshot) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Screenshot Required',
+                text: 'Please upload your payment screenshot',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        if (paymentMethod === 'paypal' && !transactionId) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Transaction ID Required',
+                text: 'Please enter your PayPal transaction ID',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        if (paymentMethod === 'paypal' && !paymentScreenshot) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Screenshot Required',
+                text: 'Please upload your PayPal payment screenshot',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        if (paymentMethod === 'external' && !transactionId) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Transaction ID Required',
+                text: 'Please enter your Melange transaction ID',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        if (paymentMethod === 'external' && !paymentScreenshot) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Screenshot Required',
+                text: 'Please upload your payment screenshot from Melange',
+                confirmButtonColor: '#dc2626',
+            });
+            return;
+        }
+
+        try {
+            Swal.fire({
+                title: 'Submitting Registration...',
+                text: 'Please wait',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            const token = localStorage.getItem('token');
+
+            // Route to different endpoints based on registration type
+            const endpoint = registrationType === 'listener'
+                ? `${API_URL}/api/listener/submit-listener`
+                : `${API_URL}/api/registration/submit`;
+
+            // Build request body
+            const requestBody: any = {
+                paymentMethod,
+                paymentSubMethod,
+                transactionId: (transactionId || '').trim(),
+                amount: Number(amount) || 0,  // Ensure amount is a number
+                paymentScreenshot,
+                registrationCategory: selectedCategory,
+                country: userCountry,
+            };
+
+            // For listeners, include institution and address (with trimming and string conversion)
+            if (registrationType === 'listener') {
+                requestBody.institution = String(institution).trim();
+                requestBody.address = String(address).trim();
+            }
+
+            console.log('🔍 Prepared request body:', requestBody);
+
+            const response = await axios.post(
+                endpoint,
+                requestBody,
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            Swal.close();
+
+            if (response.data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Registration Submitted!',
+                    html: `
+                        <p>Your ${registrationType} registration has been submitted successfully!</p>
+                        <p class="mt-2 text-sm text-gray-600">Please wait for admin verification of your payment.</p>
+                        <p class="mt-2 text-sm text-gray-600">You will be notified once verified.</p>
+                    `,
+                    confirmButtonColor: '#dc2626',
+                });
+
+                // Reset form
+                setPaymentMethod('');
+                setPaymentSubMethod('');
+                setTransactionId('');
+                setPaymentScreenshot('');
+                setSelectedCategory('');
+                checkRegistrationStatus();
+            }
+        } catch (error: any) {
+            Swal.close();
+            console.error('Registration error:', error);
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Submission Failed',
+                text: error.response?.data?.message || 'Failed to submit registration',
+                confirmButtonColor: '#dc2626',
+            });
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading your details...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Show registration status if already submitted
+    if (registrationStatus && registrationStatus.paymentStatus !== 'rejected') {
+        const statusColors = {
+            pending: 'bg-yellow-50 border-yellow-500 text-yellow-800',
+            verified: 'bg-green-50 border-green-500 text-green-800',
+            rejected: 'bg-red-50 border-red-500 text-red-800'
+        };
+
+        const statusIcons = {
+            pending: '⏳',
+            verified: '✅',
+            rejected: '❌'
+        };
+
+        return (
+            <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8">
+                <h2 className="text-2xl font-bold mb-6 text-gray-800">Registration Status</h2>
+
+                <div className={`border-l-4 p-6 rounded ${statusColors[registrationStatus.paymentStatus as keyof typeof statusColors]}`}>
+                    <div className="flex items-center mb-4">
+                        <span className="text-4xl mr-4">{statusIcons[registrationStatus.paymentStatus as keyof typeof statusIcons]}</span>
+                        <div>
+                            <h3 className="text-xl font-bold">
+                                {registrationStatus.paymentStatus === 'pending' && 'Waiting for Admin Verification'}
+                                {registrationStatus.paymentStatus === 'verified' && 'Registration Verified!'}
+                                {registrationStatus.paymentStatus === 'rejected' && 'Registration Rejected'}
+                            </h3>
+                            <p className="text-sm mt-1">
+                                {registrationStatus.paymentStatus === 'pending' && 'Your registration has been submitted successfully. Please wait while our admin team verifies your payment.'}
+                                {registrationStatus.paymentStatus === 'verified' && 'Your payment has been verified! You will receive a confirmation email shortly.'}
+                                {registrationStatus.paymentStatus === 'rejected' && 'Your payment was rejected. Please contact support for more information.'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white bg-opacity-50 p-4 rounded mt-4 space-y-2">
+                        <p><strong>Name:</strong> {registrationStatus.authorName}</p>
+                        {registrationStatus.paperTitle && <p><strong>Paper:</strong> {registrationStatus.paperTitle}</p>}
+                        <p><strong>Amount:</strong> {registrationStatus.amount} {registrationStatus.currency || 'INR'}</p>
+                        <p><strong>Payment Method:</strong> {registrationStatus.paymentMethod}</p>
+                        <p><strong>Registration Type:</strong> {registrationStatus.registrationType || 'Author'}</p>
+                        <p><strong>Submitted:</strong> {new Date(registrationStatus.registrationDate).toLocaleDateString()}</p>
+                        {registrationStatus.verifiedAt && (
+                            <p><strong>Verified:</strong> {new Date(registrationStatus.verifiedAt).toLocaleDateString()}</p>
+                        )}
+                        {registrationStatus.rejectionReason && (
+                            <p className="text-red-700"><strong>Reason:</strong> {registrationStatus.rejectionReason}</p>
+                        )}
+                    </div>
+
+                    {registrationStatus.paymentStatus === 'pending' && (
+                        <div className="mt-6 p-4 bg-blue-50 rounded">
+                            <p className="text-sm text-blue-800">
+                                <strong>📧 Email Notification:</strong> Once your payment is verified, we will send you a confirmation email with your registration details.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    // Show rejected registration with resubmit option
+    if (registrationStatus && registrationStatus.paymentStatus === 'rejected') {
+        return (
+            <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8">
+                <h2 className="text-2xl font-bold mb-6 text-gray-800">Registration Status</h2>
+
+                <div className="border-l-4 border-red-500 bg-red-50 p-6 rounded mb-6">
+                    <div className="flex items-start mb-4">
+                        <span className="text-4xl mr-4">❌</span>
+                        <div>
+                            <h3 className="text-xl font-bold text-red-800">Registration Rejected</h3>
+                            <p className="text-sm text-red-700 mt-1">
+                                Your payment could not be verified. Please review the reason below and try again with a different payment method.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white bg-opacity-50 p-4 rounded mt-4 space-y-2 mb-4">
+                        <p><strong>Name:</strong> {registrationStatus.authorName}</p>
+                        {registrationStatus.paperTitle && <p><strong>Paper:</strong> {registrationStatus.paperTitle}</p>}
+                        <p><strong>Amount:</strong> {registrationStatus.amount} {registrationStatus.currency || 'INR'}</p>
+                        <p><strong>Previous Payment Method:</strong> {registrationStatus.paymentMethod}</p>
+                        <p><strong>Registration Type:</strong> {registrationStatus.registrationType || 'Author'}</p>
+                        <p><strong>Submitted:</strong> {new Date(registrationStatus.registrationDate).toLocaleDateString()}</p>
+                        <p><strong>Reviewed:</strong> {new Date(registrationStatus.verifiedAt).toLocaleDateString()}</p>
+                        {registrationStatus.rejectionReason && (
+                            <p className="text-red-700 font-semibold"><strong>Reason for Rejection:</strong> {registrationStatus.rejectionReason}</p>
+                        )}
+                    </div>
+
+                    <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded mt-4">
+                        <p className="text-sm text-yellow-800">
+                            <strong>💡 Tip:</strong> Try using a different payment method or ensure your payment details are correct.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <button
+                        onClick={() => {
+                            setRegistrationStatus(null);
+                            setPaymentMethod('');
+                            setPaymentSubMethod('');
+                            setTransactionId('');
+                            setPaymentScreenshot('');
+                            setSelectedCategory('');
+                            setAmount(0);
+                        }}
+                        className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 px-6 rounded-xl font-semibold text-lg hover:shadow-lg transition-all duration-300"
+                    >
+                        🔄 Resubmit Registration
+                    </button>
+                    <p className="text-center text-sm text-gray-600">
+                        Clear the form and try again with a different payment method
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8">
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">Conference Registration</h2>
+
+            {/* Country Selection */}
+            {!userCountry && (
+                <div className="mb-8">
+                    <CountrySelector onCountryChange={handleCountryChange} showAsModal={false} />
+                </div>
+            )}
+
+            {userCountry && (
+                <div className="mb-6">
+                    <CountrySelector onCountryChange={handleCountryChange} showAsModal={false} />
+                </div>
+            )}
+
+            {/* User Info Section */}
+            {userInfo && userCountry && (
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-6 mb-8 rounded">
+                    <h3 className="font-bold text-lg mb-4 text-blue-900">Your Information</h3>
+                    <div className="space-y-2 text-sm">
+                        <p><strong>Name:</strong> {userInfo.name}</p>
+                        <p><strong>Email:</strong> {userInfo.email}</p>
+                        <p><strong>Country:</strong> <span className="text-blue-600 font-semibold">{userCountry}</span></p>
+                    </div>
+                </div>
+            )}
+
+            {/* Author Status Banner */}
+            {userInfo?.isAuthor && registrationType === 'author' && (
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-6">
+                    <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                            <CheckCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm font-bold text-blue-800">
+                                ✓ Author Registration
+                            </p>
+                            <p className="text-xs text-blue-700 mt-1">
+                                You have an accepted paper. Complete your author registration to present at the conference.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SCIS Membership Status */}
+            {!loadingMembership && membershipStatus && userCountry && (
+                <div className={`border-l-4 p-4 rounded mb-6 ${membershipStatus.isMember
+                    ? 'bg-green-50 border-green-500'
+                    : 'bg-yellow-50 border-yellow-500'
+                    }`}>
+                    <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                            {membershipStatus.isMember ? (
+                                <Check className="h-5 w-5 text-green-500 mt-0.5" />
+                            ) : (
+                                <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
+                            )}
+                        </div>
+                        <div className="ml-3">
+                            {membershipStatus.isMember ? (
+                                <>
+                                    <p className="text-sm font-bold text-green-800">
+                                        ✅ SCIS Member - Discount Applied!
+                                    </p>
+                                    <p className="text-xs text-green-700 mt-1">
+                                        Membership ID: <span className="font-mono font-semibold">{membershipStatus.membershipId}</span>
+                                    </p>
+                                    <p className="text-xs text-green-700 mt-1">
+                                        You will see discounted member rates below.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-bold text-yellow-800">
+                                        Non-SCIS Member
+                                    </p>
+                                    <p className="text-xs text-yellow-700 mt-1">
+                                        Standard registration fees apply. Become a SCIS member to save on registration!
+                                    </p>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Paper Details for Authors */}
+            {registrationType === 'author' && paperDetails && (
+                <div className="bg-green-50 border-l-4 border-green-500 p-6 mb-8 rounded">
+                    <h3 className="font-bold text-lg mb-4 text-green-900 flex items-center">
+                        <FileText className="mr-2" size={20} />
+                        Your Paper Details
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                        <p><strong>Submission ID:</strong> {paperDetails.submissionId}</p>
+                        <p><strong>Paper Title:</strong> {paperDetails.paperTitle}</p>
+                        <p><strong>Category:</strong> {paperDetails.category}</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Listener Details Form */}
+            {registrationType === 'listener' && !userInfo?.isAuthor && (
+                <div className="mb-8 space-y-4">
+                    <h3 className="text-lg font-semibold">Listener Details</h3>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Institution/Organization</label>
+                        <input
+                            type="text"
+                            value={institution}
+                            onChange={(e) => setInstitution(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your institution name"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                        <textarea
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your complete address"
+                            rows={3}
+                            required
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Rest of the form continues... */}
+            {registrationType && userCountry && (
+                <form onSubmit={handleSubmit} className="space-y-8">
+                    {/* Category Selection */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-4">
+                            Select Registration Category <span className="text-red-500">*</span>
+                        </label>
+                        <div className="grid grid-cols-1 gap-4">
+                            {getRegistrationCategories().map((category) => {
+                                const price = membershipStatus?.isMember ? category.memberPrice : category.nonMemberPrice;
+                                const savings = category.nonMemberPrice - category.memberPrice;
+
+                                return (
+                                    <button
+                                        key={category.id}
+                                        type="button"
+                                        onClick={() => handleCategoryChange(category)}
+                                        className={`p-6 rounded-xl border-2 transition-all text-left ${selectedCategory === category.id
+                                            ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                            : 'border-gray-200 hover:border-blue-300'
+                                            }`}
+                                    >
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-bold text-lg mb-1">{category.label}</h3>
+                                                <p className="text-sm text-gray-600 mb-2">{category.description}</p>
+                                                <p className="text-2xl font-bold text-blue-600">
+                                                    {category.currency === 'INR' ? '₹' : category.currency === 'IDR' ? 'Rp ' : '$'}
+                                                    {price.toLocaleString()}
+                                                </p>
+                                                {membershipStatus?.isMember && (
+                                                    <p className="text-xs text-green-600 mt-2">
+                                                        <span className="line-through text-gray-400">
+                                                            {category.currency === 'INR' ? '₹' : category.currency === 'IDR' ? 'Rp ' : '$'}
+                                                            {category.nonMemberPrice.toLocaleString()}
+                                                        </span>
+                                                        {' '}Save {category.currency === 'INR' ? '₹' : category.currency === 'IDR' ? 'Rp ' : '$'}{savings.toLocaleString()}!
+                                                    </p>
+                                                )}
+                                            </div>
+                                            {selectedCategory === category.id && (
+                                                <CheckCircle className="h-6 w-6 text-blue-500" />
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Payment Method Selection - Similar to original */}
+                    {selectedCategory && (
+                        <div className="space-y-6">
+                            <label className="block text-sm font-semibold text-gray-800">
+                                <CreditCard className="inline h-4 w-4 mr-2 text-red-500" />
+                                Select Payment Method <span className="text-red-500">*</span>
+                            </label>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod('bank-transfer')}
+                                    className={`p-6 rounded-xl border-2 transition-all ${paymentMethod === 'bank-transfer'
+                                        ? 'border-red-500 bg-red-50 shadow-lg'
+                                        : 'border-gray-200 hover:border-red-300'
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-center mb-3">
+                                        <div className={`p-3 rounded-lg ${paymentMethod === 'bank-transfer' ? 'bg-red-100' : 'bg-gray-100'}`}>
+                                            <Building className="h-8 w-8 text-red-500" />
+                                        </div>
+                                    </div>
+                                    <h3 className="font-bold text-lg mb-1">Bank Transfer</h3>
+                                    <p className="text-sm text-gray-600">UPI or Bank Account</p>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod('paypal')}
+                                    className={`p-6 rounded-xl border-2 transition-all ${paymentMethod === 'paypal'
+                                        ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                        : 'border-gray-200 hover:border-blue-300'
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-center mb-3">
+                                        <div className={`p-3 rounded-lg ${paymentMethod === 'paypal' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                            <CreditCard className="h-8 w-8 text-blue-500" />
+                                        </div>
+                                    </div>
+                                    <h3 className="font-bold text-lg mb-1">PayPal</h3>
+                                    <p className="text-sm text-gray-600">Direct Payment</p>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod('external')}
+                                    className={`p-6 rounded-xl border-2 transition-all ${paymentMethod === 'external'
+                                        ? 'border-purple-500 bg-purple-50 shadow-lg'
+                                        : 'border-gray-200 hover:border-purple-300'
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-center mb-3">
+                                        <div className={`p-3 rounded-lg ${paymentMethod === 'external' ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                                            <Globe className="h-8 w-8 text-purple-500" />
+                                        </div>
+                                    </div>
+                                    <h3 className="font-bold text-lg mb-1">Melange Portal</h3>
+                                    <p className="text-sm text-gray-600">External Payment</p>
+                                </button>
+                            </div>
+
+                            {/* Bank Transfer Sub-options */}
+                            {paymentMethod === 'bank-transfer' && (
+                                <div className="space-y-6">
+                                    <label className="block text-sm font-semibold text-gray-800">
+                                        Choose Payment Option <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPaymentSubMethod('upi')}
+                                            className={`p-6 rounded-xl border-2 transition-all ${paymentSubMethod === 'upi'
+                                                ? 'border-green-500 bg-green-50 shadow-lg'
+                                                : 'border-gray-200 hover:border-green-300'
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-center mb-3">
+                                                <div className={`p-3 rounded-lg ${paymentSubMethod === 'upi' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                                    <Globe className="h-8 w-8 text-green-500" />
+                                                </div>
+                                            </div>
+                                            <h3 className="font-bold text-lg mb-1">UPI Payment</h3>
+                                            <p className="text-sm text-gray-600">Scan QR Code</p>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setPaymentSubMethod('bank-account')}
+                                            className={`p-6 rounded-xl border-2 transition-all ${paymentSubMethod === 'bank-account'
+                                                ? 'border-green-500 bg-green-50 shadow-lg'
+                                                : 'border-gray-200 hover:border-green-300'
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-center mb-3">
+                                                <div className={`p-3 rounded-lg ${paymentSubMethod === 'bank-account' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                                    <Building className="h-8 w-8 text-green-500" />
+                                                </div>
+                                            </div>
+                                            <h3 className="font-bold text-lg mb-1">Bank Account</h3>
+                                            <p className="text-sm text-gray-600">Direct Transfer</p>
+                                        </button>
+                                    </div>
+
+                                    {/* UPI QR Code */}
+                                    {paymentSubMethod === 'upi' && (
+                                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-2xl border-2 border-blue-200">
+                                            <h3 className="text-xl font-bold text-center mb-4">Scan QR Code to Pay</h3>
+                                            <div className="flex justify-center mb-4">
+                                                <div className="bg-white p-4 rounded-xl shadow-lg">
+                                                    <img
+                                                        src={upiqr}
+                                                        alt="UPI Payment QR Code"
+                                                        className="w-64 h-64 object-contain"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="text-center space-y-2">
+                                                <p className="font-semibold text-gray-800">UPI ID: societyforcyber@indianbk</p>
+                                                <p className="text-sm text-gray-600">Use any UPI app (PhonePe, Google Pay, Paytm, etc.)</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Bank Account Details */}
+                                    {paymentSubMethod === 'bank-account' && (
+                                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-8 rounded-2xl border-2 border-green-200">
+                                            <h3 className="text-xl font-bold text-center mb-6">Bank Account Details</h3>
+                                            <div className="space-y-4 max-w-md mx-auto">
+                                                <div className="flex justify-between items-center p-4 bg-white rounded-lg">
+                                                    <span className="font-semibold text-gray-600">Account Name:</span>
+                                                    <span className="font-bold">Melange Publications</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-4 bg-white rounded-lg">
+                                                    <span className="font-semibold text-gray-600">Account Number:</span>
+                                                    <span className="font-bold">736805000791</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-4 bg-white rounded-lg">
+                                                    <span className="font-semibold text-gray-600">Account Type:</span>
+                                                    <span className="font-bold">Current Account</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-4 bg-white rounded-lg">
+                                                    <span className="font-semibold text-gray-600">Bank Name:</span>
+                                                    <span className="font-bold">ICICI Bank</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-4 bg-white rounded-lg">
+                                                    <span className="font-semibold text-gray-600">IFSC Code:</span>
+                                                    <span className="font-bold">ICIC0007368</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-4 bg-white rounded-lg">
+                                                    <span className="font-semibold text-gray-600">SWIFT Code:</span>
+                                                    <span className="font-bold">ICICIN BBCTS</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-4 bg-white rounded-lg">
+                                                    <span className="font-semibold text-gray-600">Branch:</span>
+                                                    <span className="font-bold">Villianur, Puducherry</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Transaction ID and Screenshot */}
+                                    {paymentSubMethod && (
+                                        <>
+                                            <div className="space-y-2">
+                                                <label className="block text-sm font-semibold text-gray-800">
+                                                    Transaction ID / Reference Number
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={transactionId}
+                                                    onChange={(e) => setTransactionId(e.target.value)}
+                                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                                    placeholder="Enter your transaction ID"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="block text-sm font-semibold text-gray-800">
+                                                    Upload Payment Screenshot <span className="text-red-500">*</span>
+                                                </label>
+                                                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-red-400 transition-all">
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={async (e) => {
+                                                            try {
+                                                                const file = e.target.files?.[0];
+                                                                if (file) {
+                                                                    const compressed = await compressImage(file);
+                                                                    setPaymentScreenshot(compressed);
+                                                                }
+                                                            } catch (error) {
+                                                                Swal.fire({
+                                                                    icon: 'error',
+                                                                    title: 'Upload Failed',
+                                                                    text: 'Failed to upload screenshot',
+                                                                    confirmButtonColor: '#dc2626',
+                                                                });
+                                                            }
+                                                        }}
+                                                        className="hidden"
+                                                        id="payment-screenshot"
+                                                    />
+                                                    <label htmlFor="payment-screenshot" className="cursor-pointer">
+                                                        {paymentScreenshot ? (
+                                                            <div className="space-y-3">
+                                                                <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
+                                                                <p className="text-sm font-semibold text-green-600">Screenshot uploaded!</p>
+                                                                <div className="mt-4 border-2 border-green-200 rounded-lg p-2 bg-green-50">
+                                                                    <img
+                                                                        src={paymentScreenshot}
+                                                                        alt="Payment Screenshot"
+                                                                        className="max-h-40 mx-auto rounded"
+                                                                    />
+                                                                </div>
+                                                                <p className="text-xs text-gray-500">Click to change</p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-2">
+                                                                <CreditCard className="h-12 w-12 text-gray-400 mx-auto" />
+                                                                <p className="text-sm font-semibold text-gray-700">Click to upload payment screenshot</p>
+                                                                <p className="text-xs text-gray-500">PNG, JPG up to 10MB</p>
+                                                            </div>
+                                                        )}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* PayPal Payment */}
+                            {paymentMethod === 'paypal' && (
+                                <div className="space-y-6">
+                                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-2xl border-2 border-blue-300">
+                                        <h3 className="text-xl font-bold text-center mb-4">PayPal Payment</h3>
+                                        <p className="text-center text-gray-700 mb-6">
+                                            Click the button below to proceed to PayPal for secure payment
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handlePayPalPayment}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all"
+                                        >
+                                            Pay with PayPal - {amount.toLocaleString()} {getRegistrationCategories().find(c => c.id === selectedCategory)?.currency}
+                                        </button>
+                                        <p className="text-center text-sm text-gray-600 mt-4">
+                                            After successful payment on PayPal, return here and fill in your details below
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-semibold text-gray-800">
+                                            Transaction ID / Reference Number <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={transactionId}
+                                            onChange={(e) => setTransactionId(e.target.value)}
+                                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="Enter your PayPal transaction ID"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-semibold text-gray-800">
+                                            Upload Payment Screenshot <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-all">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={async (e) => {
+                                                    try {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                            const compressed = await compressImage(file);
+                                                            setPaymentScreenshot(compressed);
+                                                        }
+                                                    } catch (error) {
+                                                        Swal.fire({
+                                                            icon: 'error',
+                                                            title: 'Upload Failed',
+                                                            text: 'Failed to upload screenshot',
+                                                            confirmButtonColor: '#dc2626',
+                                                        });
+                                                    }
+                                                }}
+                                                className="hidden"
+                                                id="paypal-screenshot"
+                                            />
+                                            <label htmlFor="paypal-screenshot" className="cursor-pointer">
+                                                {paymentScreenshot ? (
+                                                    <div className="space-y-3">
+                                                        <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
+                                                        <p className="text-sm font-semibold text-green-600">Screenshot uploaded!</p>
+                                                        <div className="mt-4 border-2 border-green-200 rounded-lg p-2 bg-green-50">
+                                                            <img
+                                                                src={paymentScreenshot}
+                                                                alt="Payment Screenshot"
+                                                                className="max-h-40 mx-auto rounded"
+                                                            />
+                                                        </div>
+                                                        <p className="text-xs text-gray-500">Click to change</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <CreditCard className="h-12 w-12 text-gray-400 mx-auto" />
+                                                        <p className="text-sm font-semibold text-gray-700">Click to upload payment screenshot</p>
+                                                        <p className="text-xs text-gray-500">PNG, JPG up to 10MB</p>
+                                                    </div>
+                                                )}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* External Payment Portal */}
+                            {paymentMethod === 'external' && (
+                                <div className="space-y-6">
+                                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-2xl border-2 border-purple-300">
+                                        <h3 className="text-xl font-bold text-center mb-4">Melange Publications Payment Portal</h3>
+                                        <p className="text-center text-gray-700 mb-6">
+                                            Click the button below to visit the Melange Publications payment portal
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleExternalPayment}
+                                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all"
+                                        >
+                                            Go to Melange Publications
+                                        </button>
+                                        <p className="text-center text-sm text-gray-600 mt-4">
+                                            After successful payment, return here and fill in your details below
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-semibold text-gray-800">
+                                            Transaction ID / Reference Number <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={transactionId}
+                                            onChange={(e) => setTransactionId(e.target.value)}
+                                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                            placeholder="Enter your Melange transaction ID"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-semibold text-gray-800">
+                                            Upload Payment Screenshot <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-purple-400 transition-all">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={async (e) => {
+                                                    try {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                            const compressed = await compressImage(file);
+                                                            setPaymentScreenshot(compressed);
+                                                        }
+                                                    } catch (error) {
+                                                        Swal.fire({
+                                                            icon: 'error',
+                                                            title: 'Upload Failed',
+                                                            text: 'Failed to upload screenshot',
+                                                            confirmButtonColor: '#dc2626',
+                                                        });
+                                                    }
+                                                }}
+                                                className="hidden"
+                                                id="external-screenshot"
+                                            />
+                                            <label htmlFor="external-screenshot" className="cursor-pointer">
+                                                {paymentScreenshot ? (
+                                                    <div className="space-y-3">
+                                                        <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
+                                                        <p className="text-sm font-semibold text-green-600">Screenshot uploaded!</p>
+                                                        <div className="mt-4 border-2 border-green-200 rounded-lg p-2 bg-green-50">
+                                                            <img
+                                                                src={paymentScreenshot}
+                                                                alt="Payment Screenshot"
+                                                                className="max-h-40 mx-auto rounded"
+                                                            />
+                                                        </div>
+                                                        <p className="text-xs text-gray-500">Click to change</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <CreditCard className="h-12 w-12 text-gray-400 mx-auto" />
+                                                        <p className="text-sm font-semibold text-gray-700">Click to upload payment screenshot</p>
+                                                        <p className="text-xs text-gray-500">PNG, JPG up to 10MB</p>
+                                                    </div>
+                                                )}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Submit Button */}
+                    {selectedCategory && paymentMethod && (
+                        (paymentMethod === 'bank-transfer' && paymentSubMethod && paymentScreenshot) ||
+                        (paymentMethod === 'paypal' && transactionId && paymentScreenshot) ||
+                        (paymentMethod === 'external' && transactionId && paymentScreenshot)
+                    ) && (
+                            <button
+                                type="submit"
+                                className="w-full bg-gradient-to-r from-blue-900 to-[#F5A051] text-white py-4 px-6 rounded-xl font-semibold text-lg hover:shadow-xl transition-all duration-300"
+                            >
+                                Submit Registration
+                            </button>
+                        )}
+                </form>
+            )}
+        </div>
+    );
+};
+
+export default EnhancedUniversalRegistrationForm;

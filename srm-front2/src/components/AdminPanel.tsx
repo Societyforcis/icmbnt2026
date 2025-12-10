@@ -20,7 +20,6 @@ const AdminPanel = () => {
 
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
 
-  // New states for Users management
   const [activeTab, setActiveTab] = useState('editors'); // 'editors', 'users', or 'payments'
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [roleFilter, setRoleFilter] = useState('All'); // 'All', 'Admin', 'Editor', 'Reviewer', 'Author'
@@ -28,7 +27,6 @@ const AdminPanel = () => {
 
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  // Check admin access on mount
   useEffect(() => {
     const initializeAdmin = async () => {
       await checkAdminAccess();

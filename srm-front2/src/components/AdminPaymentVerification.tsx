@@ -5,7 +5,7 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-interface Registration {
+interface AuthorRegistration {
     _id: string;
     authorName: string;
     authorEmail: string;
@@ -27,17 +27,47 @@ interface Registration {
     };
 }
 
+interface ListenerRegistration {
+    _id: string;
+    name: string;
+    email: string;
+    institution: string;
+    address: string;
+    country: string;
+    registrationCategory: string;
+    amount: number;
+    currency: string;
+    paymentMethod: string;
+    transactionId: string;
+    paymentScreenshot: string;
+    isScisMember: boolean;
+    scisMembershipId?: string;
+    paymentStatus: 'pending' | 'verified' | 'rejected';
+    registrationNumber?: string;
+    verifiedAt?: Date;
+    verifiedByName?: string;
+    rejectionReason?: string;
+    createdAt: Date;
+}
+
+type Registration = AuthorRegistration | ListenerRegistration;
+
+const isAuthorRegistration = (reg: Registration): reg is AuthorRegistration => {
+    return 'authorName' in reg && 'authorEmail' in reg && 'paperTitle' in reg;
+};
+
 const AdminPaymentVerification: React.FC = () => {
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('pending');
+    const [registrationType, setRegistrationType] = useState<'authors' | 'listeners' | 'both'>('both');
     const [searchTerm, setSearchTerm] = useState('');
     const [searchType, setSearchType] = useState<'email' | 'paperId' | 'all'>('all');
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     useEffect(() => {
         fetchRegistrations();
-    }, [filter]);
+    }, [filter, registrationType]);
 
     const fetchRegistrations = async () => {
         try {
@@ -54,41 +84,70 @@ const AdminPaymentVerification: React.FC = () => {
                 return;
             }
 
-            const endpoint = filter === 'pending'
-                ? '/api/registration/admin/pending'
-                : `/api/registration/admin/all?status=${filter === 'all' ? '' : filter}`;
+            const allRegistrations: Registration[] = [];
 
-            const response = await axios.get(`${API_URL}${endpoint}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            // Fetch author registrations
+            if (registrationType === 'authors' || registrationType === 'both') {
+                try {
+                    const endpoint = filter === 'pending'
+                        ? '/api/registration/admin/pending'
+                        : `/api/registration/admin/all?status=${filter === 'all' ? '' : filter}`;
 
-            if (response.data.success) {
-                const regs = response.data.registrations;
-                // Fetch membership status for each registration
-                const regsWithMembership = await Promise.all(
-                    regs.map(async (reg: Registration) => {
-                        try {
-                            // Create a temporary token with the user's email to check membership
-                            const membershipResponse = await axios.post(
-                                `${API_URL}/api/membership/check-user-membership`,
-                                { email: reg.authorEmail },
-                                { headers: { Authorization: `Bearer ${token}` } }
-                            );
-                            return {
-                                ...reg,
-                                membershipStatus: membershipResponse.data
-                            };
-                        } catch (error) {
-                            console.error(`Error fetching membership for ${reg.authorEmail}:`, error);
-                            return {
-                                ...reg,
-                                membershipStatus: { isMember: false }
-                            };
-                        }
-                    })
-                );
-                setRegistrations(regsWithMembership);
+                    const response = await axios.get(`${API_URL}${endpoint}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    if (response.data.success) {
+                        const regs = response.data.registrations;
+                        // Fetch membership status for each registration
+                        const regsWithMembership = await Promise.all(
+                            regs.map(async (reg: AuthorRegistration) => {
+                                try {
+                                    const membershipResponse = await axios.post(
+                                        `${API_URL}/api/membership/check-user-membership`,
+                                        { email: reg.authorEmail },
+                                        { headers: { Authorization: `Bearer ${token}` } }
+                                    );
+                                    return {
+                                        ...reg,
+                                        membershipStatus: membershipResponse.data
+                                    };
+                                } catch (error) {
+                                    console.error(`Error fetching membership for ${reg.authorEmail}:`, error);
+                                    return {
+                                        ...reg,
+                                        membershipStatus: { isMember: false }
+                                    };
+                                }
+                            })
+                        );
+                        allRegistrations.push(...regsWithMembership);
+                    }
+                } catch (error) {
+                    console.error('Error fetching author registrations:', error);
+                }
             }
+
+            // Fetch listener registrations
+            if (registrationType === 'listeners' || registrationType === 'both') {
+                try {
+                    const listenerEndpoint = filter === 'pending'
+                        ? '/api/listener/admin/pending'
+                        : `/api/listener/admin/all?status=${filter === 'all' ? '' : filter}`;
+
+                    const listenerResponse = await axios.get(`${API_URL}${listenerEndpoint}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    if (listenerResponse.data.success) {
+                        allRegistrations.push(...(listenerResponse.data.registrations || []));
+                    }
+                } catch (error) {
+                    console.error('Error fetching listener registrations:', error);
+                }
+            }
+
+            setRegistrations(allRegistrations);
         } catch (error: any) {
             console.error('Error fetching registrations:', error);
 
@@ -119,7 +178,7 @@ const AdminPaymentVerification: React.FC = () => {
         }
     };
 
-    const handleVerify = async (id: string) => {
+    const handleVerify = async (id: string, reg?: Registration) => {
         const result = await Swal.fire({
             title: 'Verify Payment?',
             text: 'This will approve the registration and notify the user.',
@@ -136,8 +195,17 @@ const AdminPaymentVerification: React.FC = () => {
         if (result.isConfirmed) {
             try {
                 const token = localStorage.getItem('token');
+                
+                // Determine if this is an author or listener registration
+                const isAuthor = reg ? isAuthorRegistration(reg) : true;
+                const endpoint = isAuthor 
+                    ? `/api/registration/admin/${id}/verify`
+                    : `/api/listener/admin/verify/${id}`;
+
+                console.log('🔄 Verifying registration:', { id, type: isAuthor ? 'author' : 'listener', endpoint });
+
                 const response = await axios.put(
-                    `${API_URL}/api/registration/admin/${id}/verify`,
+                    `${API_URL}${endpoint}`,
                     { verificationNotes: result.value || 'Payment verified' },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -148,13 +216,14 @@ const AdminPaymentVerification: React.FC = () => {
                         title: 'Verified!',
                         html: `
                             <p>Payment verified successfully!</p>
-                            <p class="mt-2 text-sm"><strong>Registration Number:</strong> ${response.data.finalUser.registrationNumber}</p>
+                            <p class="mt-2 text-sm"><strong>Registration ID:</strong> ${id}</p>
                         `,
                         confirmButtonColor: '#10b981',
                     });
                     fetchRegistrations();
                 }
             } catch (error: any) {
+                console.error('Verification error:', error);
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
@@ -165,7 +234,7 @@ const AdminPaymentVerification: React.FC = () => {
         }
     };
 
-    const handleReject = async (id: string) => {
+    const handleReject = async (id: string, reg?: Registration) => {
         const result = await Swal.fire({
             title: 'Reject Payment?',
             text: 'Please provide a reason for rejection.',
@@ -187,8 +256,17 @@ const AdminPaymentVerification: React.FC = () => {
         if (result.isConfirmed) {
             try {
                 const token = localStorage.getItem('token');
+                
+                // Determine if this is an author or listener registration
+                const isAuthor = reg ? isAuthorRegistration(reg) : true;
+                const endpoint = isAuthor 
+                    ? `/api/registration/admin/${id}/reject`
+                    : `/api/listener/admin/reject/${id}`;
+
+                console.log('🔄 Rejecting registration:', { id, type: isAuthor ? 'author' : 'listener', endpoint });
+
                 await axios.put(
-                    `${API_URL}/api/registration/admin/${id}/reject`,
+                    `${API_URL}${endpoint}`,
                     { rejectionReason: result.value },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -201,6 +279,7 @@ const AdminPaymentVerification: React.FC = () => {
                 });
                 fetchRegistrations();
             } catch (error: any) {
+                console.error('Rejection error:', error);
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
@@ -224,17 +303,22 @@ const AdminPaymentVerification: React.FC = () => {
         const lowerSearchTerm = searchTerm.toLowerCase().trim();
 
         return registrations.filter((reg) => {
+            const email = isAuthorRegistration(reg) ? reg.authorEmail : reg.email;
+            const name = isAuthorRegistration(reg) ? reg.authorName : reg.name;
+            const paperTitle = isAuthorRegistration(reg) ? reg.paperTitle : '';
+            const submissionId = isAuthorRegistration(reg) ? reg.submissionId : '';
+
             switch (searchType) {
                 case 'email':
-                    return reg.authorEmail.toLowerCase().includes(lowerSearchTerm);
+                    return email.toLowerCase().includes(lowerSearchTerm);
                 case 'paperId':
-                    return reg.submissionId.toLowerCase().includes(lowerSearchTerm);
+                    return submissionId.toLowerCase().includes(lowerSearchTerm);
                 case 'all':
                     return (
-                        reg.authorEmail.toLowerCase().includes(lowerSearchTerm) ||
-                        reg.submissionId.toLowerCase().includes(lowerSearchTerm) ||
-                        reg.authorName.toLowerCase().includes(lowerSearchTerm) ||
-                        reg.paperTitle.toLowerCase().includes(lowerSearchTerm)
+                        email.toLowerCase().includes(lowerSearchTerm) ||
+                        submissionId.toLowerCase().includes(lowerSearchTerm) ||
+                        name.toLowerCase().includes(lowerSearchTerm) ||
+                        paperTitle.toLowerCase().includes(lowerSearchTerm)
                     );
                 default:
                     return true;
@@ -247,8 +331,43 @@ const AdminPaymentVerification: React.FC = () => {
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-3xl font-bold text-gray-900 mb-6">Payment Verification</h1>
 
+                {/* Registration Type Filter */}
+                <div className="bg-white rounded-lg shadow mb-6 p-4">
+                    <p className="text-sm font-semibold text-gray-700 mb-3">Registration Type:</p>
+                    <div className="flex space-x-4">
+                        <button
+                            onClick={() => setRegistrationType('both')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${registrationType === 'both'
+                                ? 'bg-indigo-500 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                        >
+                            Both
+                        </button>
+                        <button
+                            onClick={() => setRegistrationType('authors')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${registrationType === 'authors'
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                        >
+                            Authors Only
+                        </button>
+                        <button
+                            onClick={() => setRegistrationType('listeners')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${registrationType === 'listeners'
+                                ? 'bg-purple-500 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                        >
+                            Listeners Only
+                        </button>
+                    </div>
+                </div>
+
                 {/* Filter Tabs */}
                 <div className="bg-white rounded-lg shadow mb-6 p-4">
+                    <p className="text-sm font-semibold text-gray-700 mb-3">Payment Status:</p>
                     <div className="flex space-x-4">
                         <button
                             onClick={() => setFilter('pending')}
@@ -333,144 +452,149 @@ const AdminPaymentVerification: React.FC = () => {
                     </div>
                 ) : (
                     <div className="grid gap-6">
-                        {filteredRegistrations.map((reg) => (
-                            <div key={reg._id} className="bg-white rounded-lg shadow-lg p-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Left Column - Details */}
-                                    <div className="space-y-3">
-                                        <h3 className="text-xl font-bold text-gray-900">{reg.authorName}</h3>
-
-                                        {/* SCIS Membership Badge */}
-                                        {reg.membershipStatus?.isMember && (
-                                            <div className="inline-flex items-center bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg px-3 py-2">
-                                                <Award className="h-5 w-5 text-green-600 mr-2" />
-                                                <div>
-                                                    <p className="text-sm font-bold text-green-800">SCIS Member</p>
-                                                    <p className="text-xs text-green-600">ID: {reg.membershipStatus.membershipId}</p>
-                                                </div>
+                        {filteredRegistrations.map((reg) => {
+                            const isAuthor = isAuthorRegistration(reg);
+                            const name = isAuthor ? reg.authorName : reg.name;
+                            const email = isAuthor ? reg.authorEmail : reg.email;
+                            const createdDate = isAuthor ? reg.registrationDate : (reg.createdAt || new Date());
+                            
+                            return (
+                                <div key={reg._id} className="bg-white rounded-lg shadow-lg p-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Left Column - Details */}
+                                        <div className="space-y-3">
+                                            {/* Header with type indicator */}
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-xl font-bold text-gray-900">{name}</h3>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                                    isAuthor 
+                                                        ? 'bg-blue-100 text-blue-800' 
+                                                        : 'bg-purple-100 text-purple-800'
+                                                }`}>
+                                                    {isAuthor ? 'Author' : 'Listener'}
+                                                </span>
                                             </div>
-                                        )}
 
-                                        <div className="space-y-2 text-sm">
-                                            <p><strong>Email:</strong> {reg.authorEmail}</p>
-                                            <p><strong>Paper:</strong> {reg.paperTitle}</p>
-                                            <p><strong>Submission ID:</strong> {reg.submissionId}</p>
-                                            <p><strong>Category:</strong> {reg.registrationCategory}</p>
-                                            <p><strong>Payment Method:</strong> {reg.paymentMethod}</p>
-                                            <p><strong>Transaction ID:</strong> {reg.transactionId || 'N/A'}</p>
-
-                                            {/* Amount with Membership Discount Info */}
-                                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                                <p className="font-semibold text-gray-800 mb-1">Payment Amount:</p>
-                                                {reg.membershipStatus?.isMember ? (
+                                            {/* SCIS/Membership Badge */}
+                                            {isAuthor && (reg as AuthorRegistration).membershipStatus?.isMember && (
+                                                <div className="inline-flex items-center bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg px-3 py-2">
+                                                    <Award className="h-5 w-5 text-green-600 mr-2" />
                                                     <div>
-                                                        <p className="text-lg font-bold text-green-600">₹{reg.amount}</p>
-                                                        <p className="text-xs text-green-600 mt-1">
-                                                            <span className="bg-green-100 px-2 py-0.5 rounded">SCIS Member Rate</span>
-                                                        </p>
-                                                        {(() => {
-                                                            // Calculate what non-member would have paid
-                                                            const category = reg.registrationCategory.toLowerCase();
-                                                            let nonMemberFee = reg.amount;
-                                                            let discount = 0;
-
-                                                            if (category.includes('student')) {
-                                                                nonMemberFee = 5850;
-                                                                discount = nonMemberFee - 4500;
-                                                            } else if (category.includes('faculty') || category.includes('scholar')) {
-                                                                nonMemberFee = 7500;
-                                                                discount = nonMemberFee - 6750;
-                                                            } else if (category.includes('foreign')) {
-                                                                nonMemberFee = 350;
-                                                                discount = 50;
-                                                            } else if (category.includes('indonesian')) {
-                                                                nonMemberFee = 2600000;
-                                                                discount = 900000;
-                                                            }
-
-                                                            return discount > 0 ? (
-                                                                <p className="text-xs text-gray-600 mt-1">
-                                                                    Non-member rate: <span className="line-through">₹{nonMemberFee}</span>
-                                                                    <span className="ml-2 text-green-600 font-semibold">Saved: ₹{discount}</span>
-                                                                </p>
-                                                            ) : null;
-                                                        })()}
+                                                        <p className="text-sm font-bold text-green-800">SCIS Member</p>
+                                                        <p className="text-xs text-green-600">ID: {(reg as AuthorRegistration).membershipStatus?.membershipId}</p>
                                                     </div>
-                                                ) : (
+                                                </div>
+                                            )}
+                                            {!isAuthor && (reg as ListenerRegistration).isScisMember && (
+                                                <div className="inline-flex items-center bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-lg px-3 py-2">
+                                                    <Award className="h-5 w-5 text-green-600 mr-2" />
                                                     <div>
-                                                        <p className="text-lg font-bold text-gray-800">₹{reg.amount}</p>
-                                                        <p className="text-xs text-gray-500 mt-1">
-                                                            <span className="bg-gray-200 px-2 py-0.5 rounded">Non-Member Rate</span>
-                                                        </p>
+                                                        <p className="text-sm font-bold text-green-800">SCIS Member</p>
+                                                        <p className="text-xs text-green-600">ID: {(reg as ListenerRegistration).scisMembershipId}</p>
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-2 text-sm">
+                                                <p><strong>Email:</strong> {email}</p>
+                                                
+                                                {/* Author-specific fields */}
+                                                {isAuthor && (
+                                                    <>
+                                                        <p><strong>Paper Title:</strong> {(reg as AuthorRegistration).paperTitle}</p>
+                                                        <p><strong>Submission ID:</strong> {(reg as AuthorRegistration).submissionId}</p>
+                                                    </>
+                                                )}
+
+                                                {/* Listener-specific fields */}
+                                                {!isAuthor && (
+                                                    <>
+                                                        <p><strong>Institution:</strong> {(reg as ListenerRegistration).institution}</p>
+                                                        <p><strong>Address:</strong> {(reg as ListenerRegistration).address}</p>
+                                                        <p><strong>Country:</strong> {(reg as ListenerRegistration).country}</p>
+                                                    </>
+                                                )}
+
+                                                <p><strong>Category:</strong> {reg.registrationCategory}</p>
+                                                <p><strong>Payment Method:</strong> {reg.paymentMethod}</p>
+                                                <p><strong>Transaction ID:</strong> {reg.transactionId || 'N/A'}</p>
+
+                                                {/* Amount Display */}
+                                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                                    <p className="font-semibold text-gray-800 mb-1">Payment Amount:</p>
+                                                    <p className="text-lg font-bold text-gray-900">
+                                                        {isAuthor ? '₹' : (reg as ListenerRegistration).currency === 'IDR' ? 'Rp ' : '$'}
+                                                        {reg.amount.toLocaleString()}
+                                                    </p>
+                                                </div>
+
+                                                <p><strong>Submitted:</strong> {new Date(createdDate).toLocaleString()}</p>
+                                                {reg.verifiedAt && (
+                                                    <p><strong>Verified:</strong> {new Date(reg.verifiedAt).toLocaleString()}</p>
+                                                )}
+                                                {reg.rejectionReason && (
+                                                    <p className="text-red-600"><strong>Rejection Reason:</strong> {reg.rejectionReason}</p>
                                                 )}
                                             </div>
 
-                                            <p><strong>Submitted:</strong> {new Date(reg.registrationDate).toLocaleString()}</p>
-                                            {reg.verifiedAt && (
-                                                <p><strong>Verified:</strong> {new Date(reg.verifiedAt).toLocaleString()}</p>
-                                            )}
-                                            {reg.rejectionReason && (
-                                                <p className="text-red-600"><strong>Rejection Reason:</strong> {reg.rejectionReason}</p>
-                                            )}
-                                        </div>
-
-                                        {/* Status Badge */}
-                                        <div className="mt-4 flex gap-2">
-                                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${reg.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                reg.paymentStatus === 'verified' ? 'bg-green-100 text-green-800' :
-                                                    'bg-red-100 text-red-800'
+                                            {/* Status Badge */}
+                                            <div className="mt-4 flex gap-2">
+                                                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                                    reg.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                    reg.paymentStatus === 'verified' ? 'bg-green-100 text-green-800' :
+                                                        'bg-red-100 text-red-800'
                                                 }`}>
-                                                {reg.paymentStatus.toUpperCase()}
-                                            </span>
+                                                    {(reg.paymentStatus as string).toUpperCase()}
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Right Column - Screenshot & Actions */}
-                                    <div className="space-y-4">
-                                        {reg.paymentScreenshot && (
-                                            <div>
-                                                <p className="font-semibold mb-2">Payment Screenshot:</p>
-                                                <div className="relative">
-                                                    <img
-                                                        src={reg.paymentScreenshot}
-                                                        alt="Payment Screenshot"
-                                                        className="w-full h-48 object-contain bg-gray-100 rounded cursor-pointer"
-                                                        onClick={() => viewScreenshot(reg.paymentScreenshot)}
-                                                    />
+                                        {/* Right Column - Screenshot & Actions */}
+                                        <div className="space-y-4">
+                                            {reg.paymentScreenshot && (
+                                                <div>
+                                                    <p className="font-semibold mb-2">Payment Screenshot:</p>
+                                                    <div className="relative">
+                                                        <img
+                                                            src={reg.paymentScreenshot}
+                                                            alt="Payment Screenshot"
+                                                            className="w-full h-48 object-contain bg-gray-100 rounded cursor-pointer border border-gray-300"
+                                                            onClick={() => viewScreenshot(reg.paymentScreenshot)}
+                                                        />
+                                                        <button
+                                                            onClick={() => viewScreenshot(reg.paymentScreenshot)}
+                                                            className="absolute top-2 right-2 bg-white p-2 rounded-full shadow-lg hover:bg-gray-100"
+                                                        >
+                                                            <Eye className="h-5 w-5 text-gray-700" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Action Buttons */}
+                                            {reg.paymentStatus === 'pending' && (
+                                                <div className="flex space-x-3">
                                                     <button
-                                                        onClick={() => viewScreenshot(reg.paymentScreenshot)}
-                                                        className="absolute top-2 right-2 bg-white p-2 rounded-full shadow-lg hover:bg-gray-100"
+                                                        onClick={() => handleVerify(reg._id, reg)}
+                                                        className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center"
                                                     >
-                                                        <Eye className="h-5 w-5 text-gray-700" />
+                                                        <CheckCircle className="h-5 w-5 mr-2" />
+                                                        Verify
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleReject(reg._id, reg)}
+                                                        className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center"
+                                                    >
+                                                        <XCircle className="h-5 w-5 mr-2" />
+                                                        Reject
                                                     </button>
                                                 </div>
-                                            </div>
-                                        )}
-
-                                        {/* Action Buttons */}
-                                        {reg.paymentStatus === 'pending' && (
-                                            <div className="flex space-x-3">
-                                                <button
-                                                    onClick={() => handleVerify(reg._id)}
-                                                    className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center"
-                                                >
-                                                    <CheckCircle className="h-5 w-5 mr-2" />
-                                                    Verify
-                                                </button>
-                                                <button
-                                                    onClick={() => handleReject(reg._id)}
-                                                    className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center"
-                                                >
-                                                    <XCircle className="h-5 w-5 mr-2" />
-                                                    Reject
-                                                </button>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

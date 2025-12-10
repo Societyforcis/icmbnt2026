@@ -19,6 +19,8 @@ import reviewerRoutes from './routes/reviewerRoutes.js';
 import paymentRegistrationRoutes from './routes/paymentRegistration.js';
 import committeeRoutes from './routes/committee.js';
 import membershipRoutes from './routes/membershipRoutes.js';
+import listenerRoutes from './routes/listenerRoutes.js';
+import debugRoutes from './routes/debugRoutes.js';
 
 
 dotenv.config();
@@ -163,6 +165,8 @@ app.use('/api/reviewer', reviewerRoutes);
 app.use('/api/registration', paymentRegistrationRoutes);
 app.use('/api/committee', committeeRoutes);
 app.use('/api/membership', membershipRoutes);
+app.use('/api/listener', listenerRoutes);
+app.use('/api/debug', debugRoutes);
 
 
 

@@ -41,6 +41,16 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: null  // Store the actual temporary password (unhashed) for reviewer credentials email
     },
+    country: {
+        type: String,
+        enum: ['India', 'Indonesia', 'Other'],
+        default: null  // Will be set during login or profile update
+    },
+    userType: {
+        type: String,
+        enum: ['student', 'faculty', 'scholar'],
+        default: null  // Will be set during signup or profile update
+    },
     createdAt: {
         type: Date,
         default: Date.now

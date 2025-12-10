@@ -1,6 +1,7 @@
 import express from 'express';
 import PaymentRegistration from '../models/PaymentRegistration.js';
 import FinalAcceptance from '../models/FinalAcceptance.js';
+import { PaperSubmission } from '../models/Paper.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
 import cloudinary from '../config/cloudinary.js';
 
@@ -99,9 +100,8 @@ router.post('/submit', authMiddleware, async (req, res) => {
             }
         }
 
-        // Create payment registration with auto-filled details
         const paymentRegistration = new PaymentRegistration({
-            userId: req.user?.id,
+            userId: req.user?.userId,
             authorEmail: acceptedPaper.authorEmail,
             authorName: acceptedPaper.authorName,
             paperId: acceptedPaper._id,
@@ -111,7 +111,7 @@ router.post('/submit', authMiddleware, async (req, res) => {
             institution: 'To be updated', // Can be updated later if needed
             address: 'To be updated',
             country: 'To be updated',
-            paymentMethod: paymentMethod + (paymentSubMethod ? `-${paymentSubMethod}` : ''),
+            paymentMethod: paymentSubMethod || paymentMethod,
             transactionId,
             amount,
             paymentScreenshot: screenshotUrl,
@@ -196,32 +196,73 @@ router.get('/my-registration', authMiddleware, async (req, res) => {
 });
 
 // Get User's Accepted Paper Details (for auto-filling registration)
+// Checks both FinalAcceptance and PaperSubmission collections
 router.get('/my-paper-details', authMiddleware, async (req, res) => {
     try {
         const userEmail = req.user.email;
 
-        // Find accepted paper for this user
-        const acceptedPaper = await FinalAcceptance.findOne({ authorEmail: userEmail })
-            .sort({ acceptanceDate: -1 });
+        console.log('🔍 Searching for accepted paper for email:', userEmail);
 
-        if (!acceptedPaper) {
-            return res.status(404).json({
-                success: false,
-                message: 'No accepted paper found for this user'
+        // First check FinalAcceptance (migrated papers)
+        let acceptedPaper = await FinalAcceptance.findOne({
+            authorEmail: userEmail
+        }).sort({ acceptanceDate: -1 });
+
+        if (acceptedPaper) {
+            console.log('✅ Accepted paper found in FinalAcceptance:', {
+                submissionId: acceptedPaper.submissionId,
+                authorName: acceptedPaper.authorName,
+                paperTitle: acceptedPaper.paperTitle
+            });
+
+            return res.json({
+                success: true,
+                paperDetails: {
+                    submissionId: acceptedPaper.submissionId,
+                    paperTitle: acceptedPaper.paperTitle,
+                    authorName: acceptedPaper.authorName,
+                    authorEmail: acceptedPaper.authorEmail,
+                    category: acceptedPaper.category || 'General',
+                    acceptanceDate: acceptedPaper.acceptanceDate,
+                    paymentStatus: 'pending'
+                }
             });
         }
 
-        res.json({
-            success: true,
-            paperDetails: {
-                submissionId: acceptedPaper.submissionId,
-                paperTitle: acceptedPaper.paperTitle,
-                authorName: acceptedPaper.authorName,
-                authorEmail: acceptedPaper.authorEmail,
-                category: acceptedPaper.category,
-                acceptanceDate: acceptedPaper.acceptanceDate,
-                paymentStatus: acceptedPaper.paymentStatus
-            }
+        // If not in FinalAcceptance, check PaperSubmission for accepted papers
+        const submittedPaper = await PaperSubmission.findOne({
+            email: userEmail,
+            status: 'Accepted'
+        }).sort({ updatedAt: -1 });
+
+        if (submittedPaper) {
+            console.log('✅ Accepted paper found in PaperSubmission:', {
+                submissionId: submittedPaper.submissionId,
+                authorName: submittedPaper.authorName,
+                paperTitle: submittedPaper.paperTitle,
+                status: submittedPaper.status
+            });
+
+            return res.json({
+                success: true,
+                paperDetails: {
+                    submissionId: submittedPaper.submissionId,
+                    paperTitle: submittedPaper.paperTitle,
+                    authorName: submittedPaper.authorName,
+                    authorEmail: submittedPaper.email,
+                    category: submittedPaper.category || 'General',
+                    acceptanceDate: submittedPaper.updatedAt,
+                    paymentStatus: 'pending'
+                }
+            });
+        }
+
+        // No accepted paper found
+        console.log('❌ No accepted paper found for user:', userEmail);
+
+        return res.status(404).json({
+            success: false,
+            message: 'No accepted paper found for this user'
         });
 
     } catch (error) {
@@ -446,6 +487,64 @@ router.put('/admin/:id/reject', authMiddleware, adminMiddleware, async (req, res
             message: 'Failed to reject payment',
             error: error.message
         });
+    }
+});
+
+// DEBUG ENDPOINT: Check all accepted papers in database
+router.get('/debug/all-papers', async (req, res) => {
+    try {
+        const allPapers = await FinalAcceptance.find({}).select('submissionId authorName authorEmail paperTitle acceptanceDate');
+        res.json({
+            success: true,
+            totalPapers: allPapers.length,
+            papers: allPapers
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEBUG ENDPOINT: Create test accepted paper for user
+router.post('/debug/create-test-paper', async (req, res) => {
+    try {
+        // First create a test paper
+        const testPaper = new PaperSubmission({
+            submissionId: 'TEST-' + Date.now(),
+            paperTitle: 'Test Paper for Registration',
+            authorName: 'Test Author',
+            email: 'itzrvm237@gmail.com',
+            category: 'STEM',
+            abstract: 'Test abstract',
+            status: 'Accepted',
+            pdfUrl: 'https://example.com/test.pdf'
+        });
+
+        const savedPaper = await testPaper.save();
+
+        // Now create FinalAcceptance record
+        const finalAcceptance = new FinalAcceptance({
+            paperId: savedPaper._id,
+            submissionId: savedPaper.submissionId,
+            paperTitle: savedPaper.paperTitle,
+            authorName: savedPaper.authorName,
+            authorEmail: savedPaper.email,
+            category: savedPaper.category,
+            pdfUrl: 'https://example.com/test.pdf',
+            acceptanceDate: new Date(),
+            paymentStatus: 'pending',
+            status: 'Accepted'
+        });
+
+        const savedAcceptance = await finalAcceptance.save();
+
+        res.json({
+            success: true,
+            message: 'Test paper created successfully',
+            paper: savedAcceptance
+        });
+    } catch (error) {
+        console.error('Error creating test paper:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 

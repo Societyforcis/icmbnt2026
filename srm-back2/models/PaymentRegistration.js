@@ -54,7 +54,7 @@ const paymentRegistrationSchema = new mongoose.Schema({
     // Payment Information
     paymentMethod: {
         type: String,
-        enum: ['bank-transfer', 'bank-transfer-upi', 'bank-transfer-bank-account', 'paypal', 'qr-code'],
+        enum: ['bank-transfer', 'upi', 'bank-account', 'paypal', 'external'],
         required: true
     },
     transactionId: {
@@ -73,9 +73,7 @@ const paymentRegistrationSchema = new mongoose.Schema({
     // Payment Screenshot (Cloudinary URL)
     paymentScreenshot: {
         type: String, // Cloudinary URL
-        required: function () {
-            return this.paymentMethod && this.paymentMethod.includes('bank-transfer');
-        }
+        required: false
     },
     paymentScreenshotPublicId: {
         type: String, // Cloudinary public ID for deletion

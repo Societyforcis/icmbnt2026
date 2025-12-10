@@ -3,11 +3,12 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { User } from '../models/User.js';
 import FinalAcceptance from '../models/FinalAcceptance.js';
+import { PaperSubmission } from '../models/Paper.js';
 import { sendVerificationEmail, sendOTPEmail } from '../utils/emailService.js';
 
 // Register new user
 export const register = async (req, res) => {
-    const { email, password, role = 'Author' } = req.body;
+    const { email, password, role = 'Author', country, userType } = req.body;
 
     try {
         const existingUser = await User.findOne({ email });
@@ -26,6 +27,8 @@ export const register = async (req, res) => {
             email,
             password: hash,
             role,
+            country: country || null, // Save country if provided
+            userType: userType || null, // Save userType if provided (student, faculty, scholar)
             verified: false,
             verificationToken,
             verificationExpires: new Date(Date.now() + 48 * 60 * 60 * 1000) // 48 hours
@@ -101,10 +104,12 @@ export const login = async (req, res) => {
             email: user.email,
             username: user.username,
             role: user.role, // Add role at top level for easy access
+            country: user.country, // Add country for pricing display
             user: {
                 email: user.email,
                 username: user.username,
-                role: user.role
+                role: user.role,
+                country: user.country
             }
         });
     } catch (error) {
@@ -133,7 +138,7 @@ export const verifyEmail = async (req, res) => {
     try {
         // If email is not provided, find user by token alone
         let query = { verificationToken: token, verificationExpires: { $gt: new Date() } };
-        
+
         if (email) {
             query.email = email;
         }
@@ -307,11 +312,12 @@ export const getCurrentUser = async (req, res) => {
     }
 };
 
-// Check if user's email exists in FinalAcceptance (is accepted for registration)
+// Check if user has an accepted paper in PaperSubmission collection
+// This determines if they should see "Register as Author" or "Register as Listener"
 export const checkAcceptanceStatus = async (req, res) => {
     try {
         const email = req.query.email;
-        
+
         if (!email) {
             return res.status(400).json({
                 success: false,
@@ -320,25 +326,32 @@ export const checkAcceptanceStatus = async (req, res) => {
             });
         }
 
-        // Search for acceptance record with this email
-        const acceptanceRecord = await FinalAcceptance.findOne({ authorEmail: email });
+        console.log('🔍 Checking acceptance status for:', email);
 
-        if (acceptanceRecord) {
+        // Check PaperSubmission for accepted papers
+        const acceptedPaper = await PaperSubmission.findOne({
+            email: email,
+            status: 'Accepted'
+        }).sort({ updatedAt: -1 });
+
+        if (acceptedPaper) {
+            console.log('✅ Found accepted paper:', acceptedPaper.submissionId);
             return res.status(200).json({
                 success: true,
                 isAccepted: true,
-                message: "User is accepted for registration",
+                message: "User has an accepted paper",
                 acceptanceData: {
-                    paperTitle: acceptanceRecord.paperTitle,
-                    authorName: acceptanceRecord.authorName,
-                    acceptanceDate: acceptanceRecord.acceptanceDate
+                    paperTitle: acceptedPaper.paperTitle,
+                    authorName: acceptedPaper.authorName,
+                    submissionId: acceptedPaper.submissionId
                 }
             });
         } else {
+            console.log('❌ No accepted paper found for:', email);
             return res.status(200).json({
                 success: true,
                 isAccepted: false,
-                message: "User is not accepted for registration"
+                message: "User does not have an accepted paper"
             });
         }
     } catch (error) {
@@ -347,6 +360,52 @@ export const checkAcceptanceStatus = async (req, res) => {
             success: false,
             isAccepted: false,
             message: "An error occurred while checking acceptance status",
+            error: error.message
+        });
+    }
+};
+
+// Update user country
+export const updateUserCountry = async (req, res) => {
+    try {
+        const { country } = req.body;
+        const userId = req.user.userId;
+
+        if (!country || !['India', 'Indonesia', 'Other'].includes(country)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid country selection. Must be 'India', 'Indonesia', or 'Other'"
+            });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { country },
+            { new: true }
+        ).select('-password');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Country updated successfully",
+            user: {
+                email: user.email,
+                username: user.username,
+                role: user.role,
+                country: user.country
+            }
+        });
+    } catch (error) {
+        console.error("Update country error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred while updating country",
             error: error.message
         });
     }
