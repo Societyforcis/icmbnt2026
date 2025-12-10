@@ -2,7 +2,7 @@ import { FaCalendarAlt, FaFileAlt, FaExclamationTriangle } from "react-icons/fa"
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
-
+import qr from "./images/bali/qr2.png"
 const CallForPapers = () => {
   const navigate = useNavigate();
 
@@ -409,7 +409,7 @@ const CallForPapers = () => {
             <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-orange-300">
               <h3 className="text-center font-bold text-gray-800 mb-4">💳 Scan & Pay with UPI</h3>
               <img 
-                src="/image/bali/qr2.png" 
+                src={qr}
                 alt="UPI QR Code for Payment" 
                 className="w-48 h-48 object-contain mx-auto rounded-lg border-2 border-orange-300"
               />
