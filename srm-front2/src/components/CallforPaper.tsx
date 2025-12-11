@@ -273,6 +273,21 @@ const CallForPapers = () => {
           <div className="mt-6 p-4 bg-blue-50 border-l-4 border-[#F5A051] text-gray-700 rounded">
             <p className="text-sm"><strong>Note:</strong> Registration fees include conference kit, certificate, proceedings, and refreshments (excluding accommodation and publication fees).</p>
             <p className="text-sm mt-2"><strong>SCIS Members:</strong> Must have an active SCIS membership with admin approval to qualify for member rates.</p>
+
+            <div className="mt-4 flex items-center gap-3 bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-green-900 mb-1">💰 Save Money with SCIS Membership!</p>
+                <p className="text-xs text-green-800">Become a SCIS member to enjoy discounted registration rates and exclusive benefits.</p>
+              </div>
+              <a
+                href="https://societycis.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all shadow-md whitespace-nowrap text-sm"
+              >
+                Become SCIS Member →
+              </a>
+            </div>
           </div>
         </section>
 

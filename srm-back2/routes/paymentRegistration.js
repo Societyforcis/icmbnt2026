@@ -56,8 +56,11 @@ router.post('/submit', authMiddleware, async (req, res) => {
             });
         }
 
-        // Check if user has already registered
-        const existingRegistration = await PaymentRegistration.findOne({ authorEmail: userEmail });
+        // Check if user has already registered (only pending or verified)
+        const existingRegistration = await PaymentRegistration.findOne({
+            authorEmail: userEmail,
+            paymentStatus: { $in: ['pending', 'verified'] }
+        });
         if (existingRegistration) {
             return res.status(400).json({
                 success: false,
@@ -203,6 +206,17 @@ router.get('/my-paper-details', authMiddleware, async (req, res) => {
 
         console.log('🔍 Searching for accepted paper for email:', userEmail);
 
+        // Fetch user profile data (userType and country)
+        const { User } = await import('../models/User.js');
+        const user = await User.findOne({ email: userEmail }).select('userType country');
+
+        const userProfile = {
+            userType: user?.userType || null,
+            country: user?.country || null
+        };
+
+        console.log('👤 User profile data:', userProfile);
+
         // First check FinalAcceptance (migrated papers)
         let acceptedPaper = await FinalAcceptance.findOne({
             authorEmail: userEmail
@@ -225,7 +239,8 @@ router.get('/my-paper-details', authMiddleware, async (req, res) => {
                     category: acceptedPaper.category || 'General',
                     acceptanceDate: acceptedPaper.acceptanceDate,
                     paymentStatus: 'pending'
-                }
+                },
+                userProfile
             });
         }
 
@@ -253,7 +268,8 @@ router.get('/my-paper-details', authMiddleware, async (req, res) => {
                     category: submittedPaper.category || 'General',
                     acceptanceDate: submittedPaper.updatedAt,
                     paymentStatus: 'pending'
-                }
+                },
+                userProfile
             });
         }
 
@@ -458,12 +474,16 @@ router.put('/admin/:id/reject', authMiddleware, adminMiddleware, async (req, res
             });
         }
 
-        // Update registration status
-        registration.paymentStatus = 'rejected';
-        registration.verifiedBy = req.user.id;
-        registration.verifiedAt = new Date();
-        registration.rejectionReason = rejectionReason;
-        await registration.save();
+        // Store registration details before deletion for email
+        const registrationDetails = {
+            authorEmail: registration.authorEmail,
+            authorName: registration.authorName,
+            paperTitle: registration.paperTitle,
+            submissionId: registration.submissionId,
+            amount: registration.amount,
+            transactionId: registration.transactionId,
+            rejectionReason
+        };
 
         // Update FinalAcceptance if linked
         if (registration.paperId) {
@@ -472,12 +492,48 @@ router.put('/admin/:id/reject', authMiddleware, adminMiddleware, async (req, res
             });
         }
 
-        console.log('❌ Payment rejected for registration:', id);
+        // Delete the cloudinary screenshot if exists
+        if (registration.paymentScreenshotPublicId) {
+            try {
+                await cloudinary.uploader.destroy(registration.paymentScreenshotPublicId);
+                console.log('🗑️ Cloudinary screenshot deleted:', registration.paymentScreenshotPublicId);
+            } catch (cloudinaryError) {
+                console.error('⚠️ Failed to delete cloudinary screenshot:', cloudinaryError);
+            }
+        }
+
+        // Delete the registration from database
+        await PaymentRegistration.findByIdAndDelete(id);
+
+        // Send rejection email to author
+        try {
+            const { sendPaymentRejectionEmail } = await import('../utils/emailService.js');
+            await sendPaymentRejectionEmail({
+                authorEmail: registrationDetails.authorEmail,
+                authorName: registrationDetails.authorName,
+                paperTitle: registrationDetails.paperTitle,
+                submissionId: registrationDetails.submissionId,
+                rejectionReason: registrationDetails.rejectionReason,
+                amount: registrationDetails.amount,
+                transactionId: registrationDetails.transactionId,
+                registrationType: 'author'
+            });
+            console.log('✅ Payment rejection email sent to:', registrationDetails.authorEmail);
+        } catch (emailError) {
+            console.error('⚠️ Failed to send rejection email:', emailError);
+            // Don't fail the rejection if email fails
+        }
+
+        console.log('❌ Payment rejected and deleted for registration:', id);
 
         res.json({
             success: true,
-            message: 'Payment rejected',
-            registration
+            message: 'Payment rejected and registration removed. User has been notified to resubmit payment.',
+            deletedRegistration: {
+                authorEmail: registrationDetails.authorEmail,
+                authorName: registrationDetails.authorName,
+                rejectionReason: registrationDetails.rejectionReason
+            }
         });
 
     } catch (error) {

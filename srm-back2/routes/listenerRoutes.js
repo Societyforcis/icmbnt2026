@@ -361,19 +361,51 @@ router.put('/admin/reject/:id', verifyJWT, adminMiddleware, async (req, res) => 
             });
         }
 
-        registration.paymentStatus = 'rejected';
-        registration.rejectionReason = rejectionReason;
-        registration.rejectedBy = req.user.userId;
-        registration.rejectedAt = new Date();
+        // Store registration details before deletion for email
+        const registrationDetails = {
+            email: registration.email,
+            name: registration.name,
+            institution: registration.institution,
+            registrationCategory: registration.registrationCategory,
+            amount: registration.amount,
+            currency: registration.currency,
+            transactionId: registration.transactionId,
+            rejectionReason
+        };
 
-        await registration.save();
+        // Delete the registration from database
+        await ListenerRegistration.findByIdAndDelete(id);
 
-        console.log('✅ Listener registration rejected successfully:', registration._id);
+        // Send rejection email to listener
+        try {
+            const { sendPaymentRejectionEmail } = await import('../utils/emailService.js');
+            await sendPaymentRejectionEmail({
+                authorEmail: registrationDetails.email,
+                authorName: registrationDetails.name,
+                institution: registrationDetails.institution,
+                registrationCategory: registrationDetails.registrationCategory,
+                rejectionReason: registrationDetails.rejectionReason,
+                amount: registrationDetails.amount,
+                currency: registrationDetails.currency,
+                transactionId: registrationDetails.transactionId,
+                registrationType: 'listener'
+            });
+            console.log('✅ Payment rejection email sent to listener:', registrationDetails.email);
+        } catch (emailError) {
+            console.error('⚠️ Failed to send rejection email:', emailError);
+            // Don't fail the rejection if email fails
+        }
+
+        console.log('✅ Listener registration rejected and deleted successfully:', id);
 
         return res.status(200).json({
             success: true,
-            message: 'Listener registration rejected successfully',
-            registration
+            message: 'Listener registration rejected and removed. User has been notified to resubmit payment.',
+            deletedRegistration: {
+                email: registrationDetails.email,
+                name: registrationDetails.name,
+                rejectionReason: registrationDetails.rejectionReason
+            }
         });
 
     } catch (error) {

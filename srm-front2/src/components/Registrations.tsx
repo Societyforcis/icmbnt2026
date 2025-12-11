@@ -288,6 +288,16 @@ const Registrations: React.FC = () => {
                     <p className="text-xs text-yellow-700 mt-1">
                       You will be charged non-member registration fees. Consider becoming a SCIS member to enjoy discounted rates!
                     </p>
+                    <div className="mt-3">
+                      <a
+                        href="https://societycis.org/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-lg font-semibold hover:from-yellow-700 hover:to-orange-700 transition-all shadow-md text-sm"
+                      >
+                        Become SCIS Member →
+                      </a>
+                    </div>
                   </>
                 )}
               </div>

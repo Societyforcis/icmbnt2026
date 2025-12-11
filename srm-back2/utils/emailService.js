@@ -1465,4 +1465,149 @@ export const sendListenerPaymentVerificationEmail = async (listenerData) => {
     }
 };
 
+// Send payment rejection email
+export const sendPaymentRejectionEmail = async (rejectionData) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const isAuthor = rejectionData.registrationType === 'author';
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: rejectionData.authorEmail,
+        subject: `❌ Payment Rejected - Action Required - ICMBNT 2026`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="background-color: #fee2e2; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+                    <h2 style="margin: 0; color: #991b1b;">❌ Payment Rejected</h2>
+                    <p style="margin: 5px 0 0 0; color: #991b1b; font-weight: bold;">Action Required: Please Resubmit Payment</p>
+                </div>
+
+                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear <strong>${rejectionData.authorName}</strong>,
+                </p>
+
+                <p style="font-size: 14px; line-height: 1.6; color: #555; margin-bottom: 20px;">
+                    We regret to inform you that your payment for ${isAuthor ? 'author' : 'listener'} registration has been <strong style="color: #dc2626;">rejected</strong> 
+                    for the <strong>ICMBNT 2026</strong> conference.
+                </p>
+
+                ${isAuthor ? `
+                <div style="background-color: #dbeafe; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #0066cc;">📋 Registration Details:</p>
+                    <table style="width: 100%; font-size: 13px;">
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold; width: 150px;">Submission ID:</td>
+                            <td style="padding: 8px 0; color: #333;">${rejectionData.submissionId}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Paper Title:</td>
+                            <td style="padding: 8px 0; color: #333;">${rejectionData.paperTitle || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Amount Paid:</td>
+                            <td style="padding: 8px 0; color: #333;">₹${rejectionData.amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Transaction ID:</td>
+                            <td style="padding: 8px 0; color: #333;">${rejectionData.transactionId || 'N/A'}</td>
+                        </tr>
+                    </table>
+                </div>
+                ` : `
+                <div style="background-color: #dbeafe; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #0066cc;">📋 Registration Details:</p>
+                    <table style="width: 100%; font-size: 13px;">
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold; width: 150px;">Registration Type:</td>
+                            <td style="padding: 8px 0; color: #333;">Listener</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Institution:</td>
+                            <td style="padding: 8px 0; color: #333;">${rejectionData.institution || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Category:</td>
+                            <td style="padding: 8px 0; color: #333;">${rejectionData.registrationCategory || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Amount Paid:</td>
+                            <td style="padding: 8px 0; color: #333;">${rejectionData.currency || '$'}${rejectionData.amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold;">Transaction ID:</td>
+                            <td style="padding: 8px 0; color: #333;">${rejectionData.transactionId || 'N/A'}</td>
+                        </tr>
+                    </table>
+                </div>
+                `}
+
+                <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #92400e;">⚠️ Rejection Reason:</p>
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                        ${rejectionData.rejectionReason}
+                    </p>
+                </div>
+
+                <div style="background-color: #e0f2fe; border-left: 4px solid #0284c7; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #075985;">📝 What You Need to Do:</p>
+                    <ol style="margin: 0; padding-left: 20px; color: #333; font-size: 13px;">
+                        <li style="margin: 5px 0;">Review the rejection reason above carefully</li>
+                        <li style="margin: 5px 0;">Ensure you have the correct payment details and amount</li>
+                        <li style="margin: 5px 0;">Make the payment again using the correct information</li>
+                        <li style="margin: 5px 0;">Take a clear screenshot of the payment confirmation</li>
+                        <li style="margin: 5px 0;">Submit your registration again with the new payment details</li>
+                    </ol>
+                </div>
+
+                <div style="background-color: #dcfce7; border-left: 4px solid #16a34a; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0 0 15px 0; font-weight: bold; color: #166534; font-size: 15px;">Resubmit Your Registration</p>
+                    <p style="margin: 0 0 15px 0; font-size: 14px; color: #166534; line-height: 1.6;">
+                        Click the button below to go to the registration page and resubmit your payment:
+                    </p>
+                    <p style="margin: 0; text-align: center; padding: 15px 0;">
+                        <a href="${frontendUrl}/registrations" style="display: inline-block; background-color: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;">
+                            Go to Registration Page
+                        </a>
+                    </p>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; color: #166534; border-top: 1px solid #bbf7d0; padding-top: 10px;">
+                        Direct link: <a href="${frontendUrl}/registrations" style="color: #16a34a; word-break: break-all; text-decoration: none;">${frontendUrl}/registrations</a>
+                    </p>
+                </div>
+
+                <div style="background-color: #f3f4f6; padding: 15px; margin: 20px 0; border-radius: 4px; font-size: 13px; color: #666; line-height: 1.6;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold;">💡 Important Notes:</p>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li>Your previous registration entry has been removed from our system</li>
+                        <li>You need to submit a new registration with corrected payment details</li>
+                        <li>Make sure to upload a clear screenshot of your payment confirmation</li>
+                        <li>Double-check the transaction ID before submitting</li>
+                        <li>If you have questions, contact us at <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc;">icmbnt2026@gmail.com</a></li>
+                    </ul>
+                </div>
+
+                <p style="font-size: 13px; line-height: 1.6; color: #666; margin-top: 25px; margin-bottom: 10px;">
+                    We apologize for any inconvenience. If you believe this rejection was made in error or need assistance, 
+                    please contact us immediately at <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc;">icmbnt2026@gmail.com</a>.
+                </p>
+
+                <p style="font-size: 13px; color: #999; margin: 15px 0 0 0; border-top: 1px solid #ddd; padding-top: 15px;">
+                    <strong>ICMBNT 2026 Organizing Committee</strong><br>
+                    Society for Cyber Intelligent Systems<br>
+                    Puducherry, India<br>
+                    Email: <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc; text-decoration: none;">icmbnt2026@gmail.com</a><br>
+                    Website: <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a>
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log("📧 Payment rejection email sent to:", rejectionData.authorEmail, "- Message ID:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Error sending payment rejection email:", error);
+        throw error;
+    }
+};
+
 export default transporter;

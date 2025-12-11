@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, Building, CheckCircle, Globe, FileText, AlertCircle, Check } from 'lucide-react';
 import Swal from 'sweetalert2';
 import axios from 'axios';
-import upiqr from "./images/bali/qr2.png"
+import upiqr from "./images/bali/qr.png"
 import CountrySelector from './CountrySelector';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
