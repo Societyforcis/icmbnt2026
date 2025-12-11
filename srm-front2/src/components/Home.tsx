@@ -11,7 +11,7 @@ import RegistrationCountdown from "./RegistrationCountdown"
 
 // Sponsor logos - placeholder imports (replace with actual logo paths)
 import udayanaLogo from "./images/bali/ul.png" // TODO: Replace with Udayana University logo
-import srmLogo from "./images/bali/srm2.png" // TODO: Replace with SRM University logo
+// import srmLogo from "./images/bali/srm2.png" // TODO: Replace with SRM University logo
 import pelitaBangsaLogo from "./images/bali/pelita.png" // TODO: Replace with Universitas Pelita Bangsa logo
 
 const Home = () => {
@@ -117,7 +117,7 @@ const Home = () => {
               </div>
 
               {/* SRM University Logo */}
-              <div className="flex flex-col items-center">
+              {/* <div className="flex flex-col items-center">
                 <img
                   src={srmLogo}
                   alt="SRM University"
@@ -127,7 +127,7 @@ const Home = () => {
                 <p className="text-xs sm:text-sm text-white mt-3 text-center font-medium max-w-[140px]">
                   SRM University
                 </p>
-              </div>
+              </div> */}
 
               {/* Universitas Pelita Bangsa Logo */}
               <div className="flex flex-col items-center">
