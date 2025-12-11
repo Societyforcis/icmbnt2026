@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 import RegistrationCountdown from './RegistrationCountdown';
 import EnhancedUniversalRegistrationForm from './EnhancedUniversalRegistrationForm';
 import EnhancedFeeTable from './EnhancedFeeTable';
@@ -345,6 +346,25 @@ const Registrations: React.FC = () => {
           </div>
         )}
 
+        {/* Login Required Section - Show when not logged in */}
+        {!isLoggedIn && (
+          <div className="mb-8 bg-amber-50 border-2 border-amber-300 rounded-xl p-8 text-center">
+            <div className="mb-4">
+              <AlertCircle className="mx-auto mb-3 text-amber-600" size={32} />
+            </div>
+            <h3 className="text-2xl font-bold text-amber-900 mb-3">Login Required</h3>
+            <p className="text-amber-800 mb-6 text-lg">
+              You need to log in to access the full registration details and submit your registration.
+            </p>
+            <Link
+              to="/login"
+              className="inline-block bg-amber-600 hover:bg-amber-700 text-white px-8 py-3 rounded-lg font-bold transition-colors"
+            >
+              Login / Register Account
+            </Link>
+          </div>
+        )}
+
         {/* Tab buttons */}
         <div className="flex mb-8 border-b border-gray-200">
           <button
@@ -510,9 +530,26 @@ const Registrations: React.FC = () => {
           </div>
         )}
 
-        {/* Registration Form Tab - renders conditionally */}
-        {activeTab === 'form' && (
+        {/* Registration Form Tab - renders conditionally (only if logged in) */}
+        {activeTab === 'form' && isLoggedIn && (
           <EnhancedUniversalRegistrationForm />
+        )}
+
+        {/* Login Required for Form - Show when not logged in and form tab is selected */}
+        {activeTab === 'form' && !isLoggedIn && (
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <AlertCircle className="mx-auto mb-4 text-amber-600" size={40} />
+            <h3 className="text-2xl font-bold text-gray-800 mb-3">Login Required</h3>
+            <p className="text-gray-600 mb-6 text-lg">
+              Please log in to your account to access the registration form and complete your registration.
+            </p>
+            <Link
+              to="/login"
+              className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-bold transition-colors"
+            >
+              Go to Login Page
+            </Link>
+          </div>
         )}
 
         {/* More Information */}

@@ -179,11 +179,9 @@ const Navbar: React.FC = () => {
                 <li><Link to="/" className={`py-2 px-2 hover:text-[#F5A051] transition-colors text-sm xl:text-base ${isActive('/')}`}>Home</Link></li>
                 <li><Link to="/call-for-papers" className={`py-2 px-2 hover:text-[#F5A051] transition-colors text-sm xl:text-base ${isActive('/call-for-papers')}`}>Call For Papers</Link></li>
                 {isLoggedIn && (
-                  <>
-                    <li><Link to="/paper-submission" className={`py-2 px-2 hover:text-[#F5A051] transition-colors text-sm xl:text-base ${isActive('/paper-submission')}`}>Paper Submission</Link></li>
-                    <li><Link to="/Registrations" className="py-2 px-2 hover:text-[#F5A051] transition-colors text-sm xl:text-base">Registrations</Link></li>
-                  </>
+                  <li><Link to="/paper-submission" className={`py-2 px-2 hover:text-[#F5A051] transition-colors text-sm xl:text-base ${isActive('/paper-submission')}`}>Paper Submission</Link></li>
                 )}
+                <li><Link to="/Registrations" className="py-2 px-2 hover:text-[#F5A051] transition-colors text-sm xl:text-base">Registrations</Link></li>
                 <li><Link to="/commitee" className={`py-2 px-2 hover:text-[#F5A051] transition-colors text-sm xl:text-base ${isActive('/commitee')}`}>Committee</Link></li>
                 <li><Link to="/keynote-speakers" className={`py-2 px-2 hover:text-[#F5A051] transition-colors text-sm xl:text-base ${isActive('/keynote-speakers')}`}>Keynote speakers</Link></li>
                 <li><Link to="/contact" className={`py-2 px-2 hover:text-[#F5A051] transition-colors text-sm xl:text-base ${isActive('/contact')}`}>Contact</Link></li>
@@ -278,25 +276,24 @@ const Navbar: React.FC = () => {
               </li>
               
               {isLoggedIn && (
-                <>
-                  <li>
-                    <Link 
-                      to="/paper-submission" 
-                      className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/paper-submission')}`}
-                    >
-                      Paper Submission
-                    </Link>
-                  </li>
-                  <li>
-                    <Link 
-                      to="/Registrations" 
-                      className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/Registrations')}`}
-                    >
-                      Registrations
-                    </Link>
-                  </li>
-                </>
+                <li>
+                  <Link 
+                    to="/paper-submission" 
+                    className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/paper-submission')}`}
+                  >
+                    Paper Submission
+                  </Link>
+                </li>
               )}
+              
+              <li>
+                <Link 
+                  to="/Registrations" 
+                  className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/Registrations')}`}
+                >
+                  Registrations
+                </Link>
+              </li>
               
               <li>
                 <Link 
