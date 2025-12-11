@@ -371,16 +371,16 @@ export const updateUserCountry = async (req, res) => {
         const { country } = req.body;
         const userId = req.user.userId;
 
-        if (!country || !['India', 'Indonesia', 'Other'].includes(country)) {
+        if (!country || typeof country !== 'string' || country.trim() === '') {
             return res.status(400).json({
                 success: false,
-                message: "Invalid country selection. Must be 'India', 'Indonesia', or 'Other'"
+                message: "Invalid country selection. Country is required."
             });
         }
 
         const user = await User.findByIdAndUpdate(
             userId,
-            { country },
+            { country: country.trim() },
             { new: true }
         ).select('-password');
 
@@ -390,6 +390,8 @@ export const updateUserCountry = async (req, res) => {
                 message: "User not found"
             });
         }
+
+        console.log(`✅ Country updated for user ${user.email}: ${country}`);
 
         return res.status(200).json({
             success: true,

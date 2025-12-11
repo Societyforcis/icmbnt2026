@@ -15,6 +15,9 @@ router.post('/submit', authMiddleware, async (req, res) => {
             paymentSubMethod, // 'upi' or 'bank-account'
             transactionId,
             amount,
+            currency,
+            currencySymbol,
+            country,
             paymentScreenshot,
             registrationCategory
         } = req.body;
@@ -25,6 +28,9 @@ router.post('/submit', authMiddleware, async (req, res) => {
             email: userEmail,
             paymentMethod,
             paymentSubMethod,
+            amount,
+            currency,
+            country,
             hasScreenshot: !!paymentScreenshot,
             registrationCategory
         });
@@ -41,10 +47,10 @@ router.post('/submit', authMiddleware, async (req, res) => {
         }
 
         // Validate required fields
-        if (!paymentMethod || !amount || !registrationCategory) {
+        if (!paymentMethod || !amount || !registrationCategory || !country) {
             return res.status(400).json({
                 success: false,
-                message: 'Missing required fields: paymentMethod, amount, registrationCategory'
+                message: 'Missing required fields: paymentMethod, amount, registrationCategory, country'
             });
         }
 
@@ -113,10 +119,11 @@ router.post('/submit', authMiddleware, async (req, res) => {
             paperUrl: acceptedPaper.pdfUrl || acceptedPaper.revisionPdfs?.cleanPdfUrl || '',
             institution: 'To be updated', // Can be updated later if needed
             address: 'To be updated',
-            country: 'To be updated',
+            country: country || 'Not specified',
             paymentMethod: paymentSubMethod || paymentMethod,
             transactionId,
             amount,
+            currency: currency || 'USD',
             paymentScreenshot: screenshotUrl,
             paymentScreenshotPublicId: screenshotPublicId,
             registrationCategory,
@@ -131,7 +138,12 @@ router.post('/submit', authMiddleware, async (req, res) => {
             paymentRegistrationId: paymentRegistration._id
         });
 
-        console.log('✅ Payment registration created:', paymentRegistration._id);
+        console.log('✅ Payment registration created:', {
+            id: paymentRegistration._id,
+            amount: paymentRegistration.amount,
+            currency: paymentRegistration.currency,
+            country: paymentRegistration.country
+        });
 
         res.status(201).json({
             success: true,

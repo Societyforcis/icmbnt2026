@@ -43,8 +43,8 @@ const userSchema = new mongoose.Schema({
     },
     country: {
         type: String,
-        enum: ['India', 'Indonesia', 'Other'],
-        default: null  // Will be set during login or profile update
+        default: null,  // Will be set during signup or profile update
+        trim: true      // Automatically trim whitespace
     },
     userType: {
         type: String,

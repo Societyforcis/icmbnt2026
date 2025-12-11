@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, Building, CheckCircle, Globe, Check, AlertCircle } from 'lucide-react';
 import Swal from 'sweetalert2';
 import axios from 'axios';
+import Select from 'react-select';
 import upiqr from "./images/bali/qr.png"
+import { ALL_COUNTRIES } from '../utils/countries';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const compressImage = async (file: File): Promise<string> => {
@@ -62,6 +65,7 @@ interface UserProfile {
 const SimplifiedRegistrationForm: React.FC = () => {
     const [paperDetails, setPaperDetails] = useState<PaperDetails | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [selectedCountry, setSelectedCountry] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [paymentMethod, setPaymentMethod] = useState<'bank-transfer' | 'paypal' | ''>('');
     const [paymentSubMethod, setPaymentSubMethod] = useState<'upi' | 'bank-account' | ''>('');
@@ -77,14 +81,20 @@ const SimplifiedRegistrationForm: React.FC = () => {
         fetchPaperDetails();
         checkRegistrationStatus();
         checkMembershipStatus();
+
+        // Load country from user profile or localStorage
+        const storedCountry = localStorage.getItem('userCountry');
+        if (storedCountry) {
+            setSelectedCountry(storedCountry);
+        }
     }, []);
 
-    // Auto-select category when userProfile and membershipStatus are both loaded
+    // Auto-select category when userProfile, selectedCountry, and membershipStatus are loaded
     useEffect(() => {
-        if (userProfile?.userType && userProfile?.country && membershipStatus !== null && !loadingMembership) {
-            autoSelectCategory(userProfile.userType, userProfile.country);
+        if (userProfile?.userType && selectedCountry && membershipStatus !== null && !loadingMembership) {
+            autoSelectCategory(userProfile.userType, selectedCountry);
         }
-    }, [userProfile, membershipStatus, loadingMembership]);
+    }, [userProfile, selectedCountry, membershipStatus, loadingMembership]);
 
     const fetchPaperDetails = async () => {
         try {
@@ -179,7 +189,8 @@ const SimplifiedRegistrationForm: React.FC = () => {
         } else if (country === 'Indonesia') {
             category = 'indonesian-author';
             fee = membershipStatus?.isMember ? 1700000 : 2600000;
-        } else if (country === 'Other') {
+        } else {
+            // For all other countries
             category = 'foreign-author';
             fee = membershipStatus?.isMember ? 300 : 350;
         }
@@ -194,6 +205,20 @@ const SimplifiedRegistrationForm: React.FC = () => {
     const handleCategoryChange = (category: string, fee: number) => {
         setSelectedCategory(category);
         setAmount(fee);
+    };
+
+    const handleCountryChange = (country: string) => {
+        setSelectedCountry(country);
+        localStorage.setItem('userCountry', country);
+
+        // Reset category when country changes
+        setSelectedCategory('');
+        setAmount(0);
+
+        // Auto-select if userType exists
+        if (userProfile?.userType) {
+            autoSelectCategory(userProfile.userType, country);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -252,6 +277,17 @@ const SimplifiedRegistrationForm: React.FC = () => {
 
             const token = localStorage.getItem('token');
 
+            // Determine currency based on selected country
+            let currency = 'USD';
+            let currencySymbol = '$';
+            if (selectedCountry === 'India') {
+                currency = 'INR';
+                currencySymbol = '₹';
+            } else if (selectedCountry === 'Indonesia') {
+                currency = 'IDR';
+                currencySymbol = 'Rp';
+            }
+
             const response = await axios.post(
                 `${API_URL}/api/registration/submit`,
                 {
@@ -259,6 +295,9 @@ const SimplifiedRegistrationForm: React.FC = () => {
                     paymentSubMethod,
                     transactionId,
                     amount,
+                    currency,
+                    currencySymbol,
+                    country: selectedCountry,
                     paymentScreenshot,
                     registrationCategory: selectedCategory,
                 },
@@ -441,6 +480,61 @@ const SimplifiedRegistrationForm: React.FC = () => {
                 </div>
             )}
 
+            {/* Country Selection */}
+            <div className="mb-8">
+                <label className="block text-sm font-semibold text-gray-800 mb-4">
+                    <Globe className="inline h-5 w-5 mr-2 text-blue-600" />
+                    Select Your Country <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                    Type to search for your country
+                </p>
+                <Select
+                    options={ALL_COUNTRIES.map(c => ({ value: c.value, label: c.label }))}
+                    value={selectedCountry ? { value: selectedCountry, label: ALL_COUNTRIES.find(c => c.value === selectedCountry)?.label || selectedCountry } : null}
+                    onChange={(option) => option && handleCountryChange(option.value)}
+                    isSearchable={true}
+                    placeholder="🔍 Type to search for your country..."
+                    styles={{
+                        control: (base, state) => ({
+                            ...base,
+                            padding: '4px',
+                            borderRadius: '12px',
+                            borderWidth: '2px',
+                            borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+                            boxShadow: state.isFocused ? '0 0 0 1px #3b82f6' : 'none',
+                            '&:hover': {
+                                borderColor: '#3b82f6'
+                            }
+                        }),
+                        option: (base, state) => ({
+                            ...base,
+                            backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#dbeafe' : 'white',
+                            color: state.isSelected ? 'white' : '#1f2937',
+                            cursor: 'pointer',
+                            '&:active': {
+                                backgroundColor: '#3b82f6'
+                            }
+                        }),
+                        menu: (base) => ({
+                            ...base,
+                            borderRadius: '12px',
+                            marginTop: '8px',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+                        })
+                    }}
+                    className="text-base"
+                />
+                {selectedCountry && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                            ✓ Country selected: <span className="font-bold">{ALL_COUNTRIES.find(c => c.value === selectedCountry)?.label}</span>
+                            {' '}- Fees will be displayed in <span className="font-bold">{selectedCountry === 'India' ? 'INR (₹)' : selectedCountry === 'Indonesia' ? 'IDR (Rp)' : 'USD ($)'}</span>
+                        </p>
+                    </div>
+                )}
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-8">
                 {/* Registration Category */}
                 <div>
@@ -448,134 +542,144 @@ const SimplifiedRegistrationForm: React.FC = () => {
                         Select Registration Category <span className="text-red-500">*</span>
                     </label>
 
-                    {/* Show user profile info if available */}
-                    {userProfile?.userType && (
-                        <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
-                            <p className="text-sm text-blue-800">
-                                <strong>Your Profile:</strong> {userProfile.userType.charAt(0).toUpperCase() + userProfile.userType.slice(1)} from {userProfile.country}
-                            </p>
-                            <p className="text-xs text-blue-600 mt-1">
-                                Category automatically selected based on your profile.
+                    {!selectedCountry ? (
+                        <div className="p-6 bg-yellow-50 border-2 border-yellow-200 rounded-xl text-center">
+                            <p className="text-yellow-800 font-medium">
+                                Please select your country first to view registration categories
                             </p>
                         </div>
+                    ) : (
+                        <>
+                            {/* Show user profile info if available */}
+                            {userProfile?.userType && (
+                                <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                                    <p className="text-sm text-blue-800">
+                                        <strong>Your Profile:</strong> {userProfile.userType.charAt(0).toUpperCase() + userProfile.userType.slice(1)}
+                                    </p>
+                                    <p className="text-xs text-blue-600 mt-1">
+                                        Category automatically selected based on your profile.
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* Indian Student - Show only if country is India and (userType is student or no userType) */}
+                                {selectedCountry === 'India' && (!userProfile?.userType || userProfile?.userType === 'student') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCategoryChange('indian-student', membershipStatus?.isMember ? 4500 : 5850)}
+                                        className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-student'
+                                            ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                            : 'border-gray-200 hover:border-blue-300'
+                                            }`}
+                                    >
+                                        <h3 className="font-bold text-lg mb-1">Indian Student</h3>
+                                        <p className="text-sm text-gray-600 mb-2">For undergraduate and postgraduate students</p>
+                                        <p className="text-2xl font-bold text-blue-600">
+                                            ₹{membershipStatus?.isMember ? '4,500' : '5,850'}
+                                        </p>
+                                        {membershipStatus?.isMember && (
+                                            <p className="text-xs text-green-600 mt-2">
+                                                <span className="line-through text-gray-400">₹5,850</span> Save ₹1,350!
+                                            </p>
+                                        )}
+                                    </button>
+                                )}
+
+                                {/* Indian Faculty - Show only if country is India and (userType is faculty or no userType) */}
+                                {selectedCountry === 'India' && (!userProfile?.userType || userProfile?.userType === 'faculty') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCategoryChange('indian-faculty', membershipStatus?.isMember ? 6750 : 7500)}
+                                        className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-faculty'
+                                            ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                            : 'border-gray-200 hover:border-blue-300'
+                                            }`}
+                                    >
+                                        <h3 className="font-bold text-lg mb-1">Indian Faculty</h3>
+                                        <p className="text-sm text-gray-600 mb-2">For faculty members and professors</p>
+                                        <p className="text-2xl font-bold text-blue-600">
+                                            ₹{membershipStatus?.isMember ? '6,750' : '7,500'}
+                                        </p>
+                                        {membershipStatus?.isMember && (
+                                            <p className="text-xs text-green-600 mt-2">
+                                                <span className="line-through text-gray-400">₹7,500</span> Save ₹750!
+                                            </p>
+                                        )}
+                                    </button>
+                                )}
+
+                                {/* Indian Scholar - Show only if country is India and (userType is scholar or no userType) */}
+                                {selectedCountry === 'India' && (!userProfile?.userType || userProfile?.userType === 'scholar') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCategoryChange('indian-scholar', membershipStatus?.isMember ? 6750 : 7500)}
+                                        className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-scholar'
+                                            ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                            : 'border-gray-200 hover:border-blue-300'
+                                            }`}
+                                    >
+                                        <h3 className="font-bold text-lg mb-1">Research Scholar</h3>
+                                        <p className="text-sm text-gray-600 mb-2">For research scholars and PhD candidates</p>
+                                        <p className="text-2xl font-bold text-blue-600">
+                                            ₹{membershipStatus?.isMember ? '6,750' : '7,500'}
+                                        </p>
+                                        {membershipStatus?.isMember && (
+                                            <p className="text-xs text-green-600 mt-2">
+                                                <span className="line-through text-gray-400">₹7,500</span> Save ₹750!
+                                            </p>
+                                        )}
+                                    </button>
+                                )}
+
+                                {/* Indonesian Author - Show only if country is Indonesia */}
+                                {selectedCountry === 'Indonesia' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCategoryChange('indonesian-author', membershipStatus?.isMember ? 1700000 : 2600000)}
+                                        className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indonesian-author'
+                                            ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                            : 'border-gray-200 hover:border-blue-300'
+                                            }`}
+                                    >
+                                        <h3 className="font-bold text-lg mb-1">Indonesian Author</h3>
+                                        <p className="text-sm text-gray-600 mb-2">For Indonesian participants</p>
+                                        <p className="text-xl font-bold text-blue-600">
+                                            Rp {membershipStatus?.isMember ? '1,700,000' : '2,600,000'}
+                                        </p>
+                                        {membershipStatus?.isMember && (
+                                            <p className="text-xs text-green-600 mt-2">
+                                                <span className="line-through text-gray-400">Rp 2,600,000</span> Save Rp 900,000!
+                                            </p>
+                                        )}
+                                    </button>
+                                )}
+
+                                {/* Foreign Author - Show for all countries except India and Indonesia */}
+                                {selectedCountry && selectedCountry !== 'India' && selectedCountry !== 'Indonesia' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCategoryChange('foreign-author', membershipStatus?.isMember ? 300 : 350)}
+                                        className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'foreign-author'
+                                            ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                            : 'border-gray-200 hover:border-blue-300'
+                                            }`}
+                                    >
+                                        <h3 className="font-bold text-lg mb-1">International Author</h3>
+                                        <p className="text-sm text-gray-600 mb-2">For international participants</p>
+                                        <p className="text-2xl font-bold text-blue-600">
+                                            ${membershipStatus?.isMember ? '300' : '350'}
+                                        </p>
+                                        {membershipStatus?.isMember && (
+                                            <p className="text-xs text-green-600 mt-2">
+                                                <span className="line-through text-gray-400">$350</span> Save $50!
+                                            </p>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+                        </>
                     )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {/* Indian Student - Show only if userType is student and country is India, or if no userType */}
-                        {(!userProfile?.userType || (userProfile?.userType === 'student' && userProfile?.country === 'India')) && (
-                            <button
-                                type="button"
-                                onClick={() => handleCategoryChange('indian-student', membershipStatus?.isMember ? 4500 : 5850)}
-                                className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-student'
-                                    ? 'border-blue-500 bg-blue-50 shadow-lg'
-                                    : 'border-gray-200 hover:border-blue-300'
-                                    }`}
-                            >
-                                <h3 className="font-bold text-lg mb-1">Indian Student</h3>
-                                <p className="text-sm text-gray-600 mb-2">For undergraduate and postgraduate students</p>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    ₹{membershipStatus?.isMember ? '4,500' : '5,850'}
-                                </p>
-                                {membershipStatus?.isMember && (
-                                    <p className="text-xs text-green-600 mt-2">
-                                        <span className="line-through text-gray-400">₹5,850</span> Save ₹1,350!
-                                    </p>
-                                )}
-                            </button>
-                        )}
-
-                        {/* Indian Faculty - Show only if userType is faculty and country is India, or if no userType */}
-                        {(!userProfile?.userType || (userProfile?.userType === 'faculty' && userProfile?.country === 'India')) && (
-                            <button
-                                type="button"
-                                onClick={() => handleCategoryChange('indian-faculty', membershipStatus?.isMember ? 6750 : 7500)}
-                                className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-faculty'
-                                    ? 'border-blue-500 bg-blue-50 shadow-lg'
-                                    : 'border-gray-200 hover:border-blue-300'
-                                    }`}
-                            >
-                                <h3 className="font-bold text-lg mb-1">Indian Faculty</h3>
-                                <p className="text-sm text-gray-600 mb-2">For faculty members and professors</p>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    ₹{membershipStatus?.isMember ? '6,750' : '7,500'}
-                                </p>
-                                {membershipStatus?.isMember && (
-                                    <p className="text-xs text-green-600 mt-2">
-                                        <span className="line-through text-gray-400">₹7,500</span> Save ₹750!
-                                    </p>
-                                )}
-                            </button>
-                        )}
-
-                        {/* Indian Scholar - Show only if userType is scholar and country is India, or if no userType */}
-                        {(!userProfile?.userType || (userProfile?.userType === 'scholar' && userProfile?.country === 'India')) && (
-                            <button
-                                type="button"
-                                onClick={() => handleCategoryChange('indian-scholar', membershipStatus?.isMember ? 6750 : 7500)}
-                                className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indian-scholar'
-                                    ? 'border-blue-500 bg-blue-50 shadow-lg'
-                                    : 'border-gray-200 hover:border-blue-300'
-                                    }`}
-                            >
-                                <h3 className="font-bold text-lg mb-1">Research Scholar</h3>
-                                <p className="text-sm text-gray-600 mb-2">For research scholars and PhD candidates</p>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    ₹{membershipStatus?.isMember ? '6,750' : '7,500'}
-                                </p>
-                                {membershipStatus?.isMember && (
-                                    <p className="text-xs text-green-600 mt-2">
-                                        <span className="line-through text-gray-400">₹7,500</span> Save ₹750!
-                                    </p>
-                                )}
-                            </button>
-                        )}
-
-                        {/* Foreign Author - Show only if country is Other, or if no userType */}
-                        {(!userProfile?.userType || userProfile?.country === 'Other') && (
-                            <button
-                                type="button"
-                                onClick={() => handleCategoryChange('foreign-author', membershipStatus?.isMember ? 300 : 350)}
-                                className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'foreign-author'
-                                    ? 'border-blue-500 bg-blue-50 shadow-lg'
-                                    : 'border-gray-200 hover:border-blue-300'
-                                    }`}
-                            >
-                                <h3 className="font-bold text-lg mb-1">Foreign Author</h3>
-                                <p className="text-sm text-gray-600 mb-2">For international participants</p>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    ${membershipStatus?.isMember ? '300' : '350'}
-                                </p>
-                                {membershipStatus?.isMember && (
-                                    <p className="text-xs text-green-600 mt-2">
-                                        <span className="line-through text-gray-400">$350</span> Save $50!
-                                    </p>
-                                )}
-                            </button>
-                        )}
-
-                        {/* Indonesian Author - Show only if country is Indonesia, or if no userType */}
-                        {(!userProfile?.userType || userProfile?.country === 'Indonesia') && (
-                            <button
-                                type="button"
-                                onClick={() => handleCategoryChange('indonesian-author', membershipStatus?.isMember ? 1700000 : 2600000)}
-                                className={`p-6 rounded-xl border-2 transition-all ${selectedCategory === 'indonesian-author'
-                                    ? 'border-blue-500 bg-blue-50 shadow-lg'
-                                    : 'border-gray-200 hover:border-blue-300'
-                                    }`}
-                            >
-                                <h3 className="font-bold text-lg mb-1">Indonesian Author</h3>
-                                <p className="text-sm text-gray-600 mb-2">For Indonesian participants</p>
-                                <p className="text-xl font-bold text-blue-600">
-                                    {membershipStatus?.isMember ? '17L' : '26L'} IDR
-                                </p>
-                                {membershipStatus?.isMember && (
-                                    <p className="text-xs text-green-600 mt-2">
-                                        <span className="line-through text-gray-400">26L IDR</span> Save 9L!
-                                    </p>
-                                )}
-                            </button>
-                        )}
-                    </div>
                 </div>
 
                 {/* Payment Method Selection */}
