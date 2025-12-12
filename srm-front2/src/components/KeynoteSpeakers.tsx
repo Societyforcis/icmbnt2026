@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Scroll, Globe, Mail, BookOpen, Award, GraduationCap, Briefcase, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
+import { Scroll, Globe, Mail, BookOpen, Award, ChevronDown, ChevronUp } from 'lucide-react';
 import PageTransition from './PageTransition';
 import Speaker1 from "./images/speaker/s1.png"
 import Speaker2 from "./images/g.jpg"
@@ -11,15 +11,13 @@ interface Speaker {
   title: string;
   institution: string;
   image: string;
-  education: string[];
-  experience: string[];
-  research: string[];
-  awards: string[];
-  contact?: {
-    email?: string;
-    website?: string;
-    scholar?: string;
-  };
+  email?: string;
+  facultyProfile?: string;
+  linkedIn?: string;
+  biography: string;
+  expertise: string[];
+  keynoteTitle: string;
+  keynoteDescription: string;
 }
 
 const speakers: Speaker[] = [
@@ -29,23 +27,11 @@ const speakers: Speaker[] = [
     title: "Dean, School of Digital Technology",
     institution: "Universiti Sains Malaysia",
     image: Speaker1,
-    education: [
-      "PhD (Computer Science), Universite Grenoble Alpes, France",
-      "PhD (Computer Science), Universiti Sains Malaysia, Malaysia",
-      "Master of Computer Science (Information and Knowledge Engineering), Universiti Sains Malaysia",
-      "Bachelor of Computer Science (Computing and Software Engineering), Universiti Sains Malaysia",
-      "Google Data Analytics Professional Certificate",
-      "Google Advanced Data Analytics Professional Certificate"
-    ],
-    experience: [
-      "Successfully launched DiGiT Learning Model, ensuring 100% job placement for 1st cohort students after one year of study",
-      "Visiting Scientist at Universite Grenoble Alpes (2016), focusing on lifelogging and tourism using machine learning",
-      "Adjunct Researcher at International e-Tourism Research Center at Chengdu University, China",
-      "Advisor at National Child Data Centre (NCDC) for comprehensive child data management",
-      "Ambassador of Laboratoire d'Informatique de Grenoble, France",
-      "Software Engineer at Intel, contributing to automation software solutions in the United States, India, and China"
-    ],
-    research: [
+    email: "andrew.tan@usm.edu.my",
+    facultyProfile: "https://usm.edu.my",
+    linkedIn: "https://linkedin.com",
+    biography: "Associate Professor Ts Dr Tan Kian Lam (Andrew) is an accomplished academic and researcher with extensive experience in computer science and digital technology. He successfully launched the DiGiT Learning Model, ensuring 100% job placement for the first cohort students after one year of study. As a Visiting Scientist at Universite Grenoble Alpes, he focused on lifelogging and tourism using machine learning. Dr. Tan has served as an Adjunct Researcher at the International e-Tourism Research Center at Chengdu University, China, and as an Advisor at the National Child Data Centre (NCDC) for comprehensive child data management. His industry experience includes working as a Software Engineer at Intel, contributing to automation software solutions across the United States, India, and China. With over 80 proceedings and journal articles in high-impact journals, Dr. Tan is renowned for his innovative contributions to data science and digital heritage.",
+    expertise: [
       "Data Science",
       "Digital Heritage",
       "E-Tourism",
@@ -53,61 +39,31 @@ const speakers: Speaker[] = [
       "Gamification",
       "Information Retrieval",
       "Mobile Computing",
-      "Education"
+      "Education Technology"
     ],
-    awards: [
-      "Innovation Award for Most Impactful Academia-Industry Collaboration (Commercial) from MOSTI (2023)",
-      "Best result in International Evaluation Challenge in Information Retrieval, CLEF 2013",
-      "EC Innovation Award for Intel's 'Netbatch Utilization and Machine Allocation Center (NutMac)' project (2009)",
-      "Gold Winner of National Research Innovation Competition (NRIC)",
-      "Bronze Winner of International Exposition of Research and Inventions (PECIPTA)",
-      "Recognized as one of the Young Rising Stars from Universiti Pendidikan Sultan Idris",
-      "Over 80 proceedings and journal articles in high impact journals"
-    ]
+    keynoteTitle: "Digital Transformation in Education: Bridging Technology and Learning",
+    keynoteDescription: "This keynote will explore how digital technologies are revolutionizing education systems worldwide. Dr. Tan will discuss the DiGiT Learning Model and its success in achieving 100% job placement, while addressing the integration of extended reality, gamification, and data science in creating more engaging and effective learning experiences. The presentation will cover practical implementations, challenges, and future directions in technology-driven education."
   },
   {
     id: 2,
-    name: "Dr. Sam Goundar",
-    title: "Academic Programme Director, Associate Professor",
-    institution: "University of Central Asia • Canada",
+    name: "Prof. Dr. Sam Goundar",
+    title: "Senior Lecturer in Information Technology",
+    institution: "RMIT University • Vietnam",
     image: Speaker2,
-    education: [
-      "PhD in Computer Science",
-      "Extensive academic qualifications across multiple disciplines"
+    email: "sam.goundar@rmit.edu.vn",
+    facultyProfile: "https://rmit.edu.vn",
+    linkedIn: "https://linkedin.com",
+    biography: "Professor Dr. Sam Goundar is an international academic and researcher with over 35 years of teaching experience across 13 universities in 11 different countries. He specializes in emerging technologies such as Artificial Intelligence, Blockchain, Educational Technologies, Data Science, and Cyber Security. As Editor-in-Chief of multiple international journals, including the International Journal of Blockchains and Cryptocurrencies and the International Journal of Fog Computing, he has made significant contributions to academic publishing. Dr. Goundar has authored and edited 20 books and published over 140 research articles in reputable journals and book chapters. His research excellence is reflected in his global collaborations and innovative contributions to advancing technology-driven education. He is renowned for his work in equitable and transformative education.",
+    expertise: [
+      "Artificial Intelligence & Machine Learning",
+      "Blockchain Technologies",
+      "Educational Technologies",
+      "Data Science & Analytics",
+      "Cyber Security",
+      "Technology-Driven Education"
     ],
-    experience: [
-      "International academic with over 35+ years of teaching experience across 13 universities in 11 countries",
-      "Visiting Professor of Data Science at SRM University, Chennai, India",
-      "Adjunct Research Professor of Computer Science at Fiji National University",
-      "Adjunct Professor of Artificial Intelligence at Mohan Babu University, Tirupati, India",
-      "Former Adjunct Professor of Information Technology at The University of Fiji (2021-2023)",
-      "Former Affiliate Professor of Information Technology at Pontificia Universidad Católica del Perú, Lima, Peru (2016-2020)",
-      "Senior Lecturer in IT at RMIT University",
-      "Senior Lecturer in ICT at British University Vietnam",
-      "Senior Lecturer in IS at The University of the South Pacific, Suva, Fiji",
-      "Research Fellow at United Nations University",
-      "Visiting Professor at Hassan 1st University, Morocco (June-July 2019)",
-      "Visiting Professor at Bahir Dar University, Ethiopia (June-July 2018)"
-    ],
-    research: [
-      "Blockchains and Cryptocurrencies",
-      "Fog Computing",
-      "Cloud Computing",
-      "Creative Computing",
-      "Advanced Intelligent Systems",
-      "Data Science",
-      "Artificial Intelligence"
-    ],
-    awards: [
-      "Editor-in-Chief of International Journal of Blockchains and Cryptocurrencies (IJBC)",
-      "Editor-in-Chief of International Journal of Fog Computing (IJFC)",
-      "Editor-in-Chief of International Journal of Creative Computing (IJCrC)",
-      "Editor-in-Chief of International Journal of Advanced Intelligent Systems and Engineering Science (IJAIASES)",
-      "Editor-in-Chief (Emeritus) of International Journal of Cloud Applications and Computing (IJCAC)"
-    ],
-    contact: {
-      scholar: "https://scholar.google.com"
-    }
+    keynoteTitle: "The Future of AI and Blockchain in Transforming Global Education",
+    keynoteDescription: "This keynote will explore how emerging technologies like AI and blockchain are revolutionizing education systems worldwide. Dr. Goundar will discuss the potential of these technologies to create more equitable, accessible, and personalized learning experiences, while addressing challenges related to implementation, ethics, and digital divide considerations."
   },
   {
     id: 3,
@@ -115,17 +71,11 @@ const speakers: Speaker[] = [
     title: "Professor and Head (Computational Intelligence)",
     institution: "SRM Institute of Science and Technology • Chennai",
     image: Speaker3,
-    education: [
-      "PhD in Computer Science",
-      "Specialized training in Computational Intelligence and Machine Learning"
-    ],
-    experience: [
-      "Professor and Head, Department of Computational Intelligence",
-      "Faculty of Engineering & Technology, SRM Institute of Science and Technology",
-      "Extensive teaching experience in advanced computer science subjects",
-      "Research leadership in Machine Learning and IoT applications"
-    ],
-    research: [
+    email: "annieu@srmist.edu.in",
+    facultyProfile: "https://srmist.edu.in",
+    linkedIn: "https://linkedin.com",
+    biography: "Dr. R. Annie Uthra is a distinguished Professor and Head of the Department of Computational Intelligence at SRM Institute of Science and Technology. With extensive expertise in Machine Learning, Data Analytics, and IoT applications, she has made significant contributions to the field of computational intelligence. Her research focuses on energy-efficient routing in wireless sensor networks, database management systems, and cloud computing. Dr. Uthra has published extensively in Machine Learning and Data Mining, and is recognized for her teaching excellence in Data Structures and Algorithm Design. She has been instrumental in advancing research in wireless sensor networks and has mentored numerous students in cutting-edge technologies.",
+    expertise: [
       "Machine Learning",
       "Data Analytics",
       "Internet of Things (IoT)",
@@ -135,15 +85,8 @@ const speakers: Speaker[] = [
       "Cloud Computing",
       "Computer Networks"
     ],
-    awards: [
-      "Published extensively in Machine Learning and Data Mining",
-      "Expert in Compiler Design and Operating Systems",
-      "Recognized for contributions to Wireless Sensor Networks research",
-      "Teaching excellence in Data Structures and Algorithm Design"
-    ],
-    contact: {
-      email: "annieu@srmist.edu.in"
-    }
+    keynoteTitle: "Intelligent Systems and IoT: Shaping the Future of Connected Devices",
+    keynoteDescription: "This keynote will delve into the convergence of machine learning and IoT technologies, exploring how intelligent systems are transforming the landscape of connected devices. Dr. Uthra will discuss energy-efficient routing protocols, data analytics in IoT ecosystems, and the role of computational intelligence in creating smarter, more responsive networks. The presentation will highlight real-world applications, research challenges, and future opportunities in this rapidly evolving field."
   }
 ];
 
@@ -155,9 +98,9 @@ const KeynoteSpeakers = () => {
       setExpandedSpeaker(null);
     } else {
       setExpandedSpeaker(id);
-      // Smooth scroll to the card
+      // Smooth scroll to the profile
       setTimeout(() => {
-        const element = document.getElementById(`speaker-${id}`);
+        const element = document.getElementById(`profile-${id}`);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -247,144 +190,114 @@ const KeynoteSpeakers = () => {
             </div>
           </div>
 
-          {/* Expanded Details Section (Full Width Below) */}
+          {/* Expanded Profile Section */}
           {expandedSpeaker !== null && (
-            <div className="max-w-7xl mx-auto animate-slideDown">
+            <div id={`profile-${expandedSpeaker}`} className="max-w-7xl mx-auto animate-slideDown mb-8">
               {speakers
                 .filter((speaker) => speaker.id === expandedSpeaker)
                 .map((speaker) => (
                   <div
                     key={speaker.id}
-                    className="bg-white rounded-2xl shadow-2xl overflow-hidden border-t-4 border-[#F5A051]"
+                    className="bg-white rounded-2xl shadow-2xl overflow-hidden"
                   >
-                    {/* Speaker Header in Expanded View */}
-                    <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-[#F5A051] text-white p-8">
-                      <div className="flex flex-col md:flex-row items-center gap-6">
+                    {/* Profile Layout */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
+                      {/* Left Column - Speaker Photo */}
+                      <div className="lg:col-span-3 bg-gradient-to-br from-gray-100 to-gray-200 p-8 flex flex-col items-center justify-start">
                         <img
                           src={speaker.image}
                           alt={speaker.name}
-                          className="w-32 h-32 object-cover rounded-2xl shadow-2xl border-4 border-white"
+                          className="w-48 h-48 object-cover rounded-xl shadow-xl border-4 border-white mb-6"
                         />
-                        <div className="flex-1 text-center md:text-left">
-                          <h2 className="text-3xl md:text-4xl font-bold mb-2">{speaker.name}</h2>
-                          <p className="text-xl mb-1 opacity-95">{speaker.title}</p>
-                          <p className="text-lg opacity-90">{speaker.institution}</p>
-
-                          {/* Contact Icons */}
-                          {speaker.contact && (
-                            <div className="flex gap-3 mt-4 justify-center md:justify-start">
-                              {speaker.contact.email && (
-                                <a
-                                  href={`mailto:${speaker.contact.email}`}
-                                  className="bg-white/20 hover:bg-white/30 p-3 rounded-full transition-all duration-300"
-                                  aria-label="Email"
-                                >
-                                  <Mail className="w-5 h-5" />
-                                </a>
-                              )}
-                              {speaker.contact.website && (
-                                <a
-                                  href={speaker.contact.website}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="bg-white/20 hover:bg-white/30 p-3 rounded-full transition-all duration-300"
-                                  aria-label="Website"
-                                >
-                                  <Globe className="w-5 h-5" />
-                                </a>
-                              )}
-                              {speaker.contact.scholar && (
-                                <a
-                                  href={speaker.contact.scholar}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="bg-white/20 hover:bg-white/30 p-3 rounded-full transition-all duration-300"
-                                  aria-label="Google Scholar"
-                                >
-                                  <GraduationCap className="w-5 h-5" />
-                                </a>
-                              )}
-                            </div>
-                          )}
-                        </div>
                       </div>
-                    </div>
 
-                    {/* Detailed Content */}
-                    <div className="p-8 space-y-8 bg-gradient-to-br from-gray-50 to-blue-50">
-                      {/* Education */}
-                      <section>
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="bg-gradient-to-r from-blue-900 to-blue-700 p-3 rounded-lg">
-                            <GraduationCap className="w-6 h-6 text-white" />
-                          </div>
-                          <h3 className="text-2xl font-bold text-gray-800">Education & Qualifications</h3>
-                        </div>
-                        <ul className="space-y-3">
-                          {speaker.education.map((edu, index) => (
-                            <li key={index} className="flex items-start gap-3 bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition-colors duration-300">
-                              <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
-                              <span className="text-gray-700">{edu}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
+                      {/* Right Column - Speaker Details */}
+                      <div className="lg:col-span-9 p-8 lg:p-12">
+                        {/* Header */}
+                        <div className="mb-8">
+                          <h2 className="text-4xl font-bold text-gray-900 mb-2">{speaker.name}</h2>
+                          <p className="text-xl text-[#F5A051] font-semibold mb-1">{speaker.title}</p>
+                          <p className="text-lg text-gray-600 mb-4">{speaker.institution}</p>
 
-                      {/* Experience */}
-                      <section>
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="bg-gradient-to-r from-[#F5A051] to-orange-600 p-3 rounded-lg">
-                            <Briefcase className="w-6 h-6 text-white" />
+                          {/* Contact Links */}
+                          <div className="flex flex-wrap gap-4 mb-6">
+                            {speaker.email && (
+                              <a
+                                href={`mailto:${speaker.email}`}
+                                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+                              >
+                                <Mail className="w-4 h-4" />
+                                <span className="text-sm">{speaker.email}</span>
+                              </a>
+                            )}
+                            {speaker.facultyProfile && (
+                              <a
+                                href={speaker.facultyProfile}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+                              >
+                                <BookOpen className="w-4 h-4" />
+                                <span className="text-sm">Faculty Profile</span>
+                              </a>
+                            )}
+                            {speaker.linkedIn && (
+                              <a
+                                href={speaker.linkedIn}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+                              >
+                                <Globe className="w-4 h-4" />
+                                <span className="text-sm">LinkedIn Profile</span>
+                              </a>
+                            )}
                           </div>
-                          <h3 className="text-2xl font-bold text-gray-800">Professional Experience</h3>
                         </div>
-                        <ul className="space-y-3">
-                          {speaker.experience.map((exp, index) => (
-                            <li key={index} className="flex items-start gap-3 bg-orange-50 p-4 rounded-lg hover:bg-orange-100 transition-colors duration-300">
-                              <div className="w-2 h-2 bg-[#F5A051] rounded-full mt-2 flex-shrink-0"></div>
-                              <span className="text-gray-700">{exp}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
 
-                      {/* Research Interests */}
-                      <section>
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="bg-gradient-to-r from-purple-600 to-purple-800 p-3 rounded-lg">
-                            <BookOpen className="w-6 h-6 text-white" />
+                        {/* Biography Section */}
+                        <section className="mb-8">
+                          <div className="flex items-center gap-2 mb-4">
+                            <BookOpen className="w-5 h-5 text-[#F5A051]" />
+                            <h3 className="text-2xl font-bold text-gray-800">Biography</h3>
                           </div>
-                          <h3 className="text-2xl font-bold text-gray-800">Research Interests</h3>
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                          {speaker.research.map((area, index) => (
-                            <span
-                              key={index}
-                              className="bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 px-4 py-2 rounded-full text-sm font-medium hover:from-purple-200 hover:to-purple-300 transition-all duration-300 cursor-default"
-                            >
-                              {area}
-                            </span>
-                          ))}
-                        </div>
-                      </section>
+                          <p className="text-gray-700 leading-relaxed text-justify">
+                            {speaker.biography}
+                          </p>
+                        </section>
 
-                      {/* Awards & Recognition */}
-                      <section>
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-3 rounded-lg">
-                            <Trophy className="w-6 h-6 text-white" />
+                        {/* Areas of Expertise */}
+                        <section className="mb-8">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Award className="w-5 h-5 text-[#F5A051]" />
+                            <h3 className="text-2xl font-bold text-gray-800">Areas of Expertise</h3>
                           </div>
-                          <h3 className="text-2xl font-bold text-gray-800">Awards & Recognition</h3>
-                        </div>
-                        <ul className="space-y-3">
-                          {speaker.awards.map((award, index) => (
-                            <li key={index} className="flex items-start gap-3 bg-yellow-50 p-4 rounded-lg hover:bg-yellow-100 transition-colors duration-300">
-                              <Award className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                              <span className="text-gray-700">{award}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
+                          <div className="flex flex-wrap gap-3">
+                            {speaker.expertise.map((area, index) => (
+                              <span
+                                key={index}
+                                className="bg-gray-100 text-gray-800 px-4 py-2 rounded-md text-sm font-medium border border-gray-300 hover:bg-gray-200 transition-colors"
+                              >
+                                {area}
+                              </span>
+                            ))}
+                          </div>
+                        </section>
+
+                        {/* Keynote Presentation */}
+                        <section className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-xl border-l-4 border-[#F5A051]">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Scroll className="w-5 h-5 text-[#F5A051]" />
+                            <h3 className="text-2xl font-bold text-gray-800">Keynote Presentation</h3>
+                          </div>
+                          <h4 className="text-xl font-bold text-[#F5A051] mb-3">
+                            {speaker.keynoteTitle}
+                          </h4>
+                          <p className="text-gray-700 leading-relaxed">
+                            {speaker.keynoteDescription}
+                          </p>
+                        </section>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -396,11 +309,11 @@ const KeynoteSpeakers = () => {
           @keyframes slideDown {
             from {
               opacity: 0;
-              max-height: 0;
+              transform: translateY(-20px);
             }
             to {
               opacity: 1;
-              max-height: 5000px;
+              transform: translateY(0);
             }
           }
 
