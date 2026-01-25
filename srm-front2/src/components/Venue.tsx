@@ -7,7 +7,7 @@ const Venue = () => {
   return (
     <PageTransition>
       <div className="min-h-screen flex flex-col bg-gray-100 text-gray-900">
-     
+
         <div className="bg-gradient-to-r from-blue-900 to-[#F5A051] text-white py-16 px-4">
           <div className="container mx-auto max-w-6xl">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Conference Venue</h1>
@@ -114,9 +114,9 @@ const Venue = () => {
                   <div>
                     <h4 className="text-lg font-semibold text-gray-800 mb-3">Important Dates</h4>
                     <ul className="space-y-3 text-gray-700">
-                      <li><strong>Paper Submission:</strong> 5 January 2026</li>
-                      <li><strong>Acceptance Notification:</strong> 25 January 2026</li>
-                      <li><strong>Registration Deadline:</strong> 5 February 2026</li>
+                      <li><strong>Paper Submission:</strong> 10 February 2026</li>
+                      <li><strong>Acceptance Notification:</strong> 12 February 2026</li>
+                      <li><strong>Registration Deadline:</strong> 15 February 2026</li>
                       <li><strong>Conference Days:</strong> 12-13 March 2026</li>
                     </ul>
                   </div>

@@ -8,10 +8,10 @@ import society from "./images/bali/society.png"
 import isius from "./images/bali/isius.png"
 import Timeline from "./Timeline"
 import RegistrationCountdown from "./RegistrationCountdown"
-
+import kpr from "./images/bali/kpr.png"
 // Sponsor logos - placeholder imports (replace with actual logo paths)
 import udayanaLogo from "./images/bali/ul.png" // TODO: Replace with Udayana University logo
-// import srmLogo from "./images/bali/srm2.png" // TODO: Replace with SRM University logo
+import srmLogo from "./images/bali/k.png" // TODO: Replace with SRM University logo
 import pelitaBangsaLogo from "./images/bali/pelita.png" // TODO: Replace with Universitas Pelita Bangsa logo
 
 const Home = () => {
@@ -117,18 +117,29 @@ const Home = () => {
               </div>
 
               {/* SRM University Logo */}
-              {/* <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center">
                 <img
                   src={srmLogo}
                   alt="SRM University"
                   className="h-16 sm:h-20 md:h-24 object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-300"
                   loading="lazy"
                 />
-                <p className="text-xs sm:text-sm text-white mt-3 text-center font-medium max-w-[140px]">
+                <p className="text-xs sm:text-sm text-white mt-3 text-center font-medium max-w-[140px] ml-[50px]">
                   SRM University
                 </p>
-              </div> */}
+              </div>
 
+ <div className="flex flex-col items-center">
+                <img
+                  src={kpr}
+                  alt="SRM University"
+                  className="h-16 sm:h-20 md:h-24 object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                />
+                <p className="text-xs sm:text-sm text-white mt-3 text-center font-medium max-w-[140px] ml-[50px]">
+                  SRM University
+                </p>
+              </div>
               {/* Universitas Pelita Bangsa Logo */}
               <div className="flex flex-col items-center">
                 <img

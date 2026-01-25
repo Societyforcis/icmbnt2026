@@ -9,7 +9,7 @@ const reviewerMessageSchema = new mongoose.Schema(
         reviewId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'ReviewerReview',
-            required: true
+            required: false // Changed to false to support chat before review
         },
         reviewerId: {
             type: mongoose.Schema.Types.ObjectId,

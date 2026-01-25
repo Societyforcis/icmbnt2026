@@ -21,6 +21,9 @@ import {
 import SubmitPaperForm from "./SubmitPaperForm";
 import RevisionForm from "./RevisionForm";
 import PageTransition from "./PageTransition";
+import ReuploadPaperModal from './ReuploadPaperModal';
+import PaperHistoryTimeline from './PaperHistoryTimeline';
+import { FaUpload, FaHistory } from "react-icons/fa";
 
 interface Submission {
   submissionId: string;
@@ -32,6 +35,7 @@ interface Submission {
   abstractFileUrl: string | null;
   status: string;
   submissionDate: string;
+  isPaid?: boolean;
 }
 
 const PaperSubmission = () => {
@@ -42,6 +46,8 @@ const PaperSubmission = () => {
   const [revisionStatus, setRevisionStatus] = useState<any>(null);
   const [hasRevision, setHasRevision] = useState(false);
   const [showRevisionUpload, setShowRevisionUpload] = useState(false);
+  const [showReuploadModal, setShowReuploadModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const navigate = useNavigate();
 
   // Check for authentication and existing submission when component mounts
@@ -86,6 +92,10 @@ const PaperSubmission = () => {
           setHasRevision(true);
           setRevisionStatus(revisionResponse.data.revision);
         }
+        if (response.data.hasSubmission) {
+          setHasExistingSubmission(true);
+          setExistingSubmission(response.data.submission);
+        }
       } catch (error) {
         console.error("Error fetching user submission:", error);
       } finally {
@@ -95,6 +105,7 @@ const PaperSubmission = () => {
 
     checkUserSubmission();
   }, [navigate]);
+
 
   // Handler for submission success
   const handleSubmissionSuccess = () => {
@@ -213,7 +224,7 @@ const PaperSubmission = () => {
                   <div className="flex items-center">
                     <FaExclamationTriangle className="text-blue-600 mr-3 flex-shrink-0" />
                     <p className="text-blue-700">
-                      You have a submitted paper. Your paper status is shown below.
+                      You have a submitted paper.
                     </p>
                   </div>
                 </div>
@@ -254,14 +265,14 @@ const PaperSubmission = () => {
                       <p className="text-gray-500 text-sm mb-1">Status</p>
                       <p>
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${existingSubmission.status === 'Submitted'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : existingSubmission.status === 'Under Review'
-                              ? 'bg-blue-100 text-blue-800'
-                              : existingSubmission.status === 'Accepted'
-                                ? 'bg-green-100 text-green-800'
-                                : existingSubmission.status === 'Rejected'
-                                  ? 'bg-red-100 text-red-800'
-                                  : 'bg-gray-100 text-gray-800'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : existingSubmission.status === 'Under Review'
+                            ? 'bg-blue-100 text-blue-800'
+                            : existingSubmission.status === 'Accepted'
+                              ? 'bg-green-100 text-green-800'
+                              : existingSubmission.status === 'Rejected'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-gray-100 text-gray-800'
                           }`}>
                           {existingSubmission.status}
                         </span>
@@ -292,15 +303,95 @@ const PaperSubmission = () => {
                   )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-center gap-4 mt-6">
+                <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8 pt-6 border-t border-gray-100">
                   <button
                     onClick={() => navigate('/dashboard')}
-                    className="bg-blue-800 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center justify-center"
+                    className="bg-blue-800 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center justify-center shadow-md hover:shadow-lg w-full sm:w-auto"
                   >
                     <FaEye className="mr-2" />
                     View in Dashboard
                   </button>
+
+                  <button
+                    onClick={() => {
+                      setShowHistory(!showHistory);
+                      setShowReuploadModal(false);
+                    }}
+                    className={`px-6 py-3 rounded-md transition-all duration-300 flex items-center justify-center shadow-md hover:shadow-lg w-full sm:w-auto ${showHistory ? 'bg-gray-800 text-white' : 'bg-gray-600 text-white hover:bg-gray-700'
+                      }`}
+                  >
+                    <FaHistory className="mr-2" />
+                    {showHistory ? 'Hide History' : 'View History'}
+                  </button>
+
+                  {existingSubmission.status !== 'Accepted' && existingSubmission.status !== 'Rejected' && (
+                    <button
+                      onClick={() => {
+                        setShowReuploadModal(!showReuploadModal);
+                        setShowHistory(false);
+                      }}
+                      className={`px-6 py-3 rounded-md transition-all duration-300 flex items-center justify-center shadow-md hover:shadow-lg w-full sm:w-auto ${showReuploadModal ? 'bg-purple-800 text-white' : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
+                    >
+                      <FaUpload className="mr-2" />
+                      {showReuploadModal ? 'Cancel Re-upload' : 'Re-upload Paper'}
+                    </button>
+                  )}
+
+                  {existingSubmission.status === 'Accepted' && (
+                    <button
+                      onClick={() => navigate('/copyright-dashboard')}
+                      className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition-all duration-300 flex items-center justify-center shadow-md hover:shadow-lg w-full sm:w-auto"
+                    >
+                      <FaCheckCircle className="mr-2" />
+                      Proceed to Copyright Dashboard
+                    </button>
+                  )}
                 </div>
+
+
+                {/* Inline History Timeline */}
+                {showHistory && (
+                  <div className="mt-8 p-0 bg-transparent animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="flex justify-between items-center mb-6 px-4">
+                      <h3 className="text-xl font-black text-gray-900 flex items-center gap-3">
+                        <div className="p-2 bg-gray-100 rounded-lg">
+                          <FaHistory className="text-gray-800" />
+                        </div>
+                        Trace Your Paper
+                      </h3>
+                      <button
+                        onClick={() => setShowHistory(false)}
+                        className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition flex items-center gap-2 text-xs font-bold uppercase"
+                      >
+                        Hide <FaEye className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="bg-white/50 backdrop-blur-sm rounded-3xl p-6 md:p-10 border border-gray-100 shadow-xl shadow-gray-200/50">
+                      <PaperHistoryTimeline submissionId={existingSubmission.submissionId} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Inline Re-upload Form */}
+                {showReuploadModal && (
+                  <div className="mt-8 p-6 bg-gray-50 rounded-xl border-2 border-dashed border-purple-200 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <FaUpload className="text-purple-600" />
+                        Re-upload New Manuscript
+                      </h3>
+                    </div>
+                    <ReuploadPaperModal
+                      submissionId={existingSubmission.submissionId}
+                      onSuccess={() => {
+                        window.location.reload();
+                      }}
+                      onClose={() => setShowReuploadModal(false)}
+                      embedded={true}
+                    />
+                  </div>
+                )}
               </section>
             )}
 
@@ -434,7 +525,7 @@ const PaperSubmission = () => {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm text-blue-800">
-                        <span className="font-bold">Important:</span> Manuscript submission deadline is <span className="font-bold">5 January 2026</span>. Submit your paper before the deadline!
+                        <span className="font-bold">Important:</span> Manuscript submission deadline is <span className="font-bold">10 February 2026</span>. Submit your paper before the deadline!
                       </p>
                     </div>
                   </div>
@@ -480,8 +571,9 @@ const PaperSubmission = () => {
             </div>
           </div>
         </div>
+
       </div>
-    </PageTransition>
+    </PageTransition >
   );
 };
 

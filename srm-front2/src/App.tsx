@@ -24,6 +24,8 @@ import KeynoteSpeakers from './components/KeynoteSpeakers';
 import SpeakerProfile from './components/SpeakerProfile';
 import AdminPanel from './components/AdminPanel';
 import ReviewerConfirmation from './components/ReviewerConfirmation';
+import CopyrightDashboard from './components/CopyrightDashboard';
+import AdminCopyrightManagement from './components/AdminCopyrightManagement';
 // import SubmitPaperForm from "./components/SubmitPaperForm";
 // The App component should contain BrowserRouter
 const App = () => {
@@ -38,11 +40,11 @@ const App = () => {
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = localStorage.getItem('token');
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
@@ -70,14 +72,14 @@ const RoleProtectedRoute = ({ children, roles = [] }: { children: React.ReactNod
 };
 
 // Route wrapper component that conditionally applies loading
-const RouteWithLoading = ({ 
-  element, 
+const RouteWithLoading = ({
+  element,
   skipLoading = false,
-  loadingTime = 300 
-}: { 
-  element: React.ReactNode, 
-  skipLoading?: boolean, 
-  loadingTime?: number 
+  loadingTime = 300
+}: {
+  element: React.ReactNode,
+  skipLoading?: boolean,
+  loadingTime?: number
 }) => {
   return skipLoading ? (
     <>{element}</>
@@ -91,7 +93,7 @@ const RouteWithLoading = ({
 // Separate component for the routes
 const AppRoutes = () => {
   const location = useLocation();
-  const dashboardRoutes = ['/dashboard', '/reviewer', '/reviewer-dashboard', '/admin'];
+  const dashboardRoutes = ['/dashboard', '/author-dashboard', '/reviewer', '/reviewer-dashboard', '/admin', '/admin/copyrights'];
   const showFooter = !dashboardRoutes.includes(location.pathname);
 
   return (
@@ -99,64 +101,71 @@ const AppRoutes = () => {
       <Navbar />
       <Routes>
         <Route path="/" element={
-          <RouteWithLoading element={<Home />} loadingTime={800} />
+          <RouteWithLoading element={<Home />} />
         } />
         <Route path="/contact" element={
           <RouteWithLoading element={<Contact />} />
         } />
-        
+
         {/* Auth routes - no loading screen */}
         <Route path="/signin" element={<Signin />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify" element={<VerifyEmail />} />
-        
+
         {/* Reviewer Confirmation - Accept/Reject assignment */}
         <Route path="/reviewer/confirm" element={<ReviewerConfirmation />} />
-        
+
         <Route path="/commitee" element={
           <RouteWithLoading element={<Commitee />} />
         } />
-        
+
         {/* Admin Dashboard - protected route for admins only */}
         <Route path="/admin" element={
           <RoleProtectedRoute roles={["Admin"]}>
             <RouteWithLoading element={<AdminPanel />} />
           </RoleProtectedRoute>
         } />
-        
-        {/* Apply loading effect to Dashboard */}
+
+        {/* Editor/Admin Dashboard */}
         <Route path="/dashboard" element={
-          <RoleProtectedRoute roles={["Editor","Admin"]}>
-            <RouteWithLoading element={<Dashboard/>} />
+          <RoleProtectedRoute roles={["Editor", "Admin"]}>
+            <RouteWithLoading element={<Dashboard />} />
           </RoleProtectedRoute>
         } />
-        
+
+        {/* Author Dashboard */}
+        <Route path="/author-dashboard" element={
+          <RoleProtectedRoute roles={["Author"]}>
+            <RouteWithLoading element={<CopyrightDashboard />} />
+          </RoleProtectedRoute>
+        } />
+
         {/* Reviewer Dashboard - protected route for reviewers */}
         <Route path="/reviewer" element={
           <RoleProtectedRoute roles={["Reviewer"]}>
             <RouteWithLoading element={<ReviewerDashboard />} />
           </RoleProtectedRoute>
         } />
-        
+
         {/* Reviewer Dashboard Alias - for email links */}
         <Route path="/reviewer-dashboard" element={
           <RoleProtectedRoute roles={["Reviewer"]}>
             <RouteWithLoading element={<ReviewerDashboard />} />
           </RoleProtectedRoute>
         } />
-        
+
         {/* Backup link route - reviewer can access specific paper review */}
         <Route path="/reviewer/review/:submissionId" element={
           <RoleProtectedRoute roles={["Reviewer"]}>
             <ReviewerDashboard />
           </RoleProtectedRoute>
         } />
-        
+
         {/* Make Call for Papers accessible to all, but protect Paper Submission */}
         <Route path="/call-for-papers" element={
           <RouteWithLoading element={<CallForPapers />} />
         } />
-        
+
         {/* Protected routes with loading - only accessible when logged in */}
         <Route path="/paper-submission" element={
           <ProtectedRoute>
@@ -165,7 +174,7 @@ const AppRoutes = () => {
         } />
         <Route path="/submit-paper" element={
           <ProtectedRoute>
-            <RouteWithLoading element={<SubmitPaperForm isOpen={true} onClose={() => {}} embedded={false} onSubmissionSuccess={() => {}} />} />
+            <RouteWithLoading element={<SubmitPaperForm isOpen={true} onClose={() => { }} embedded={false} onSubmissionSuccess={() => { }} />} />
           </ProtectedRoute>
         } />
         <Route path="/registrations" element={
@@ -173,7 +182,7 @@ const AppRoutes = () => {
             <RouteWithLoading element={<Registrations />} />
           </ProtectedRoute>
         } />
-        
+
         {/* Add loading effect to EditSubmission route */}
         <Route path="/edit-submission/:submissionId" element={
           <ProtectedRoute>
@@ -187,21 +196,29 @@ const AppRoutes = () => {
             <RouteWithLoading element={<RevisedPaperSubmissionForm />} />
           </ProtectedRoute>
         } />
-        
+
+
+        {/* Admin Copyright Management */}
+        <Route path="/admin/copyrights" element={
+          <RoleProtectedRoute roles={["Admin"]}>
+            <RouteWithLoading element={<AdminCopyrightManagement />} />
+          </RoleProtectedRoute>
+        } />
+
         {/* Add loading effects to keynote and venue routes */}
         <Route path="/venue" element={
-          <RouteWithLoading element={<Venue />} loadingTime={600} />
+          <RouteWithLoading element={<Venue />} />
         } />
         <Route path="/keynote-speakers" element={
-          <RouteWithLoading element={<KeynoteSpeakers />} loadingTime={600} />
+          <RouteWithLoading element={<KeynoteSpeakers />} />
         } />
         <Route path="/keynote-speakers/:speakerId" element={
-          <RouteWithLoading element={<SpeakerProfile />} loadingTime={500} />
+          <RouteWithLoading element={<SpeakerProfile />} />
         } />
-        
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      {showFooter && <Footer/>}
+      {showFooter && <Footer />}
     </>
   );
 };

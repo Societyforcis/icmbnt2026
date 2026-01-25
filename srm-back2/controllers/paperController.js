@@ -12,7 +12,7 @@ export const submitPaper = async (req, res) => {
 
     try {
         let { email, paperTitle, authorName, category, topic, abstract } = req.body;
-        
+
         if (!email && req.user && req.user.email) {
             email = req.user.email;
             console.log('Email extracted from token:', email);
@@ -59,9 +59,9 @@ export const submitPaper = async (req, res) => {
             pdfUrl = cloudinaryResult.url;
             pdfPublicId = cloudinaryResult.publicId;
             pdfFileName = cloudinaryResult.fileName;
-            
-            console.log('PDF uploaded to Cloudinary:', { 
-                fileName: pdfFileName, 
+
+            console.log('PDF uploaded to Cloudinary:', {
+                fileName: pdfFileName,
                 url: pdfUrl,
                 publicId: pdfPublicId
             });
@@ -177,13 +177,18 @@ export const getUserSubmission = async (req, res) => {
         }).populate('assignedEditor', 'username email')
             .populate('assignedReviewers', 'username email');
 
+        // Check for verified payment
+        const { default: PaymentDoneFinalUser } = await import('../models/PaymentDoneFinalUser.js');
+        const payment = await PaymentDoneFinalUser.findOne({ authorEmail: email });
+
         return res.status(200).json({
             success: true,
             hasSubmission: true,
             submission: {
                 ...paperSubmission.toObject(),
                 bookingId: userSubmission.bookingId,
-                submissionDate: userSubmission.submissionDate
+                submissionDate: userSubmission.submissionDate,
+                isPaid: !!payment
             }
         });
     } catch (error) {
@@ -319,6 +324,91 @@ export const editSubmission = async (req, res) => {
     }
 };
 
+// Reupload paper (creates a new version)
+export const reuploadPaper = async (req, res) => {
+    try {
+        const { submissionId } = req.params;
+        const { email } = req.user;
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "No file uploaded"
+            });
+        }
+
+        // Verify the submission belongs to the user
+        const userSubmission = await UserSubmission.findOne({
+            email,
+            submissionId
+        });
+
+        if (!userSubmission) {
+            return res.status(403).json({
+                success: false,
+                message: "You do not have permission to update this submission"
+            });
+        }
+
+        const paperSubmission = await PaperSubmission.findOne({ submissionId });
+        if (!paperSubmission) {
+            return res.status(404).json({
+                success: false,
+                message: "Submission not found"
+            });
+        }
+
+        // Block re-upload if paper is already Accepted or Rejected
+        if (paperSubmission.status === 'Accepted' || paperSubmission.status === 'Rejected') {
+            return res.status(400).json({
+                success: false,
+                message: `Paper has already been ${paperSubmission.status.toLowerCase()}. Further uploads are not permitted.`
+            });
+        }
+
+        // Upload new PDF to Cloudinary
+        const { url: pdfUrl, publicId: pdfPublicId } = await uploadPdfToCloudinary(
+            req.file.buffer,
+            req.file.originalname
+        );
+
+        // Update current reference
+        paperSubmission.pdfUrl = pdfUrl;
+        paperSubmission.pdfPublicId = pdfPublicId;
+        paperSubmission.pdfFileName = req.file.originalname;
+
+        // Update version count and add to history
+        const nextVersion = (paperSubmission.versions?.length || 0) + 1;
+
+        if (!paperSubmission.versions) paperSubmission.versions = [];
+
+        paperSubmission.versions.push({
+            version: nextVersion,
+            pdfUrl,
+            pdfPublicId,
+            pdfFileName: req.file.originalname,
+            submittedAt: new Date()
+        });
+
+        await paperSubmission.save();
+
+        return res.status(200).json({
+            success: true,
+            message: `Paper version v${nextVersion} uploaded successfully`,
+            version: nextVersion,
+            pdfUrl
+        });
+
+    } catch (error) {
+        console.error("Error reuploading paper:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error reuploading paper",
+            error: error.message
+        });
+    }
+};
+
 // Get all papers (for admin/editor)
 export const getAllPapers = async (req, res) => {
     try {
@@ -434,26 +524,26 @@ export const submitRevision = async (req, res) => {
         let responsePdfUrl, responsePdfPublicId, responsePdfFileName;
 
         try {
-            // Upload Clean PDF
-            let cloudinaryResult = await uploadPdfToCloudinary(req.files.cleanPdf[0].buffer, `${submissionId}_clean.pdf`);
-            cleanPdfUrl = cloudinaryResult.url;
-            cleanPdfPublicId = cloudinaryResult.publicId;
-            cleanPdfFileName = cloudinaryResult.fileName;
-            console.log('Clean PDF uploaded:', { fileName: cleanPdfFileName, url: cleanPdfUrl });
+            // Parallelize all three Cloudinary uploads
+            const [cleanResult, highlightedResult, responseResult] = await Promise.all([
+                uploadPdfToCloudinary(req.files.cleanPdf[0].buffer, `${submissionId}_clean.pdf`),
+                uploadPdfToCloudinary(req.files.highlightedPdf[0].buffer, `${submissionId}_highlighted.pdf`),
+                uploadPdfToCloudinary(req.files.responsePdf[0].buffer, `${submissionId}_response.pdf`)
+            ]);
 
-            // Upload Highlighted PDF
-            cloudinaryResult = await uploadPdfToCloudinary(req.files.highlightedPdf[0].buffer, `${submissionId}_highlighted.pdf`);
-            highlightedPdfUrl = cloudinaryResult.url;
-            highlightedPdfPublicId = cloudinaryResult.publicId;
-            highlightedPdfFileName = cloudinaryResult.fileName;
-            console.log('Highlighted PDF uploaded:', { fileName: highlightedPdfFileName, url: highlightedPdfUrl });
+            cleanPdfUrl = cleanResult.url;
+            cleanPdfPublicId = cleanResult.publicId;
+            cleanPdfFileName = cleanResult.fileName;
 
-            // Upload Response PDF
-            cloudinaryResult = await uploadPdfToCloudinary(req.files.responsePdf[0].buffer, `${submissionId}_response.pdf`);
-            responsePdfUrl = cloudinaryResult.url;
-            responsePdfPublicId = cloudinaryResult.publicId;
-            responsePdfFileName = cloudinaryResult.fileName;
-            console.log('Response PDF uploaded:', { fileName: responsePdfFileName, url: responsePdfUrl });
+            highlightedPdfUrl = highlightedResult.url;
+            highlightedPdfPublicId = highlightedResult.publicId;
+            highlightedPdfFileName = highlightedResult.fileName;
+
+            responsePdfUrl = responseResult.url;
+            responsePdfPublicId = responseResult.publicId;
+            responsePdfFileName = responseResult.fileName;
+
+            console.log('✅ All revision PDFs uploaded in parallel');
         } catch (uploadError) {
             console.error('Failed to upload PDFs to Cloudinary:', uploadError.message);
             return res.status(500).json({
@@ -464,21 +554,21 @@ export const submitRevision = async (req, res) => {
 
         // Update or create revision record with all three PDFs
         let revision = await Revision.findOne({ paperId: paper._id });
-        
+
         if (revision) {
             // Update existing revision
             revision.cleanPdfUrl = cleanPdfUrl;
             revision.cleanPdfPublicId = cleanPdfPublicId;
             revision.cleanPdfFileName = cleanPdfFileName;
-            
+
             revision.highlightedPdfUrl = highlightedPdfUrl;
             revision.highlightedPdfPublicId = highlightedPdfPublicId;
             revision.highlightedPdfFileName = highlightedPdfFileName;
-            
+
             revision.responsePdfUrl = responsePdfUrl;
             revision.responsePdfPublicId = responsePdfPublicId;
             revision.responsePdfFileName = responsePdfFileName;
-            
+
             revision.revisionStatus = 'Submitted';
             revision.revisedPaperSubmittedAt = new Date();
         } else {
@@ -512,7 +602,7 @@ export const submitRevision = async (req, res) => {
         paper.pdfUrl = cleanPdfUrl; // Main PDF is the clean version
         paper.pdfPublicId = cleanPdfPublicId;
         paper.pdfFileName = cleanPdfFileName;
-        
+
         // Increment revision count
         paper.revisionCount = (paper.revisionCount || 0) + 1;
 
@@ -596,7 +686,7 @@ export const getRevisionData = async (req, res) => {
         console.log(`🔍 Looking for revision ${revisionNumber} with submissionId:`, submissionId);
 
         // Find the specific revision
-        const revision = await Revision.findOne({ 
+        const revision = await Revision.findOne({
             submissionId,
             revisionNumber: parseInt(revisionNumber)
         });
@@ -652,6 +742,224 @@ export const getAllRevisions = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Error fetching revisions',
+            error: error.message
+        });
+    }
+};
+// Get complete history of a paper (submissions, reviews, messages)
+export const getPaperHistory = async (req, res) => {
+    try {
+        const { submissionId } = req.params;
+        const { role, email } = req.user;
+
+        // Support searching by either ID or Email
+        let query = { submissionId: submissionId };
+        if (submissionId.includes('@')) {
+            query = { email: submissionId.toLowerCase() };
+        }
+
+        const paper = await PaperSubmission.findOne(query)
+            .populate('assignedEditor', 'username email')
+            .populate('reviewAssignments.reviewer', 'username email');
+
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: "Paper not found"
+            });
+        }
+
+        // Permission check: Admin/Editor can see anything. Author can only see THEIR paper.
+        if (role !== 'Admin' && role !== 'Editor' && paper.email !== email) {
+            return res.status(403).json({
+                success: false,
+                message: "You do not have permission to view this paper's history"
+            });
+        }
+
+        // Get reviews
+        const { Review } = await import('../models/Review.js');
+        const reviews = await Review.find({ paper: paper._id })
+            .populate('reviewer', 'username email')
+            .sort({ createdAt: 1 });
+
+        // Get messages
+        const { PaperMessage } = await import('../models/PaperMessage.js');
+        const paperMessages = await PaperMessage.findOne({ submissionId });
+
+        // Build timeline
+        const timeline = [];
+
+        // 1. Initial Submission
+        timeline.push({
+            type: 'submission',
+            date: paper.createdAt,
+            title: 'Initial Submission',
+            description: `Paper submitted by ${paper.authorName}`,
+            details: {
+                title: paper.paperTitle,
+                category: paper.category,
+                topic: paper.topic,
+                pdfUrl: paper.pdfUrl
+            }
+        });
+
+        // 1.5. Version History (Author uploads)
+        if (paper.versions && paper.versions.length > 0) {
+            paper.versions.forEach(ver => {
+                timeline.push({
+                    type: 'version_upload',
+                    date: ver.submittedAt,
+                    title: `Paper Version v${ver.version} Uploaded`,
+                    description: `Author uploaded a new version of the paper: ${ver.pdfFileName}`,
+                    details: {
+                        version: ver.version,
+                        pdfUrl: ver.pdfUrl,
+                        fileName: ver.pdfFileName
+                    }
+                });
+            });
+        }
+
+        // 2. Editor Assignment
+        if (paper.assignedEditor) {
+            timeline.push({
+                type: 'assignment',
+                date: paper.updatedAt, // Approximate
+                title: 'Editor Assigned',
+                description: `Editor ${paper.assignedEditor.username} assigned to manage the paper.`,
+                details: {
+                    editor: paper.assignedEditor.email
+                }
+            });
+        }
+
+        // 3. Reviewer Assignments & Rejections
+        paper.reviewAssignments.forEach(asm => {
+            timeline.push({
+                type: 'reviewer_assigned',
+                date: asm.assignedAt,
+                title: 'Reviewer Invited',
+                description: `Reviewer ${asm.reviewer?.username || 'Unknown'} invited to review.`,
+                status: asm.status,
+                details: {
+                    reviewer: asm.reviewer?.email,
+                    deadline: asm.deadline
+                }
+            });
+
+            if (asm.respondedAt) {
+                timeline.push({
+                    type: 'reviewer_response',
+                    date: asm.respondedAt,
+                    title: `Reviewer ${asm.status}`,
+                    description: `Reviewer ${asm.reviewer?.username || 'Unknown'} ${asm.status.toLowerCase()} the invitation.`,
+                    details: {
+                        reviewer: asm.reviewer?.email
+                    }
+                });
+            }
+        });
+
+        // 4. Review Submissions
+        reviews.forEach(review => {
+            timeline.push({
+                type: 'review_submitted',
+                date: review.createdAt,
+                title: 'Review Submitted',
+                description: `Reviewer ${review.reviewer?.username || 'Unknown'} submitted their feedback.`,
+                details: {
+                    recommendation: review.recommendation,
+                    overall: review.ratings?.overall
+                }
+            });
+        });
+
+        // 5. Revision Model Data (Detailed Corrected Paper Uploads)
+        const detailedRevisions = await Revision.find({ submissionId }).sort({ revisionNumber: 1 });
+        detailedRevisions.forEach(rev => {
+            timeline.push({
+                type: 'revision_cycle',
+                date: rev.revisionRequestedAt,
+                title: `Revision Cycle Started (v${rev.revisionNumber})`,
+                description: `Revision requested by ${rev.editorName}.`,
+                details: {
+                    deadline: rev.revisionDeadline,
+                    message: rev.revisionMessage
+                }
+            });
+
+            if (rev.revisedPaperSubmittedAt) {
+                timeline.push({
+                    type: 'revised_submission_detailed',
+                    date: rev.revisedPaperSubmittedAt,
+                    title: `Corrected Paper Uploaded (v${rev.revisionNumber})`,
+                    description: 'Author uploaded clean, highlighted, and response PDFs.',
+                    details: {
+                        cleanPdf: rev.cleanPdfUrl,
+                        highlightedPdf: rev.highlightedPdfUrl,
+                        responsePdf: rev.responsePdfUrl
+                    }
+                });
+            }
+
+            if (rev.finalOutcome && rev.finalOutcome !== 'Pending') {
+                timeline.push({
+                    type: 'revision_outcome',
+                    date: rev.updatedAt,
+                    title: `Revision Outcome (v${rev.revisionNumber})`,
+                    description: `Revision was ${rev.finalOutcome.toLowerCase()}.`,
+                    details: {
+                        outcome: rev.finalOutcome
+                    }
+                });
+            }
+        });
+
+        // 6. Messages
+        if (paperMessages && paperMessages.messages) {
+            paperMessages.messages.forEach(msg => {
+                timeline.push({
+                    type: 'message',
+                    date: msg.timestamp,
+                    title: `Message from ${msg.sender}`,
+                    description: msg.message,
+                    details: {
+                        senderName: msg.senderName
+                    }
+                });
+            });
+        }
+
+        // 7. Final Decision
+        if (paper.status === 'Accepted' || paper.status === 'Rejected') {
+            timeline.push({
+                type: 'final_decision',
+                date: paper.updatedAt,
+                title: `Paper ${paper.status}`,
+                description: `The final decision has been recorded as ${paper.status}.`,
+                details: {
+                    decision: paper.status
+                }
+            });
+        }
+
+        // Sort all events by date
+        timeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        return res.status(200).json({
+            success: true,
+            submissionId,
+            paperTitle: paper.paperTitle,
+            authorName: paper.authorName,
+            currentStatus: paper.status,
+            timeline
+        });
+    } catch (error) {
+        console.error("Error fetching paper history:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching paper history",
             error: error.message
         });
     }

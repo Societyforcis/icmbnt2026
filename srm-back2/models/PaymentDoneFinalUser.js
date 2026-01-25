@@ -163,8 +163,6 @@ const paymentDoneFinalUserSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
-paymentDoneFinalUserSchema.index({ authorEmail: 1 });
-paymentDoneFinalUserSchema.index({ registrationNumber: 1 });
 paymentDoneFinalUserSchema.index({ verifiedAt: -1 });
 paymentDoneFinalUserSchema.index({ conferenceYear: 1 });
 

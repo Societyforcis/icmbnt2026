@@ -6,7 +6,11 @@ import {
     reassignEditor,
     getAllUsers,
     getDashboardStats,
-    deleteUser
+    deleteUser,
+    sendMessageToEditor,
+    getConferenceSelectedUsers,
+    getAllPdfsAdmin,
+    deletePdfAdmin
 } from '../controllers/adminController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/roleCheck.js';
@@ -19,6 +23,7 @@ router.use(verifyJWT, requireAdmin);
 // Editor management
 router.post('/editors', createEditor);
 router.get('/editors', getAllEditors);
+router.post('/editors/message', sendMessageToEditor);
 
 // Paper assignment
 router.post('/assign-editor', assignEditor);
@@ -30,5 +35,12 @@ router.delete('/users/:userId', deleteUser);
 
 // Dashboard statistics
 router.get('/dashboard-stats', getDashboardStats);
+
+// Conference selected users
+router.get('/selected-users', getConferenceSelectedUsers);
+
+// PDF Management (admin only)
+router.get('/pdfs', getAllPdfsAdmin);
+router.delete('/pdfs', deletePdfAdmin);
 
 export default router;

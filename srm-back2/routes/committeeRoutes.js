@@ -34,11 +34,6 @@ router.delete(
   committeeController.deleteMember
 );
 
-router.post(
-  '/bulk-import',
-  verifyToken,
-  isAdmin,
-  committeeController.bulkImport
-);
+
 
 export default router;

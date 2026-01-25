@@ -6,9 +6,9 @@ dotenv.config();
 export const connectDatabase = async () => {
     try {
         await mongoose.connect(process.env.MONGODB_URI);
-        console.log("MongoDB Atlas Connected Successfully to database 'SRM'");
+        console.log(`MongoDB Atlas   Connected Successfully to database ${process.env.MONGODB_URI}`);
     } catch (err) {
-        console.error("MongoDB Connection Error Details:", {
+        console.error(      "MongoDB Connection Error Details:", {
             message: err.message,
             stack: err.stack
         });

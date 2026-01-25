@@ -84,26 +84,23 @@ export const generateReminderEmail = (
                 }
                 .reminder-box {
                     padding: 15px;
-                    background-color: ${
-                        urgencyClass === 'critical' ? '#fee2e2' : 
-                        urgencyClass === 'high' ? '#fed7aa' : 
-                        '#dbeafe'
-                    };
-                    border-left: 4px solid ${
-                        urgencyClass === 'critical' ? '#dc2626' : 
-                        urgencyClass === 'high' ? '#ea580c' : 
-                        '#2563eb'
-                    };
+                    background-color: ${urgencyClass === 'critical' ? '#fee2e2' :
+            urgencyClass === 'high' ? '#fed7aa' :
+                '#dbeafe'
+        };
+                    border-left: 4px solid ${urgencyClass === 'critical' ? '#dc2626' :
+            urgencyClass === 'high' ? '#ea580c' :
+                '#2563eb'
+        };
                     border-radius: 4px;
                     margin: 20px 0;
                 }
                 .reminder-box p {
                     margin: 0;
-                    color: ${
-                        urgencyClass === 'critical' ? '#991b1b' : 
-                        urgencyClass === 'high' ? '#92400e' : 
-                        '#1e40af'
-                    };
+                    color: ${urgencyClass === 'critical' ? '#991b1b' :
+            urgencyClass === 'high' ? '#92400e' :
+                '#1e40af'
+        };
                     font-weight: 500;
                 }
                 .paper-info {
@@ -200,16 +197,16 @@ export const generateReminderEmail = (
                         <p class="paper-title">${paperTitle}</p>
                     </div>
 
-                    ${daysRemaining < 0 
-                        ? `<div class="deadline-section">
+                    ${daysRemaining < 0
+            ? `<div class="deadline-section">
                             <p><strong class="deadline-critical">STATUS: OVERDUE</strong></p>
                             <p>The review deadline was ${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) !== 1 ? 's' : ''} ago. Your review is urgently needed.</p>
                         </div>`
-                        : `<div class="deadline-section">
+            : `<div class="deadline-section">
                             <p><strong>Time Remaining: ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}</strong></p>
                             <p>Please submit your review before the deadline to ensure timely publication.</p>
                         </div>`
-                    }
+        }
 
                     <div style="text-align: center; margin: 30px 0;">
                         <a href="${reviewLink}" class="cta-button">Submit Your Review</a>
@@ -223,15 +220,15 @@ export const generateReminderEmail = (
                         We appreciate your time and effort in reviewing this submission.
                     </p>
 
-                    ${reminderCount >= 2 
-                        ? `<div style="padding: 15px; background-color: #fee2e2; border-left: 4px solid #dc2626; border-radius: 4px; margin: 20px 0;">
+                    ${reminderCount >= 2
+            ? `<div style="padding: 15px; background-color: #fee2e2; border-left: 4px solid #dc2626; border-radius: 4px; margin: 20px 0;">
                             <p style="margin: 0; color: #991b1b; font-weight: 500;">
                                 If you have any concerns about completing this review or need an extension, 
                                 please contact the editor immediately.
                             </p>
                         </div>`
-                        : ''
-                    }
+            : ''
+        }
 
                     <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
                         Thank you for your continued support of our publication.
@@ -239,7 +236,7 @@ export const generateReminderEmail = (
                 </div>
                 <div class="footer">
                     <p style="margin: 0 0 8px 0;">This is an automated reminder. Please do not reply to this email.</p>
-                    <p style="margin: 0;">© 2025 ICMBNT Conference. All rights reserved.</p>
+                    <p style="margin: 0;">© 2026 ICMBNT Conference. All rights reserved.</p>
                 </div>
             </div>
         </body>
@@ -256,10 +253,10 @@ ${reminderMessage}
 
 Paper Title: ${paperTitle}
 
-${daysRemaining < 0 
-    ? `STATUS: OVERDUE - The review deadline was ${Math.abs(daysRemaining)} days ago.` 
-    : `Time Remaining: ${daysRemaining} days`
-}
+${daysRemaining < 0
+                ? `STATUS: OVERDUE - The review deadline was ${Math.abs(daysRemaining)} days ago.`
+                : `Time Remaining: ${daysRemaining} days`
+            }
 
 Please submit your review using this link: ${reviewLink}
 

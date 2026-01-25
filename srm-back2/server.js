@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import hpp from 'hpp';
 import mongoSanitize from 'express-mongo-sanitize';
+import helmet from 'helmet';
+import xss from 'xss-clean';
 import { connectDatabase } from './config/database.js';
 import { User } from './models/User.js';
 import { PaperSubmission } from './models/Paper.js';
@@ -21,6 +23,9 @@ import committeeRoutes from './routes/committee.js';
 import membershipRoutes from './routes/membershipRoutes.js';
 import listenerRoutes from './routes/listenerRoutes.js';
 import debugRoutes from './routes/debugRoutes.js';
+import copyrightRoutes from './routes/copyrightRoutes.js';
+import paperMessageRoutes from './routes/paperMessageRoutes.js';
+import supportMessageRoutes from './routes/supportMessageRoutes.js';
 
 
 dotenv.config();
@@ -70,11 +75,9 @@ app.use((req, res, next) => {
 // 5. CORS Configuration with strict origin checking
 const corsOptions = {
     origin: function (origin, callback) {
-        const allowedOrigins = [
-            'https://icmbnt2026-yovz.vercel.app',
-            'http://localhost:5173',
-            'https://icmbnt2026.societycis.org'
-        ];
+        const allowedOrigins = process.env.ALLOWED_ORIGINS
+            ? process.env.ALLOWED_ORIGINS.split(',')
+            : ['http://localhost:5173'];
 
         // Allow requests with no origin (mobile apps, Postman, etc.)
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
@@ -157,6 +160,18 @@ app.get('/health', (req, res) => {
 });
 
 
+// Security Middleware (Rate limiting removed as per user request)
+
+// Apply Helmet for security headers
+app.use(helmet({
+    contentSecurityPolicy: false, // Disable CSP for now to avoid breaking existing functionality
+    crossOriginEmbedderPolicy: false
+}));
+
+// Apply XSS protection
+app.use(xss());
+
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/papers', paperRoutes);
 app.use('/api/admin', adminRoutes);
@@ -167,6 +182,9 @@ app.use('/api/committee', committeeRoutes);
 app.use('/api/membership', membershipRoutes);
 app.use('/api/listener', listenerRoutes);
 app.use('/api/debug', debugRoutes);
+app.use('/api/copyright', copyrightRoutes);
+app.use('/api/paper-messages', paperMessageRoutes);
+app.use('/api/support-messages', supportMessageRoutes);
 
 
 

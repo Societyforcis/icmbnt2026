@@ -589,7 +589,7 @@ export const sendReviewerReminderEmail = async (reviewerEmail, reviewerName, pap
         </div>
         <div style="background-color: #f9fafb; padding: 20px; text-align: center; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb;">
           <p style="margin: 0 0 8px 0;">This is an automated reminder. Please do not reply to this email.</p>
-          <p style="margin: 0;">© 2025 ICMBNT Conference. All rights reserved.</p>
+          <p style="margin: 0;">© 2026 ICMBNT Conference. All rights reserved.</p>
         </div>
       </div>
     `
@@ -675,7 +675,7 @@ export const sendEditorCredentialsEmail = async (email, username, password) => {
 
         <div style="background-color: #f9fafb; padding: 15px; text-align: center; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; border-radius: 0 0 5px 5px;">
           <p style="margin: 0 0 8px 0;">This is an automated email. Please do not reply to this message.</p>
-          <p style="margin: 0;">© 2025 ICMBNT Conference. All rights reserved.</p>
+          <p style="margin: 0;">© 2026 ICMBNT Conference. All rights reserved.</p>
         </div>
       </div>
     `
@@ -1303,7 +1303,7 @@ export const sendReviewerThankYouEmail = async (reviewerEmail, reviewerName, pap
                         Best regards,
                     </p>
                     <p style="margin: 0; font-size: 13px; color: #666;">
-                        <strong>ICMBNT 2025 Conference Editorial Team</strong>
+                        <strong>ICMBNT 2026 Conference Editorial Team</strong>
                     </p>
                     <p style="margin: 5px 0 0 0; font-size: 12px; color: #999;">
                         This is an automated message. Please do not reply to this email.
@@ -1611,3 +1611,24 @@ export const sendPaymentRejectionEmail = async (rejectionData) => {
 };
 
 export default transporter;
+// Send a custom message/email to an editor
+export const sendEditorMessageEmail = async (editorEmail, editorName, messageContent) => {
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: editorEmail,
+        subject: `Message from ICMBNT 2026 Admin`,
+        html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+        <h2 style="color: #F5A051; text-align: center;">Important Message from Admin</h2>
+        <p>Dear ${editorName},</p>
+        <div style="background-color: #f9f9f9; padding: 20px; border-left: 5px solid #F5A051; margin: 20px 0; font-style: italic;">
+          ${messageContent.replace(/\n/g, '<br>')}
+        </div>
+        <p>Please log in to your dashboard if any action is required.</p>
+        <p>Best regards,<br>ICMBNT 2026 Administration</p>
+      </div>
+    `
+    };
+
+    return transporter.sendMail(mailOptions);
+};

@@ -1,24 +1,20 @@
 import { Calendar } from "lucide-react";
 // Only import if installed
-try {
-  require('animate.css');
-} catch (e) {
-  console.warn("animate.css not found, animations will be disabled");
-}
+// import 'animate.css';
 
 const timelineData = [
   {
-    date: "5 January 2026",
+    date: "10 February 2026",
     title: "Manuscript Submission Deadline",
     description: "Last date to submit your research papers and manuscripts"
   },
   {
-    date: "25 January 2026",
+    date: "12 February 2026",
     title: "Acceptance Notification",
     description: "Authors will be notified about the acceptance of their papers"
   },
   {
-    date: "5 February 2026",
+    date: "15 February 2026",
     title: "Registration Deadline",
     description: "Last date for conference registration"
   },

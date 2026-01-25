@@ -68,6 +68,7 @@ const ConferenceCommittee: React.FC = () => {
     links: {}
   })
 
+
   useEffect(() => {
     // Check if user is admin AND has a valid token (logged in)
     const role = localStorage.getItem('role');
@@ -587,6 +588,8 @@ const ConferenceCommittee: React.FC = () => {
                   <p className="text-gray-500 text-lg">No committee members found</p>
                 </div>
               )}
+
+
             </>
           )}
 

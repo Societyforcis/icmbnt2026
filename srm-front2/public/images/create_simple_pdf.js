@@ -48,9 +48,9 @@ startxref
 };
 
 // Create Registration Form PDF
-fs.writeFileSync('ICMBNT_2025_Registration_Form.pdf', createSimplePdf('ICMBNT 2025 Registration Form (Placeholder)'));
+fs.writeFileSync('ICMBNT_2026_Registration_Form.pdf', createSimplePdf('ICMBNT 2026 Registration Form (Placeholder)'));
 console.log('Registration Form PDF created.');
 
 // Create Copyright Form PDF
-fs.writeFileSync('ICMBNT_2025_Copyright_Form.pdf', createSimplePdf('ICMBNT 2025 Copyright Form (Placeholder)'));
+fs.writeFileSync('ICMBNT_2026_Copyright_Form.pdf', createSimplePdf('ICMBNT 2026 Copyright Form (Placeholder)'));
 console.log('Copyright Form PDF created.');

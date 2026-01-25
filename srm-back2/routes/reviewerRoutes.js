@@ -12,7 +12,10 @@ import {
     acceptAssignment,
     rejectAssignment,
     submitReReview,
-    acceptAssignmentBySubmission
+    acceptAssignmentBySubmission,
+    getMessageThread,
+    sendMessage,
+    getAllMessageThreads
 } from '../controllers/reviewerController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireReviewer } from '../middleware/roleCheck.js';
@@ -42,5 +45,10 @@ router.post('/papers/:submissionId/accept-assignment', acceptAssignmentBySubmiss
 
 // Dashboard statistics
 router.get('/dashboard-stats', getReviewerDashboardStats);
+
+// Messaging
+router.get('/messages', getAllMessageThreads);
+router.get('/messages/:submissionId', getMessageThread);
+router.post('/send-message', sendMessage);
 
 export default router;

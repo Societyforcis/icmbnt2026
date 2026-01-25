@@ -2,6 +2,7 @@ import { PaperSubmission } from '../models/Paper.js';
 import { ReviewerReview } from '../models/ReviewerReview.js';
 import { User } from '../models/User.js';
 import { ReviewerAssignment } from '../models/ReviewerAssignment.js';
+import { ReviewerMessage } from '../models/ReviewerMessage.js';
 import { sendReviewerAcceptanceEmail, sendReviewerRejectionNotification, sendReviewerAssignmentEmail, sendReviewSubmissionEmail, sendReviewerThankYouEmail } from '../utils/emailService.js';
 import { generateRandomPassword } from '../utils/helpers.js';
 
@@ -16,7 +17,8 @@ export const getAssignedPapers = async (req, res) => {
         })
             .populate('assignedEditor', 'username email')
             .select('-pdfBase64')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         // Enrich with review assignment details
         const enrichedPapers = papers.map(paper => {
@@ -24,7 +26,7 @@ export const getAssignedPapers = async (req, res) => {
                 a => a.reviewer.toString() === reviewerId
             );
             return {
-                ...paper.toObject(),
+                ...paper,
                 assignmentDetails: assignment  // Changed from reviewAssignment to assignmentDetails
             };
         });
@@ -74,7 +76,8 @@ export const getPaperForReview = async (req, res) => {
         }
 
         // ✅ IMPORTANT: Reviewer MUST accept the assignment before viewing the paper
-        if (assignment.status !== 'Accepted') {
+        const validStatuses = ['Accepted', 'Submitted', 'Review Submitted'];
+        if (!validStatuses.includes(assignment.status)) {
             return res.status(403).json({
                 success: false,
                 message: `You must accept the review assignment first. Current status: ${assignment.status}`,
@@ -82,18 +85,19 @@ export const getPaperForReview = async (req, res) => {
             });
         }
 
-        // Check if already reviewed
-        const existingReview = await ReviewerReview.findOne({
-            paper: paper._id,
-            reviewer: reviewerId
-        });
-
-        // Fetch ALL previous reviews by this reviewer for this paper (all rounds)
-        const previousReviews = await ReviewerReview.find({
-            paper: paper._id,
-            reviewer: reviewerId,
-            status: 'Submitted'  // Only show submitted reviews
-        }).sort({ round: 1 });  // Sort by round (1, 2, 3, etc.)
+        // Parallelize fetching reviews
+        const [existingReview, previousReviews] = await Promise.all([
+            ReviewerReview.findOne({
+                paper: paper._id,
+                reviewer: reviewerId,
+                round: paper.revisionCount + 1 // Check for current round
+            }).lean(),
+            ReviewerReview.find({
+                paper: paper._id,
+                reviewer: reviewerId,
+                status: 'Submitted'
+            }).sort({ round: 1 }).lean()
+        ]);
 
         console.log(`📋 Found ${previousReviews.length} previous reviews for paper ${submissionId} by reviewer ${reviewerId}`);
 
@@ -200,7 +204,7 @@ export const submitReview = async (req, res) => {
 
         // Determine which PDF to use based on review round
         let reviewedPdfUrl = paper.pdfUrl;  // Default to current PDF
-        
+
         // If this is round 2 or later and revision exists, use highlighted PDF
         if (round > 1) {
             const { Revision } = await import('../models/Revision.js');
@@ -265,7 +269,7 @@ export const submitReview = async (req, res) => {
             assignment.status = 'Submitted';
             assignment.review = review._id;
         }
-        
+
         await paper.save();
 
         // Update paper status if all reviewers have submitted for round 1
@@ -403,34 +407,37 @@ export const getReviewerDashboardStats = async (req, res) => {
     try {
         const reviewerId = req.user.userId;
 
-        const totalAssigned = await PaperSubmission.countDocuments({
-            assignedReviewers: reviewerId
-        });
-
-        const pendingReviews = await Review.countDocuments({
-            reviewer: reviewerId,
-            status: 'Pending'
-        });
-
-        const submittedReviews = await Review.countDocuments({
-            reviewer: reviewerId,
-            status: 'Submitted'
-        });
-
-        // Get reviews by recommendation
-        const reviewsByRecommendation = await Review.aggregate([
-            {
-                $match: {
-                    reviewer: reviewerId,
-                    status: 'Submitted'
+        const [
+            totalAssigned,
+            pendingReviews,
+            submittedReviews,
+            reviewsByRecommendation
+        ] = await Promise.all([
+            PaperSubmission.countDocuments({
+                assignedReviewers: reviewerId
+            }),
+            ReviewerReview.countDocuments({
+                reviewer: reviewerId,
+                status: 'Pending'
+            }),
+            ReviewerReview.countDocuments({
+                reviewer: reviewerId,
+                status: 'Submitted'
+            }),
+            ReviewerReview.aggregate([
+                {
+                    $match: {
+                        reviewer: reviewerId,
+                        status: 'Submitted'
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$recommendation',
+                        count: { $sum: 1 }
+                    }
                 }
-            },
-            {
-                $group: {
-                    _id: '$recommendation',
-                    count: { $sum: 1 }
-                }
-            }
+            ])
         ]);
 
         // Get pending papers
@@ -758,7 +765,7 @@ export const acceptAssignment = async (req, res) => {
 
         // Generate temp password for reviewer if needed
         const reviewerPassword = reviewer.tempPassword || generateRandomPassword();
-        
+
         const paperData = {
             submissionId: paper.submissionId,
             paperTitle: paper.paperTitle,
@@ -1040,4 +1047,126 @@ export const submitReReview = async (req, res) => {
         });
     }
 };
+// Get message thread for a reviewer
+export const getMessageThread = async (req, res) => {
+    try {
+        const { submissionId } = req.params;
+        const reviewerId = req.user.userId;
 
+        // Find threads for this reviewer and submission
+        const messageThread = await ReviewerMessage.findOne({
+            submissionId,
+            reviewerId
+        })
+            .populate('reviewerId', 'username email')
+            .populate('editorId', 'username email');
+
+        if (!messageThread) {
+            return res.status(200).json({
+                success: true,
+                messageThread: {
+                    conversation: [],
+                    editorReviewerConversation: false,
+                    submissionId,
+                    reviewerId
+                }
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            messageThread
+        });
+    } catch (error) {
+        console.error('Error getting message thread:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching messages',
+            error: error.message
+        });
+    }
+};
+
+// Send message from reviewer to editor
+export const sendMessage = async (req, res) => {
+    try {
+        const { submissionId, message } = req.body;
+        const reviewerId = req.user.userId;
+        const reviewer = await User.findById(reviewerId);
+
+        if (!message || !message.trim()) {
+            return res.status(400).json({ success: false, message: 'Message is empty' });
+        }
+
+        const paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            return res.status(404).json({ success: false, message: 'Paper not found' });
+        }
+
+        // Find or create message thread
+        let messageThread = await ReviewerMessage.findOne({
+            submissionId,
+            reviewerId
+        });
+
+        if (!messageThread) {
+            messageThread = new ReviewerMessage({
+                submissionId,
+                reviewerId,
+                editorId: paper.assignedEditor, // Default to assigned editor
+                authorId: paper.authorId || paper.email
+            });
+        }
+
+        // Add message to conversation
+        const newMessage = {
+            sender: 'reviewer',
+            senderId: reviewerId,
+            senderName: reviewer.username || reviewer.email,
+            senderEmail: reviewer.email,
+            message
+        };
+
+        messageThread.conversation.push(newMessage);
+        messageThread.editorReviewerConversation = true;
+        messageThread.lastMessageAt = new Date();
+
+        await messageThread.save();
+
+        return res.status(201).json({
+            success: true,
+            message: 'Message sent successfully',
+            messageThread
+        });
+    } catch (error) {
+        console.error('Error sending message:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error sending message',
+            error: error.message
+        });
+    }
+};
+
+// Get all message threads for the current reviewer
+export const getAllMessageThreads = async (req, res) => {
+    try {
+        const reviewerId = req.user.userId;
+
+        const messageThreads = await ReviewerMessage.find({ reviewerId })
+            .populate('editorId', 'username email')
+            .sort({ lastMessageAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            messageThreads
+        });
+    } catch (error) {
+        console.error('Error getting all message threads:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching messages',
+            error: error.message
+        });
+    }
+};

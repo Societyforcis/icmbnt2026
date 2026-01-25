@@ -312,7 +312,7 @@ const Registrations: React.FC = () => {
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-700">
-                <span className="font-medium">Important:</span> Registration deadline is <span className="font-bold">5 February 2026</span>. Complete your registration before the deadline!
+                <span className="font-medium">Important:</span> Registration deadline is <span className="font-bold">15 February 2026</span>. Complete your registration before the deadline!
               </p>
             </div>
           </div>

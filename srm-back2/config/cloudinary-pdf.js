@@ -1,13 +1,7 @@
-import cloudinary from 'cloudinary';
+import cloudinary from './cloudinary.js';
 import streamifier from 'streamifier';
 
-// Configure Cloudinary with the credentials provided
-cloudinary.v2.config({
-  cloud_name: 'divc6lt0e',
-  api_key: '317941152563513',
-  api_secret: 'IBmRaFxx01oyQd3Ebi9x07h79nE',
-  secure: true
-});
+// Use the unified configuration from cloudinary.js
 
 /**
  * Upload PDF to Cloudinary and return the secure URL
@@ -19,8 +13,8 @@ export const uploadPdfToCloudinary = async (fileBuffer, fileName) => {
   return new Promise((resolve, reject) => {
     // Clean filename: remove extension and trim whitespace
     const cleanFileName = fileName.replace(/\.[^/.]+$/, '').trim().replace(/\s+/g, '_');
-    
-    const uploadStream = cloudinary.v2.uploader.upload_stream(
+
+    const uploadStream = cloudinary.uploader.upload_stream(
       {
         resource_type: 'raw',
         folder: 'icmbnt-pdfs',
@@ -55,7 +49,7 @@ export const uploadPdfToCloudinary = async (fileBuffer, fileName) => {
       console.error('Stream read error:', error);
       reject(new Error(`Failed to read file stream: ${error.message}`));
     });
-    
+
     readStream.pipe(uploadStream);
   });
 };
@@ -68,7 +62,7 @@ export const uploadPdfToCloudinary = async (fileBuffer, fileName) => {
  */
 export const deletePdfFromCloudinary = async (publicId) => {
   return new Promise((resolve, reject) => {
-    cloudinary.v2.uploader.destroy(publicId, { resource_type: 'raw' }, (error, result) => {
+    cloudinary.uploader.destroy(publicId, { resource_type: 'raw' }, (error, result) => {
       if (error) {
         console.error('Cloudinary delete error:', error);
         reject(new Error(`Failed to delete PDF from Cloudinary: ${error.message}`));
@@ -86,7 +80,7 @@ export const deletePdfFromCloudinary = async (publicId) => {
  */
 export const listPdfsFromCloudinary = async () => {
   return new Promise((resolve, reject) => {
-    cloudinary.v2.api.resources(
+    cloudinary.api.resources(
       {
         type: 'upload',
         prefix: 'icmbnt-pdfs',

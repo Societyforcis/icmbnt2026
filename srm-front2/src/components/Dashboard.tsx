@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import PageTransition from './PageTransition';
-import { CheckCircle, Clock, FileText, Users, AlertCircle, XCircle, X } from 'lucide-react';
+import { CheckCircle, Clock, FileText, Users, AlertCircle, XCircle, X, History, Upload } from 'lucide-react';
+import ReuploadPaperModal from './ReuploadPaperModal';
+import PaperHistoryTimeline from './PaperHistoryTimeline';
 import { Document, Page, pdfjs } from 'react-pdf';
 
 // Set up PDF.js worker
@@ -28,6 +30,12 @@ interface PaperSubmission {
   editorCorrections?: string;
   createdAt: string;
   updatedAt: string;
+  versions?: Array<{
+    version: number;
+    pdfUrl: string;
+    pdfFileName: string;
+    submittedAt: string;
+  }>;
 }
 
 const Dashboard: React.FC = () => {
@@ -42,6 +50,10 @@ const Dashboard: React.FC = () => {
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // History and Reupload states
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showReuploadModal, setShowReuploadModal] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -291,8 +303,7 @@ const Dashboard: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Actions */}
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     <button
                       onClick={() => {
                         setShowPdfModal(true);
@@ -303,6 +314,25 @@ const Dashboard: React.FC = () => {
                       <FileText className="w-4 h-4 mr-2" />
                       View PDF
                     </button>
+
+                    <button
+                      onClick={() => setShowHistoryModal(true)}
+                      className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition"
+                    >
+                      <History className="w-4 h-4 mr-2" />
+                      View History
+                    </button>
+
+                    {submission.status !== 'Accepted' && submission.status !== 'Rejected' && (
+                      <button
+                        onClick={() => setShowReuploadModal(true)}
+                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Re-upload Paper
+                      </button>
+                    )}
+
                     {submission.status === 'Revision Required' && (
                       <button
                         onClick={() => navigate(`/edit-submission/${submission.submissionId}`)}
@@ -346,7 +376,7 @@ const Dashboard: React.FC = () => {
                               <span className="flex-1 w-0 truncate">Manuscript Submission Deadline</span>
                             </div>
                             <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium text-red-600">5 January 2026</span>
+                              <span className="font-medium text-red-600">10 February 2026</span>
                             </div>
                           </li>
                           <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
@@ -354,7 +384,7 @@ const Dashboard: React.FC = () => {
                               <span className="flex-1 w-0 truncate">Acceptance Notification</span>
                             </div>
                             <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium">25 January 2026</span>
+                              <span className="font-medium">12 February 2026</span>
                             </div>
                           </li>
                           <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
@@ -362,7 +392,7 @@ const Dashboard: React.FC = () => {
                               <span className="flex-1 w-0 truncate">Registration Deadline</span>
                             </div>
                             <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium">5 February 2026</span>
+                              <span className="font-medium">15 February 2026</span>
                             </div>
                           </li>
                           <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
@@ -514,6 +544,37 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+        {/* Paper History Modal */}
+        {showHistoryModal && submission && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  Paper Submission History
+                </h3>
+                <button
+                  onClick={() => setShowHistoryModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto p-6">
+                <PaperHistoryTimeline submissionId={submission.submissionId} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Re-upload Modal */}
+        {showReuploadModal && submission && (
+          <ReuploadPaperModal
+            submissionId={submission.submissionId}
+            onSuccess={fetchSubmission}
+            onClose={() => setShowReuploadModal(false)}
+          />
         )}
       </div>
     </PageTransition>

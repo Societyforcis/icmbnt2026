@@ -62,9 +62,17 @@ export const register = async (req, res) => {
 
 // Login user
 export const login = async (req, res) => {
-    const { email, password } = req.body;
-
     try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            console.log("Missing credentials:", { hasEmail: !!email, hasPassword: !!password });
+            return res.status(400).json({
+                success: false,
+                message: "Email and password are required"
+            });
+        }
+
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(400).json({
@@ -73,6 +81,17 @@ export const login = async (req, res) => {
             });
         }
 
+        if (!user.password) {
+            console.log("User found but has no password field in DB:", email);
+            return res.status(400).json({
+                success: false,
+                message: user.isGoogleAuth
+                    ? "This account was created with Google. Please use Google Login."
+                    : "No password set for this account. Please contact support."
+            });
+        }
+
+        console.log("bcrypt.compare check starting for:", email);
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({

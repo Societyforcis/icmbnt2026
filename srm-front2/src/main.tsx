@@ -11,9 +11,11 @@ import 'aos/dist/aos.css';
 // Initialize AOS
 //m
 AOS.init({
-  duration: 800,
+  duration: 400, // Reduced from 800ms
   once: true,
-  easing: 'ease-in-out'
+  easing: 'ease-out-quad',
+  offset: 50, // Trigger animations earlier
+  delay: 0, // Ensure no delay
 });
 
 // Make sure we're mounting to the correct element

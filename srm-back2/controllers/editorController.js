@@ -161,7 +161,8 @@ export const getAllReviewers = async (req, res) => {
 
         const reviewers = await User.find(query)
             .select('-password')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         // Enrich reviewers with statistics
         const enrichedReviewers = await Promise.all(
@@ -273,7 +274,7 @@ export const assignReviewers = async (req, res) => {
         // Check if any reviewers are already assigned to this paper
         const alreadyAssigned = paper.reviewAssignments || [];
         const alreadyAssignedIds = alreadyAssigned.map(a => a.reviewer?.toString());
-        const duplicates = reviewerIds.filter(id => 
+        const duplicates = reviewerIds.filter(id =>
             alreadyAssignedIds.includes(id.toString())
         );
 
@@ -506,19 +507,27 @@ export const getEditorDashboardStats = async (req, res) => {
     try {
         const editorId = req.user.userId;
 
-        const totalAssigned = await PaperSubmission.countDocuments({ assignedEditor: editorId });
-        const needsAssignment = await PaperSubmission.countDocuments({
-            assignedEditor: editorId,
-            assignedReviewers: { $size: 0 }
-        });
-        const underReview = await PaperSubmission.countDocuments({
-            assignedEditor: editorId,
-            status: 'Under Review'
-        });
-        const awaitingDecision = await PaperSubmission.countDocuments({
-            assignedEditor: editorId,
-            status: 'Review Received'
-        });
+        // Use Promise.all for parallel count queries
+        const [
+            totalAssigned,
+            needsAssignment,
+            underReview,
+            awaitingDecision
+        ] = await Promise.all([
+            PaperSubmission.countDocuments({ assignedEditor: editorId }),
+            PaperSubmission.countDocuments({
+                assignedEditor: editorId,
+                assignedReviewers: { $size: 0 }
+            }),
+            PaperSubmission.countDocuments({
+                assignedEditor: editorId,
+                status: 'Under Review'
+            }),
+            PaperSubmission.countDocuments({
+                assignedEditor: editorId,
+                status: 'Review Received'
+            })
+        ]);
 
         // Get papers by status
         const papersByStatus = await PaperSubmission.aggregate([
@@ -620,7 +629,7 @@ export const getPdfBase64 = async (req, res) => {
 
         // Support both Cloudinary URLs (new) and Base64 (legacy)
         const pdfUrl = paper.pdfUrl || (paper.pdfBase64 ? `data:application/pdf;base64,${paper.pdfBase64}` : null);
-        
+
         if (!pdfUrl) {
             return res.status(404).json({
                 success: false,
@@ -686,7 +695,7 @@ export const getReviewerDetails = async (req, res) => {
 // Send message to reviewer or author
 export const sendMessage = async (req, res) => {
     try {
-        const { submissionId, reviewId, recipientType, message } = req.body;
+        const { submissionId, reviewId, reviewerId, recipientType, message } = req.body;
         // recipientType: 'reviewer' or 'author'
         const editorId = req.user.userId;
         const editor = await User.findById(editorId);
@@ -695,25 +704,43 @@ export const sendMessage = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Access denied' });
         }
 
-        // Get review and paper (submissionId is a string like "BU001")
-        const review = await ReviewerReview.findById(reviewId);
+        // Get paper (submissionId is a string like "BU001")
         const paper = await PaperSubmission.findOne({ submissionId });
 
-        if (!review || !paper) {
-            return res.status(404).json({ success: false, message: 'Review or paper not found' });
+        if (!paper) {
+            return res.status(404).json({ success: false, message: 'Paper not found' });
+        }
+
+        // If reviewId is provided, use it. Otherwise, track by reviewerId and submissionId
+        let query = { submissionId };
+        if (reviewId) {
+            query.reviewId = reviewId;
+        } else if (reviewerId) {
+            query.reviewerId = reviewerId;
+            query.reviewId = { $exists: false }; // Specific thread for pre-review chat
+        } else {
+            return res.status(400).json({ success: false, message: 'Either reviewId or reviewerId is required' });
         }
 
         // Find or create message thread
-        let messageThread = await ReviewerMessage.findOne({
-            submissionId,
-            reviewId
-        });
+        let messageThread = await ReviewerMessage.findOne(query);
 
         if (!messageThread) {
+            // Determine reviewerId if not provided but reviewId is
+            let targetReviewerId = reviewerId;
+            if (!targetReviewerId && reviewId) {
+                const review = await ReviewerReview.findById(reviewId);
+                targetReviewerId = review?.reviewer;
+            }
+
+            if (!targetReviewerId) {
+                return res.status(400).json({ success: false, message: 'Could not determine reviewer' });
+            }
+
             messageThread = new ReviewerMessage({
                 submissionId,
-                reviewId,
-                reviewerId: review.reviewer,
+                reviewId: reviewId || undefined,
+                reviewerId: targetReviewerId,
                 editorId,
                 authorId: paper.authorId || paper.email
             });
@@ -755,18 +782,26 @@ export const sendMessage = async (req, res) => {
     }
 };
 
-// Get message thread for a review
+// Get message thread for a review or reviewer
 export const getMessageThread = async (req, res) => {
     try {
         const { submissionId, reviewId } = req.params;
+        const { reviewerId } = req.query;
 
-        const messageThread = await ReviewerMessage.findOne({
-            submissionId,
-            reviewId
-        })
+        let query = { submissionId };
+        if (reviewId && reviewId !== 'null' && reviewId !== 'undefined') {
+            query.reviewId = reviewId;
+        } else if (reviewerId) {
+            query.reviewerId = reviewerId;
+            // Also try to find a thread that might have been created with a reviewId later
+            // but for now, let's keep it simple: find threads for this reviewer/paper
+        } else {
+            return res.status(400).json({ success: false, message: 'Required parameters missing' });
+        }
+
+        const messageThread = await ReviewerMessage.findOne(query)
             .populate('reviewerId', 'username email')
-            .populate('editorId', 'username email')
-            .populate('authorId', 'username email');
+            .populate('editorId', 'username email');
 
         if (!messageThread) {
             // Return empty thread if not found yet
@@ -775,7 +810,9 @@ export const getMessageThread = async (req, res) => {
                 messageThread: {
                     conversation: [],
                     editorReviewerConversation: false,
-                    editorAuthorConversation: false
+                    editorAuthorConversation: false,
+                    submissionId,
+                    reviewerId: reviewerId || null
                 }
             });
         }
@@ -1141,7 +1178,7 @@ export const sendBulkReminders = async (req, res) => {
 export const getAllPdfs = async (req, res) => {
     try {
         const pdfs = await listPdfsFromCloudinary();
-        
+
         // Enrich with local database info if available
         const enrichedPdfs = pdfs.map(pdf => {
             const fileName = pdf.public_id.split('/').pop(); // Extract filename from public_id
@@ -1302,7 +1339,7 @@ export const sendMessageToReviewer = async (req, res) => {
 
         // Import nodemailer
         const { sendReviewerAssignmentEmail } = await import('../utils/emailService.js');
-        
+
         // Send using direct nodemailer setup from emailService
         const nodemailer = (await import('nodemailer')).default;
         const transporter = nodemailer.createTransport({
@@ -1432,9 +1469,38 @@ export const sendMessageToAuthor = async (req, res) => {
 
         await transporter.sendMail(mailOptions);
 
+        // Also save to PaperMessage for dashboard visibility
+        try {
+            const { PaperMessage } = await import('../models/PaperMessage.js');
+            let paperMessage = await PaperMessage.findOne({ submissionId });
+            if (!paperMessage) {
+                paperMessage = new PaperMessage({
+                    submissionId,
+                    paperId: paper._id,
+                    authorEmail: paper.email,
+                    editorId: paper.assignedEditor,
+                    messages: []
+                });
+            }
+
+            paperMessage.messages.push({
+                sender: editor.role === 'Admin' ? 'Admin' : 'Editor',
+                senderId: editorId,
+                senderName: editor.username || editor.email,
+                message,
+                timestamp: new Date()
+            });
+
+            paperMessage.lastMessageAt = new Date();
+            await paperMessage.save();
+        } catch (dbError) {
+            console.error('Error saving message to database:', dbError);
+            // Don't fail the request if database save fails but email was sent
+        }
+
         return res.status(200).json({
             success: true,
-            message: 'Message sent to author successfully',
+            message: 'Message sent to author successfully and saved to dashboard',
             authorEmail
         });
     } catch (error) {
@@ -1476,8 +1542,8 @@ export const requestRevision = async (req, res) => {
         console.log('📄 Paper found:', { paperId, title: paper.paperTitle, authorEmail: paper.email, assignedEditor: paper.assignedEditor });
 
         // Verify editor has permission
-        console.log('🔍 Permission check:', { 
-            hasAssignedEditor: !!paper.assignedEditor, 
+        console.log('🔍 Permission check:', {
+            hasAssignedEditor: !!paper.assignedEditor,
             editorIdMatch: paper.assignedEditor?.toString() === editorId,
             isAdmin: req.user.role === 'Admin'
         });
@@ -1650,7 +1716,7 @@ export const requestRevision = async (req, res) => {
 
                         <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px; text-align: center;">
                             <p style="margin: 0 0 10px 0; font-size: 14px; color: #155724;"><strong>Submit Your Revision</strong></p>
-                            <a href="${process.env.FRONTEND_URL || 'https://icmbnt2025.vercel.app'}/author/revision/${paper.submissionId}" style="display: inline-block; padding: 12px 30px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px;">Login & Submit Revision</a>
+                            <a href="${process.env.FRONTEND_URL || 'https://icmbnt2026.vercel.app'}/author/revision/${paper.submissionId}" style="display: inline-block; padding: 12px 30px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px;">Login & Submit Revision</a>
                             <p style="margin: 10px 0 0 0; font-size: 12px; color: #155724;">Click the button above to login and submit your revised paper</p>
                         </div>
 
@@ -1933,12 +1999,12 @@ export const rejectPaper = async (req, res) => {
         }
 
         // Get all reviews for this paper, organized by round
-        const reviews = await ReviewerReview.find({ 
-            paper: paperId 
+        const reviews = await ReviewerReview.find({
+            paper: paperId
         })
-        .populate('reviewer', 'name email affiliation')
-        .sort({ round: 1, createdAt: 1 })
-        .lean();
+            .populate('reviewer', 'name email affiliation')
+            .sort({ round: 1, createdAt: 1 })
+            .lean();
 
         // Organize reviews by round
         const reviewsByRound = [];
@@ -1952,7 +2018,7 @@ export const rejectPaper = async (req, res) => {
                     reviews: []
                 });
             }
-            
+
             roundMap.get(roundNum).reviews.push({
                 reviewerId: review.reviewer._id,
                 reviewerName: review.reviewer.name,
@@ -1973,11 +2039,11 @@ export const rejectPaper = async (req, res) => {
         });
 
         // Get all revisions if any
-        const revisions = await Revision.find({ 
-            paper: paperId 
+        const revisions = await Revision.find({
+            paper: paperId
         })
-        .sort({ revisionNumber: 1 })
-        .lean();
+            .sort({ revisionNumber: 1 })
+            .lean();
 
         const revisionPDFs = revisions.map(rev => ({
             revisionNumber: rev.revisionNumber,
@@ -2293,7 +2359,7 @@ export const removeReviewerFromPaper = async (req, res) => {
         try {
             const editor = await User.findById(paper.assignedEditor);
             const reviewer = await User.findById(reviewerId);
-            
+
             if (editor && reviewer) {
                 const mailOptions = {
                     from: process.env.EMAIL_USER,
@@ -2329,7 +2395,7 @@ export const removeReviewerFromPaper = async (req, res) => {
                         </div>
                     `
                 };
-                
+
                 const transporter = require('nodemailer').createTransport({
                     service: 'gmail',
                     auth: {
@@ -2337,7 +2403,7 @@ export const removeReviewerFromPaper = async (req, res) => {
                         pass: process.env.EMAIL_PASSWORD
                     }
                 });
-                
+
                 await transporter.sendMail(mailOptions);
             }
         } catch (emailError) {
@@ -2626,17 +2692,17 @@ export const deleteReview = async (req, res) => {
 export const updateReview = async (req, res) => {
     try {
         const { reviewId } = req.params;
-        const { 
-            recommendation, 
-            overallRating, 
-            noveltyRating, 
-            qualityRating, 
+        const {
+            recommendation,
+            overallRating,
+            noveltyRating,
+            qualityRating,
             clarityRating,
             comments,
-            commentsToEditor, 
-            commentsToReviewer, 
-            strengths, 
-            weaknesses 
+            commentsToEditor,
+            commentsToReviewer,
+            strengths,
+            weaknesses
         } = req.body;
 
         if (!reviewId) {
@@ -2718,7 +2784,7 @@ export const getPaperReReviews = async (req, res) => {
         }
 
         // Find all Round 2+ reviews for this paper from ReviewerReview collection
-        const reReviews = await ReviewerReview.find({ 
+        const reReviews = await ReviewerReview.find({
             paper: paperId,
             round: { $gte: 2 },  // Get Round 2 and higher
             status: 'Submitted'  // Only submitted reviews

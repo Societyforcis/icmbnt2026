@@ -170,11 +170,11 @@ const rejectedPaperSchema = new mongoose.Schema({
     // Conference/Event Info
     conferenceYear: {
         type: Number,
-        default: 2025
+        default: 2026
     },
     conferenceName: {
         type: String,
-        default: 'ICMBNT 2025'
+        default: 'ICMBNT 2026'
     },
 
     // Additional Metadata

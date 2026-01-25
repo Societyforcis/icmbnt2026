@@ -23,7 +23,7 @@ export const getAllMembers = async (req, res) => {
 export const getMemberById = async (req, res) => {
   try {
     const member = await CommitteeMember.findById(req.params.id);
-    
+
     if (!member) {
       return res.status(404).json({
         success: false,
@@ -153,31 +153,4 @@ export const deleteMember = async (req, res) => {
   }
 };
 
-// Bulk import committee members (Admin only)
-export const bulkImport = async (req, res) => {
-  try {
-    const { members } = req.body;
 
-    if (!Array.isArray(members) || members.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide an array of committee members'
-      });
-    }
-
-    const importedMembers = await CommitteeMember.insertMany(members);
-
-    res.status(201).json({
-      success: true,
-      message: `${importedMembers.length} committee members imported successfully`,
-      data: importedMembers
-    });
-  } catch (error) {
-    console.error('Error bulk importing committee members:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to import committee members',
-      error: error.message
-    });
-  }
-};

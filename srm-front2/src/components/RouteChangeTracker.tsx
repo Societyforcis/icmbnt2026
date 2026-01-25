@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import LoadingScreen from './LoadingScreen';
 
 interface RouteChangeTrackerProps {
@@ -7,30 +6,20 @@ interface RouteChangeTrackerProps {
   loadingTime?: number;
 }
 
-const RouteChangeTracker: React.FC<RouteChangeTrackerProps> = ({ 
-  children, 
-  loadingTime = 800
+const RouteChangeTracker: React.FC<RouteChangeTrackerProps> = ({
+  children
 }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const location = useLocation();
 
   useEffect(() => {
-    // Reset loading state on route change
-    setIsLoading(true);
-    
-    console.log(`Loading route: ${location.pathname} with loading time: ${loadingTime}ms`);
-    
-    // Set minimum loading time to ensure animation is visible
+    // Only show loading screen briefly on initial mount or extremely fast on route change
+    // We'll set a tiny timeout to ensure everything is settled
     const timer = setTimeout(() => {
       setIsLoading(false);
-      console.log(`Finished loading route: ${location.pathname}`);
-    }, loadingTime);
-    
-    // Clean up timeout on unmount or route change
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [location.pathname, loadingTime]);
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, []); // Run only on mount
 
   return isLoading ? <LoadingScreen /> : <>{children}</>;
 };

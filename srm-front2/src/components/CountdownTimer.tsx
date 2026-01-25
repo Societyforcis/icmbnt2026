@@ -9,14 +9,14 @@ const CountdownTimer: React.FC = () => {
   });
 
   useEffect(() => {
-    const conferenceDate = new Date('2026-04-26').getTime();
+    const conferenceDate = new Date('2026-03-12').getTime();
 
     const timer = setInterval(() => {
       const now = new Date().getTime();
       const difference = conferenceDate - now;
 
       if (difference > 0) {
-        
+
         setTimeLeft({
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
           hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),

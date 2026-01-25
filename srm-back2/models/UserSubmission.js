@@ -5,7 +5,8 @@ const userSubmissionSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    unique: true
   },
   submissionId: {
     type: String,
@@ -21,8 +22,5 @@ const userSubmissionSchema = new mongoose.Schema({
     unique: true
   }
 }, { timestamps: true });
-
-// Create a compound unique index to ensure one submission per email
-userSubmissionSchema.index({ email: 1 }, { unique: true });
 
 export const UserSubmission = mongoose.model('UserSubmission', userSubmissionSchema);

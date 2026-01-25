@@ -2,8 +2,9 @@ import bcrypt from 'bcrypt';
 import { User } from '../models/User.js';
 import { PaperSubmission } from '../models/Paper.js';
 import { Review } from '../models/Review.js';
+import { Revision } from '../models/Revision.js';
 import { generateRandomPassword } from '../utils/helpers.js';
-import { sendEditorAssignmentEmail, sendEditorCredentialsEmail } from '../utils/emailService.js';
+import { sendEditorAssignmentEmail, sendEditorCredentialsEmail, sendEditorMessageEmail } from '../utils/emailService.js';
 
 // Create editor account
 export const createEditor = async (req, res) => {
@@ -32,9 +33,9 @@ export const createEditor = async (req, res) => {
         });
 
         await newEditor.save();
-        
+
         console.log(`📧 Sending credentials email to ${email}...`);
-        
+
         // Send credentials email
         try {
             await sendEditorCredentialsEmail(email, username || email.split('@')[0], userPassword);
@@ -70,14 +71,14 @@ export const createEditor = async (req, res) => {
 export const getAllEditors = async (req, res) => {
     try {
         console.log('📋 Fetching all editors from database...');
-        
+
         // Query all users and check their roles
         const allUsers = await User.find({});
         console.log(`Total users in database: ${allUsers.length}`);
         console.log('User roles:', allUsers.map(u => ({ email: u.email, role: u.role })));
 
         // Find editors - handle case sensitivity
-        const editors = await User.find({ 
+        const editors = await User.find({
             role: { $in: ['Editor', 'editor', 'EDITOR'] }
         })
             .select('-password')
@@ -104,7 +105,7 @@ export const getAllEditors = async (req, res) => {
     }
 
 };
-       
+
 
 
 // Assign editor to paper
@@ -231,7 +232,8 @@ export const getAllUsers = async (req, res) => {
 
         const users = await User.find(query)
             .select('-password')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         return res.status(200).json({
             success: true,
@@ -251,18 +253,28 @@ export const getAllUsers = async (req, res) => {
 // Get dashboard statistics
 export const getDashboardStats = async (req, res) => {
     try {
-        // Get paper statistics
-        const totalPapers = await PaperSubmission.countDocuments();
-        const submittedPapers = await PaperSubmission.countDocuments({ status: 'Submitted' });
-        const underReview = await PaperSubmission.countDocuments({ status: 'Under Review' });
-        const accepted = await PaperSubmission.countDocuments({ status: 'Accepted' });
-        const rejected = await PaperSubmission.countDocuments({ status: 'Rejected' });
-
-        // Get user statistics
-        const totalUsers = await User.countDocuments();
-        const authors = await User.countDocuments({ role: 'Author' });
-        const editors = await User.countDocuments({ role: 'Editor' });
-        const reviewers = await User.countDocuments({ role: 'Reviewer' });
+        // Use Promise.all for parallel count queries
+        const [
+            totalPapers,
+            submittedPapers,
+            underReview,
+            accepted,
+            rejected,
+            totalUsers,
+            authors,
+            editors,
+            reviewers
+        ] = await Promise.all([
+            PaperSubmission.countDocuments(),
+            PaperSubmission.countDocuments({ status: 'Submitted' }),
+            PaperSubmission.countDocuments({ status: 'Under Review' }),
+            PaperSubmission.countDocuments({ status: 'Accepted' }),
+            PaperSubmission.countDocuments({ status: 'Rejected' }),
+            User.countDocuments(),
+            User.countDocuments({ role: 'Author' }),
+            User.countDocuments({ role: 'Editor' }),
+            User.countDocuments({ role: 'Reviewer' })
+        ]);
 
         // Get papers by status
         const papersByStatus = await PaperSubmission.aggregate([
@@ -274,11 +286,13 @@ export const getDashboardStats = async (req, res) => {
             }
         ]);
 
-        // Get recent submissions
+        // Get recent submissions in parallel with other aggregate tasks if possible,
+        // but here we just optimize the query itself
         const recentSubmissions = await PaperSubmission.find()
             .populate('assignedEditor', 'username email')
             .sort({ createdAt: -1 })
-            .limit(10);
+            .limit(10)
+            .lean();
 
         // Get monthly submission trends (last 6 months)
         const sixMonthsAgo = new Date();
@@ -357,6 +371,132 @@ export const deleteUser = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Error deleting user",
+            error: error.message
+        });
+    }
+};
+// Send message to editor
+export const sendMessageToEditor = async (req, res) => {
+    try {
+        const { editorId, message } = req.body;
+
+        if (!editorId || !message) {
+            return res.status(400).json({
+                success: false,
+                message: "Editor ID and message are required"
+            });
+        }
+
+        const editor = await User.findById(editorId);
+        if (!editor || editor.role !== 'Editor') {
+            return res.status(404).json({
+                success: false,
+                message: "Editor not found"
+            });
+        }
+
+        // For now, we send an email notification. 
+        // We could also store this in a Message collection if needed.
+        await sendEditorMessageEmail(editor.email, editor.username, message);
+
+        return res.status(200).json({
+            success: true,
+            message: "Message sent successfully to the editor"
+        });
+    } catch (error) {
+        console.error("Error sending message to editor:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error sending message",
+            error: error.message
+        });
+    }
+};
+
+// Get all conference selected users (users who completed the full process)
+export const getConferenceSelectedUsers = async (req, res) => {
+    try {
+        const ConferenceSelectedUser = (await import('../models/ConferenceSelectedUser.js')).default;
+
+        const selectedUsers = await ConferenceSelectedUser.find()
+            .sort({ selectionDate: -1 })
+            .populate('paymentId');
+
+        return res.status(200).json({
+            success: true,
+            message: `Found ${selectedUsers.length} selected users`,
+            users: selectedUsers,
+            total: selectedUsers.length
+        });
+    } catch (error) {
+        console.error('Error fetching conference selected users:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching selected users',
+            error: error.message
+        });
+    }
+};
+
+// Get all PDFs from Cloudinary (admin version with delete capability)
+export const getAllPdfsAdmin = async (req, res) => {
+    try {
+        const { listPdfsFromCloudinary } = await import('../config/cloudinary-pdf.js');
+        const pdfs = await listPdfsFromCloudinary();
+
+        // Enrich with local database info if available
+        const enrichedPdfs = pdfs.map(pdf => {
+            const fileName = pdf.public_id.split('/').pop();
+            return {
+                publicId: pdf.public_id,
+                fileName: fileName,
+                url: pdf.secure_url,
+                size: pdf.bytes,
+                uploadedAt: pdf.created_at,
+                version: pdf.version
+            };
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: `Found ${enrichedPdfs.length} PDFs in Cloudinary`,
+            pdfs: enrichedPdfs,
+            total: enrichedPdfs.length
+        });
+    } catch (error) {
+        console.error('Error fetching PDFs from Cloudinary:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching PDFs from Cloudinary',
+            error: error.message
+        });
+    }
+};
+
+// Delete PDF from Cloudinary (admin only)
+export const deletePdfAdmin = async (req, res) => {
+    try {
+        const { publicId } = req.body;
+
+        if (!publicId) {
+            return res.status(400).json({
+                success: false,
+                message: 'PDF public ID is required'
+            });
+        }
+
+        const { deletePdfFromCloudinary } = await import('../config/cloudinary-pdf.js');
+        await deletePdfFromCloudinary(publicId);
+
+        return res.status(200).json({
+            success: true,
+            message: 'PDF deleted successfully from Cloudinary'
+        });
+    } catch (error) {
+        console.error('Error deleting PDF:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error deleting PDF',
             error: error.message
         });
     }
