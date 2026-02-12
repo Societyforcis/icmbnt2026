@@ -1632,3 +1632,39 @@ export const sendEditorMessageEmail = async (editorEmail, editorName, messageCon
 
     return transporter.sendMail(mailOptions);
 };
+
+// Send selection email to author for final document upload
+export const sendSelectionEmail = async (authorEmail, authorName, paperData) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const uploadUrl = `${frontendUrl}/author-dashboard`;
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: authorEmail,
+        subject: `[FINAL STEP] Paper Selection Confirmation - ${paperData.submissionId}`,
+        html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+        <h2 style="color: #4CAF50; text-align: center;">Congratulations! You are Final Selected</h2>
+        <p>Dear ${authorName},</p>
+        <p>We are pleased to inform you that your paper titled "<strong>${paperData.paperTitle}</strong>" has been final selected for the conference.</p>
+        <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0; border-radius: 5px;">
+          <p><strong>Submission ID:</strong> ${paperData.submissionId}</p>
+        </div>
+        <p>To confirm one more step, please upload the conference selected paper in <strong>.doc or .docx</strong> format.</p>
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${uploadUrl}" 
+             style="background-color: #F5A051; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">
+             Upload Final Document
+          </a>
+        </div>
+        <p style="color: #666; font-size: 0.9em; text-align: center;">
+          Please log in to your dashboard to complete this final step.
+        </p>
+        <p>Best regards,<br>ICMBNT 2026 Committee</p>
+      </div>
+    `
+    };
+
+    return transporter.sendMail(mailOptions);
+};
+

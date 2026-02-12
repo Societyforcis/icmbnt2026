@@ -48,6 +48,12 @@ const CopyrightDashboard: React.FC = () => {
     const [uploading, setUploading] = useState(false);
     const [file, setFile] = useState<File | null>(null);
 
+    // Final Selection & Document Upload states
+    const [isFinalSelected, setIsFinalSelected] = useState(false);
+    const [selectedUserData, setSelectedUserData] = useState<any>(null);
+    const [isUploadingFinal, setIsUploadingFinal] = useState(false);
+    const [finalDocFile, setFinalDocFile] = useState<File | null>(null);
+
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
     useEffect(() => {
@@ -70,6 +76,8 @@ const CopyrightDashboard: React.FC = () => {
                 setHasPaper(response.data.hasPaper);
                 setDashboardData(response.data.data || null);
                 setEligible(true);
+                // Also check selection status
+                checkSelectionStatus();
             }
         } catch (error: any) {
             console.error('Error fetching dashboard data:', error);
@@ -144,6 +152,108 @@ const CopyrightDashboard: React.FC = () => {
             alert('Failed to upload file. Please try again.');
         } finally {
             setUploading(false);
+        }
+    };
+    const checkSelectionStatus = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`${API_URL}/api/papers/check-selection`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (response.data.success && response.data.isSelected) {
+                setIsFinalSelected(true);
+                setSelectedUserData(response.data.selectedUser);
+                console.log('Final selection data loaded:', response.data.selectedUser);
+            }
+        } catch (error) {
+            console.error('Error checking selection status:', error);
+        }
+    };
+
+    const handleFinalDocUpload = async () => {
+        console.log('handleFinalDocUpload called');
+        console.log('finalDocFile:', finalDocFile);
+        console.log('dashboardData.paper:', dashboardData?.paper);
+
+        if (!finalDocFile || !dashboardData?.paper?.submissionId) {
+            alert('Please select a document first or submission info missing.');
+            return;
+        }
+
+        const allowedTypes = [
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/pdf'
+        ];
+
+        const fileName = finalDocFile.name.toLowerCase();
+        const isWordDoc = allowedTypes.includes(finalDocFile.type) ||
+            fileName.endsWith('.doc') ||
+            fileName.endsWith('.docx');
+
+        console.log('Validating file:', fileName, 'Type:', finalDocFile.type);
+
+        if (!isWordDoc) {
+            alert('Please upload a Microsoft Word (.doc, .docx) file.');
+            return;
+        }
+
+        console.log('Validation passed, starting upload...');
+        setIsUploadingFinal(true);
+        try {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('finalDoc', finalDocFile);
+
+            const targetUrl = `${API_URL}/api/papers/upload-final-doc/${dashboardData.paper.submissionId}`;
+            console.log('Final upload URL:', targetUrl);
+
+            const response = await axios.post(
+                targetUrl,
+                formData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'multipart/form-data'
+                    }
+                }
+            );
+
+            console.log('Upload response status:', response.status);
+            console.log('Upload response data:', response.data);
+
+            if (response.data.success) {
+                console.log('Upload successful, updating state...');
+                // Use the returned user object or update manually
+                if (response.data.selectedUser) {
+                    setSelectedUserData(response.data.selectedUser);
+                } else {
+                    setSelectedUserData((prev: any) => ({
+                        ...prev,
+                        finalDocUrl: response.data.finalDocUrl,
+                        status: 'Final Version Submitted'
+                    }));
+                }
+                setFinalDocFile(null);
+                alert('Final document uploaded successfully! You can see it in your dashboard.');
+            }
+        } catch (error: any) {
+            console.error('--- UPLOAD FAILED ---');
+            console.error('Error message:', error.message);
+            if (error.response) {
+                console.error('Response status:', error.response.status);
+                console.error('Response data:', error.response.data);
+                alert(`Upload failed: ${error.response.data.message || 'Server error'}`);
+            } else if (error.request) {
+                console.error('No response received from server');
+                alert('No response from server. Check if backend is running.');
+            } else {
+                console.error('Error setting up request:', error.message);
+                alert(`Error: ${error.message}`);
+            }
+        } finally {
+            setIsUploadingFinal(false);
+            console.log('--- UPLOAD PROCESS ENDED ---');
         }
     };
 
@@ -347,6 +457,167 @@ const CopyrightDashboard: React.FC = () => {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Final Selected Next Steps - Show if author is selected for conference publication */}
+                            {isFinalSelected && (
+                                <div className="bg-white shadow-lg rounded-xl overflow-hidden border-2 border-green-500 animate__animated animate__fadeIn">
+                                    <div className="bg-green-600 p-4 text-white flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-white/20 p-2 rounded-lg">
+                                                <CheckCircle className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xl font-bold">Congratulations!</h3>
+                                                <p className="text-sm opacity-90 font-medium">Your paper is selected for ICBNT 2026 Conference Publication</p>
+                                            </div>
+                                        </div>
+                                        <div className="hidden md:block">
+                                            <span className="bg-green-700/50 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20">Final Selection</span>
+                                        </div>
+                                    </div>
+                                    <div className="p-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                                            <div>
+                                                <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                                    <span className="bg-green-100 text-green-700 w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span>
+                                                    Submit Final Camera-Ready Paper
+                                                </h4>
+                                                <p className="text-gray-600 text-sm mb-6 leading-relaxed">
+                                                    Please upload the final version of your paper (Camera-Ready version) in <strong>.doc / .docx</strong> format. Ensure all reviewer comments have been addressed and the format strictly follows the conference guidelines.
+                                                </p>
+
+                                                {!selectedUserData?.finalDocUrl ? (
+                                                    <div className="space-y-4">
+                                                        <div className="relative border-2 border-dashed border-gray-200 rounded-xl p-6 hover:border-green-500 transition-colors bg-gray-50/50">
+                                                            <div className="flex flex-col items-center text-center pointer-events-none">
+                                                                <Upload className="w-10 h-10 text-gray-400 mb-2" />
+                                                                <p className="text-sm font-bold text-gray-700">
+                                                                    {finalDocFile ? finalDocFile.name : "Select Word file (.doc, .docx)"}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500">Max size 25MB</p>
+                                                            </div>
+                                                            <input
+                                                                type="file"
+                                                                onChange={(e) => {
+                                                                    const selectedFile = e.target.files?.[0] || null;
+                                                                    console.log('File selected for upload:', selectedFile);
+                                                                    setFinalDocFile(selectedFile);
+                                                                }}
+                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
+                                                                accept=".doc,.docx"
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            onClick={handleFinalDocUpload}
+                                                            disabled={isUploadingFinal || !finalDocFile}
+                                                            className="w-full py-4 bg-green-600 text-white rounded-xl font-black shadow-lg shadow-green-200 hover:bg-green-700 transition-all flex items-center justify-center gap-3 disabled:bg-gray-300 disabled:shadow-none"
+                                                        >
+                                                            {isUploadingFinal ? (
+                                                                <>
+                                                                    <div className="animate-spin h-5 w-5 border-2 border-white/20 border-t-white rounded-full"></div>
+                                                                    Uploading Final Document...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Send className="w-5 h-5" />
+                                                                    Upload Final Version
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                                                        <div className="flex items-center gap-3 mb-4">
+                                                            <div className="bg-green-100 p-2 rounded-lg">
+                                                                <CheckCircle className="w-6 h-6 text-green-600" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-green-800 font-bold">Final Doc Uploaded</p>
+                                                                <p className="text-xs text-green-600">Successfully submitted for review</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex bg-white rounded-lg p-3 border border-green-100 justify-between items-center mb-4">
+                                                            <span className="text-sm font-medium text-gray-700 truncate max-w-[200px]">Camera-Ready-Paper.docx</span>
+                                                            <a
+                                                                href={selectedUserData.finalDocUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-primary hover:underline text-sm font-bold flex items-center gap-2"
+                                                            >
+                                                                <Download className="w-4 h-4" /> View
+                                                            </a>
+                                                        </div>
+
+                                                        <div className="pt-4 border-t border-green-100">
+                                                            <p className="text-xs text-gray-500 mb-2">Want to update the file?</p>
+                                                            <div className="relative border border-dashed border-green-300 rounded-lg p-3 bg-white mb-3 text-center cursor-pointer hover:bg-green-50 transition">
+                                                                <div className="flex flex-col items-center pointer-events-none">
+                                                                    <p className="text-xs font-bold text-green-700 flex items-center justify-center gap-2">
+                                                                        <Upload className="w-3 h-3" />
+                                                                        {finalDocFile ? finalDocFile.name : "Select new version (.doc, .docx)"}
+                                                                    </p>
+                                                                </div>
+                                                                <input
+                                                                    type="file"
+                                                                    onChange={(e) => {
+                                                                        const selectedFile = e.target.files?.[0] || null;
+                                                                        console.log('Update file selected:', selectedFile);
+                                                                        setFinalDocFile(selectedFile);
+                                                                    }}
+                                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
+                                                                    accept=".doc,.docx"
+                                                                />
+                                                            </div>
+
+                                                            {finalDocFile && (
+                                                                <button
+                                                                    onClick={handleFinalDocUpload}
+                                                                    disabled={isUploadingFinal}
+                                                                    className="w-full py-2.5 bg-green-600 text-white rounded-lg text-sm font-black shadow-md hover:bg-green-700 transition flex items-center justify-center gap-2"
+                                                                >
+                                                                    {isUploadingFinal ? (
+                                                                        <Loader2 className="animate-spin w-4 h-4" />
+                                                                    ) : (
+                                                                        <Send className="w-4 h-4" />
+                                                                    )}
+                                                                    Confirm & Re-upload
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="bg-gray-50 p-6 rounded-xl border border-gray-100 h-full flex flex-col justify-center">
+                                                <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                                    <span className="bg-blue-100 text-blue-700 w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
+                                                    Next Steps
+                                                </h4>
+                                                <ul className="space-y-4">
+                                                    <li className="flex gap-3">
+                                                        <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                            <CheckCircle className="w-3 h-3 text-blue-600" />
+                                                        </div>
+                                                        <p className="text-xs text-gray-600"><strong className="text-gray-900">Final Review:</strong> Our editorial team will perform a final check on your camera-ready paper format.</p>
+                                                    </li>
+                                                    <li className="flex gap-3">
+                                                        <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                            <CheckCircle className="w-3 h-3 text-blue-600" />
+                                                        </div>
+                                                        <p className="text-xs text-gray-600"><strong className="text-gray-900">Registration:</strong> Ensure your conference registration is complete if not already done.</p>
+                                                    </li>
+                                                    <li className="flex gap-3">
+                                                        <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                            <CheckCircle className="w-3 h-3 text-blue-600" />
+                                                        </div>
+                                                        <p className="text-xs text-gray-600"><strong className="text-gray-900">Presentation:</strong> You will receive details about the oral/poster presentation schedule soon.</p>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Upload Section */}
                             <div className="bg-white rounded-xl shadow-md overflow-hidden">

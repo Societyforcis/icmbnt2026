@@ -1,5 +1,6 @@
 import cloudinary from './cloudinary.js';
 import streamifier from 'streamifier';
+import path from 'path';
 
 // Use the unified configuration from cloudinary.js
 
@@ -11,15 +12,14 @@ import streamifier from 'streamifier';
  */
 export const uploadPdfToCloudinary = async (fileBuffer, fileName) => {
   return new Promise((resolve, reject) => {
-    // Clean filename: remove extension and trim whitespace
-    const cleanFileName = fileName.replace(/\.[^/.]+$/, '').trim().replace(/\s+/g, '_');
+    const extension = path.extname(fileName).toLowerCase();
+    const cleanFileNameWithoutExt = fileName.replace(/\.[^/.]+$/, '').trim().replace(/\s+/g, '_');
 
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         resource_type: 'raw',
         folder: 'icmbnt-pdfs',
-        format: 'pdf',
-        public_id: `${Date.now()}-${cleanFileName}`, // Unique ID based on timestamp and filename
+        public_id: `${Date.now()}-${cleanFileNameWithoutExt}${extension}`, // Unique ID based on timestamp and filename
         access_mode: 'authenticated', // Keep PDFs private, only accessible with auth token if needed
         timeout: 60000, // 60 second timeout for upload
         chunk_size: 5242880 // 5MB chunks for large files

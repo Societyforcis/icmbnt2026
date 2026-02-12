@@ -10,10 +10,12 @@ import {
     getRevisionData,
     getAllRevisions,
     reuploadPaper,
-    getPaperHistory
+    getPaperHistory,
+    checkFinalSelection,
+    uploadFinalDoc
 } from '../controllers/paperController.js';
 import { verifyJWT } from '../middleware/auth.js';
-import { uploadPaperPDF } from '../middleware/upload.js';
+import { uploadPaperPDF, uploadFinalDocument } from '../middleware/upload.js';
 import { requireRole } from '../middleware/roleCheck.js';
 
 const router = express.Router();
@@ -21,8 +23,10 @@ const router = express.Router();
 // Author routes
 router.post('/submit', verifyJWT, uploadPaperPDF.single('pdf'), submitPaper);
 router.get('/my-submission', verifyJWT, getUserSubmission);
+router.get('/check-selection', verifyJWT, checkFinalSelection);
 router.put('/edit/:submissionId', verifyJWT, uploadPaperPDF.single('pdf'), editSubmission);
 router.post('/reupload/:submissionId', verifyJWT, uploadPaperPDF.single('pdf'), reuploadPaper);
+router.post('/upload-final-doc/:submissionId', verifyJWT, uploadFinalDocument.single('finalDoc'), uploadFinalDoc);
 router.post('/submit-revision', verifyJWT, uploadPaperPDF.fields([
     { name: 'cleanPdf', maxCount: 1 },
     { name: 'highlightedPdf', maxCount: 1 },

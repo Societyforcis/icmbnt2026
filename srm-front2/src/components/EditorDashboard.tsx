@@ -28,6 +28,7 @@ import PDFManagement from './PDFManagement';
 import ReviewerChat from './ReviewerChat';
 import PaperHistoryTimeline from './PaperHistoryTimeline';
 import { History } from 'lucide-react';
+import AdminSelectedUsers from './AdminSelectedUsers';
 
 interface Paper {
     _id: string;
@@ -894,6 +895,13 @@ const EditorDashboard = () => {
                         onClick={() => setActiveTab('allReviewers')}
                         collapsed={!sidebarOpen}
                     />
+                    <NavItem
+                        icon={CheckCircle}
+                        label="Selected Users"
+                        active={activeTab === 'selectedUsers'}
+                        onClick={() => setActiveTab('selectedUsers')}
+                        collapsed={!sidebarOpen}
+                    />
                 </nav>
 
                 {/* Logout */}
@@ -921,6 +929,7 @@ const EditorDashboard = () => {
                         {activeTab === 'pdfs' && 'PDF Management'}
                         {activeTab === 'createReviewer' && 'Create New Reviewer'}
                         {activeTab === 'allReviewers' && 'All Reviewers'}
+                        {activeTab === 'selectedUsers' && 'Conference Selected Users'}
                     </h2>
                 </div>
 
@@ -999,6 +1008,10 @@ const EditorDashboard = () => {
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {activeTab === 'selectedUsers' && (
+                        <AdminSelectedUsers />
                     )}
 
                     {activeTab === 'papers' && !viewingPaper && (

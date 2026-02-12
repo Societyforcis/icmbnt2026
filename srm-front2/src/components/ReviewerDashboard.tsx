@@ -216,10 +216,6 @@ const ReviewerDashboard = () => {
         }
     };
 
-    // Helper function to count words
-    const countWords = (text: string): number => {
-        return text.trim().split(/\s+/).filter(word => word.length > 0).length;
-    };
 
     const verifyReviewerAccess = async () => {
         const token = localStorage.getItem('token');
@@ -364,19 +360,7 @@ const ReviewerDashboard = () => {
         }
 
         // Word count validation (minimum 150 words for both fields)
-        const commentsWordCount = countWords(formData.comments);
-        const commentsToEditorWordCount = countWords(formData.commentsToEditor);
-
-        if (commentsWordCount < 150) {
-            alert(`Review Comments (Internal) must be at least 150 words. Current: ${commentsWordCount} words.`);
-            return;
-        }
-
-        if (commentsToEditorWordCount < 150) {
-            alert(`Private Comments to Editor must be at least 150 words. Current: ${commentsToEditorWordCount} words.`);
-            return;
-        }
-
+        // Check word counts if needed
         const confirmMessage = currentRoundSubmitted
             ? 'Are you sure you want to update this submitted review?'
             : 'Are you sure you want to submit this review? You can edit it later if needed.';
@@ -907,8 +891,8 @@ const ReviewerDashboard = () => {
                                         />
                                         <div className="flex justify-between items-center mt-1">
                                             <p className="text-xs text-gray-500">These comments are for system tracking only and won't be sent to the author.</p>
-                                            <p className={`text-xs font-semibold ${countWords(formData.comments) >= 150 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {countWords(formData.comments)} / 150 words
+                                            <p className={`text-xs font-semibold ${formData.comments.trim().length >= 20 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {formData.comments.trim().length} / 20 characters
                                             </p>
                                         </div>
                                     </div>
@@ -928,8 +912,8 @@ const ReviewerDashboard = () => {
                                         />
                                         <div className="flex justify-between items-center mt-1">
                                             <p className="text-xs text-red-600">These comments are PRIVATE and will NOT be sent to the author. Only the editor will see these.</p>
-                                            <p className={`text-xs font-semibold ${countWords(formData.commentsToEditor) >= 150 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {countWords(formData.commentsToEditor)} / 150 words
+                                            <p className={`text-xs font-semibold ${formData.commentsToEditor.trim().length >= 20 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {formData.commentsToEditor.trim().length} / 20 characters
                                             </p>
                                         </div>
                                     </div>
@@ -1061,7 +1045,7 @@ const ReviewerDashboard = () => {
                                     {/* Submit Button */}
                                     <button
                                         onClick={handleSubmitReview}
-                                        disabled={submitting || !formData.comments.trim() || !formData.commentsToEditor.trim() || countWords(formData.comments) < 150 || countWords(formData.commentsToEditor) < 150}
+                                        disabled={submitting || formData.comments.trim().length < 20 || formData.commentsToEditor.trim().length < 20}
                                         className={`w-full px-4 py-3 ${currentRoundSubmitted ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold`}
                                     >
                                         {submitting ? (
@@ -1094,7 +1078,7 @@ const ReviewerDashboard = () => {
                                         </div>
                                     ) : (
                                         <p className="text-xs text-gray-500 mt-2 text-center">
-                                            ⚠️ Both comment fields must have at least 150 words
+                                            ⚠️ Both comment fields must have at least 20 characters
                                         </p>
                                     )}
                                 </div>

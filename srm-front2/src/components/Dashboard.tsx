@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Swal from 'sweetalert2';
 import PageTransition from './PageTransition';
 import { CheckCircle, Clock, FileText, Users, AlertCircle, XCircle, X, History, Upload } from 'lucide-react';
 import ReuploadPaperModal from './ReuploadPaperModal';
@@ -55,6 +56,12 @@ const Dashboard: React.FC = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showReuploadModal, setShowReuploadModal] = useState(false);
 
+  // Final Selection & Document Upload states
+  const [isFinalSelected, setIsFinalSelected] = useState(false);
+  const [selectedUserData, setSelectedUserData] = useState<any>(null);
+  const [isUploadingFinal, setIsUploadingFinal] = useState(false);
+  const [finalDocFile, setFinalDocFile] = useState<File | null>(null);
+
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
@@ -100,11 +107,71 @@ const Dashboard: React.FC = () => {
       if (response.data.success && response.data.hasSubmission) {
         setSubmission(response.data.submission);
         setHasSubmission(true);
+        // Once we have submission, also check selection status
+        checkSelectionStatus();
       }
     } catch (error) {
       console.error('Error fetching submission:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkSelectionStatus = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/papers/check-selection`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success && response.data.isSelected) {
+        setIsFinalSelected(true);
+        setSelectedUserData(response.data.selectedUser);
+      }
+    } catch (error) {
+      console.error('Error checking selection status:', error);
+    }
+  };
+
+  const handleFinalDocUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!finalDocFile || !submission) return;
+
+    setIsUploadingFinal(true);
+    try {
+      const formData = new FormData();
+      formData.append('finalDoc', finalDocFile);
+
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API_URL}/api/papers/upload-final-doc/${submission.submissionId}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.data.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Success!',
+          text: 'Final document uploaded successfully!',
+          confirmButtonColor: '#F5A051'
+        });
+        setFinalDocFile(null);
+        checkSelectionStatus(); // Refresh to show new URL
+      }
+    } catch (error: any) {
+      console.error('Error uploading final doc:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Upload Failed',
+        text: error.response?.data?.message || 'Error uploading document'
+      });
+    } finally {
+      setIsUploadingFinal(false);
     }
   };
 
@@ -344,6 +411,88 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Final Selected Next Steps */}
+              {isFinalSelected && (
+                <div className="bg-white shadow-lg rounded-lg overflow-hidden border-2 border-green-500 animate__animated animate__fadeIn">
+                  <div className="bg-green-600 px-6 py-4 flex items-center gap-2">
+                    <CheckCircle className="w-6 h-6 text-white" />
+                    <h2 className="text-xl font-semibold text-white">Congratulations! You are Final Selected</h2>
+                  </div>
+                  <div className="p-6">
+                    <p className="text-gray-700 mb-6 font-medium">
+                      Your paper has been final selected for the conference. As a final step, please upload the conference selected paper in <strong>.doc or .docx</strong> format.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Upload Form */}
+                      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <Upload className="w-5 h-5 text-[#F5A051]" />
+                          Upload Final Document (.doc / .docx)
+                        </h3>
+                        <form onSubmit={handleFinalDocUpload} className="space-y-4">
+                          <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-white">
+                            <input
+                              type="file"
+                              accept=".doc,.docx,.pdf"
+                              onChange={(e) => setFinalDocFile(e.target.files?.[0] || null)}
+                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                              required
+                            />
+                            <p className="mt-2 text-xs text-gray-500">Supported formats: .doc, .docx (Max 15MB)</p>
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={isUploadingFinal || !finalDocFile}
+                            className={`w-full py-2 px-4 rounded-md text-white font-semibold shadow-md transition ${isUploadingFinal || !finalDocFile ? 'bg-gray-400' : 'bg-[#F5A051] hover:bg-[#e08c3e]'
+                              } flex items-center justify-center gap-2`}
+                          >
+                            {isUploadingFinal ? (
+                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            ) : null}
+                            {isUploadingFinal ? 'Uploading...' : (selectedUserData?.finalDocUrl ? 'Re-upload Document' : 'Upload Final Document')}
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Status & Download */}
+                      <div className="flex flex-col justify-center bg-green-50 p-6 rounded-lg border border-green-100">
+                        <h3 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5" />
+                          Submission Status
+                        </h3>
+                        {selectedUserData?.finalDocUrl ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-2 text-green-700 font-bold bg-white p-3 rounded border border-green-200">
+                              <CheckCircle className="w-5 h-5" />
+                              <span>Final Document Uploaded Successfully</span>
+                            </div>
+                            <p className="text-sm text-gray-600">
+                              Submitted on: <span className="font-semibold text-gray-800">{new Date(selectedUserData.finalDocSubmittedAt).toLocaleString()}</span>
+                            </p>
+                            <a
+                              href={selectedUserData.finalDocUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition w-full justify-center font-bold shadow-md"
+                            >
+                              <FileText className="w-5 h-4 mr-2" />
+                              View Uploaded Document
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center text-center py-4 bg-white rounded-lg border border-orange-100 p-6">
+                            <Clock className="w-12 h-12 text-orange-400 mb-2 animate-pulse" />
+                            <p className="text-gray-700 font-medium">Waiting for your final document submission</p>
+                            <p className="text-xs text-gray-500 mt-2">Please upload your paper in .doc format above</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             /* No Submission - Show Quick Actions */

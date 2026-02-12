@@ -48,6 +48,9 @@ const conferenceSelectedUserSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    finalDocUrl: String,
+    finalDocPublicId: String,
+    finalDocSubmittedAt: Date,
     paperSubmittedAt: Date,
     copyrightSubmittedAt: Date
 }, { timestamps: true });

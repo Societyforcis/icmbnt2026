@@ -54,5 +54,14 @@ export const uploadMemory = multer({
     fileFilter: pdfFileFilter
 });
 
+// Upload middleware for final documents (PDF, DOC, DOCX)
+export const uploadFinalDocument = multer({
+    storage: memoryStorage,
+    limits: {
+        fileSize: 15 * 1024 * 1024 // 15MB limit
+    },
+    fileFilter: documentFileFilter
+});
+
 // Default export for backward compatibility
 export default uploadPaperPDF;

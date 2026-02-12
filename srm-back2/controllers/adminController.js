@@ -4,7 +4,12 @@ import { PaperSubmission } from '../models/Paper.js';
 import { Review } from '../models/Review.js';
 import { Revision } from '../models/Revision.js';
 import { generateRandomPassword } from '../utils/helpers.js';
-import { sendEditorAssignmentEmail, sendEditorCredentialsEmail, sendEditorMessageEmail } from '../utils/emailService.js';
+import {
+    sendEditorAssignmentEmail,
+    sendEditorCredentialsEmail,
+    sendEditorMessageEmail,
+    sendSelectionEmail
+} from '../utils/emailService.js';
 
 // Create editor account
 export const createEditor = async (req, res) => {
@@ -501,3 +506,37 @@ export const deletePdfAdmin = async (req, res) => {
         });
     }
 };
+
+// Send selection email to author
+export const sendSelectedUserEmail = async (req, res) => {
+    try {
+        const { submissionId } = req.body;
+        const ConferenceSelectedUser = (await import('../models/ConferenceSelectedUser.js')).default;
+
+        const selectedUser = await ConferenceSelectedUser.findOne({ submissionId });
+        if (!selectedUser) {
+            return res.status(404).json({
+                success: false,
+                message: 'Selected user not found'
+            });
+        }
+
+        await sendSelectionEmail(selectedUser.authorEmail, selectedUser.authorName, {
+            submissionId: selectedUser.submissionId,
+            paperTitle: selectedUser.paperTitle
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Selection email sent successfully'
+        });
+    } catch (error) {
+        console.error('Error sending selection email:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error sending selection email',
+            error: error.message
+        });
+    }
+};
+

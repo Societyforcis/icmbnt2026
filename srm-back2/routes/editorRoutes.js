@@ -112,4 +112,13 @@ router.get('/accepted-papers/:submissionId', getAcceptedPaperDetails);          
 router.get('/acceptance-statistics', getAcceptanceStatistics);                  // Get statistics
 router.put('/accepted-papers/:submissionId/status', updateAcceptanceStatus);    // Update status
 
+// Selected users routes (shared with admin but role check is verified by verifyJWT + role Check)
+router.get('/selected-users', (req, res, next) => {
+    // We can reuse the adminController function if we export it properly
+    import('../controllers/adminController.js').then(m => m.getConferenceSelectedUsers(req, res, next));
+});
+router.post('/selected-users/send-email', (req, res, next) => {
+    import('../controllers/adminController.js').then(m => m.sendSelectedUserEmail(req, res, next));
+});
+
 export default router;

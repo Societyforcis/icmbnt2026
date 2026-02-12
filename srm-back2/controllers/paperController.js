@@ -964,3 +964,106 @@ export const getPaperHistory = async (req, res) => {
         });
     }
 };
+
+// Check if user is final selected
+export const checkFinalSelection = async (req, res) => {
+    try {
+        const { email } = req.user;
+        const ConferenceSelectedUser = (await import('../models/ConferenceSelectedUser.js')).default;
+
+        const selectedUser = await ConferenceSelectedUser.findOne({ authorEmail: email });
+
+        if (!selectedUser) {
+            return res.status(200).json({
+                success: true,
+                isSelected: false
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            isSelected: true,
+            selectedUser
+        });
+    } catch (error) {
+        console.error('Error checking final selection:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error checking selection status'
+        });
+    }
+};
+
+export const uploadFinalDoc = async (req, res) => {
+    console.log('--- FINAL DOC UPLOAD ATTEMPT ---');
+    console.log('Submission ID from params:', req.params.submissionId);
+    console.log('User email from token:', req.user?.email);
+    console.log('File received:', req.file ? {
+        fieldname: req.file.fieldname,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+    } : 'NO FILE');
+
+    try {
+        const { submissionId } = req.params;
+        const { email } = req.user;
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        const ConferenceSelectedUser = (await import('../models/ConferenceSelectedUser.js')).default;
+
+        // Case-insensitive search for submissionId
+        const selectedUser = await ConferenceSelectedUser.findOne({
+            submissionId: { $regex: new RegExp(`^${submissionId}$`, 'i') },
+            authorEmail: email
+        });
+
+        console.log('Selected user search result:', selectedUser ? 'Found' : 'Not Found');
+        if (selectedUser) {
+            console.log('User submissionId in DB:', selectedUser.submissionId);
+        }
+
+        if (!selectedUser) {
+            console.error('Final upload unauthorized: User not found in selected list for ID:', submissionId);
+            return res.status(403).json({
+                success: false,
+                message: 'You are not authorized for final submission or your paper is not yet confirmed in the selected list.'
+            });
+        }
+
+        // Upload to Cloudinary
+        const cloudinaryResult = await uploadPdfToCloudinary(req.file.buffer, req.file.originalname);
+
+        // Delete old if exists
+        if (selectedUser.finalDocPublicId) {
+            try {
+                await deletePdfFromCloudinary(selectedUser.finalDocPublicId);
+            } catch (delErr) {
+                console.warn('Old file deletion failed:', delErr.message);
+            }
+        }
+
+        selectedUser.finalDocUrl = cloudinaryResult.url;
+        selectedUser.finalDocPublicId = cloudinaryResult.publicId;
+        selectedUser.finalDocSubmittedAt = new Date();
+
+        await selectedUser.save();
+
+        return res.status(200).json({
+            success: true,
+            message: 'Final document uploaded successfully',
+            finalDocUrl: selectedUser.finalDocUrl,
+            selectedUser: selectedUser
+        });
+    } catch (error) {
+        console.error('Error uploading final doc:', error, error.stack);
+        return res.status(500).json({
+            success: false,
+            message: 'Error uploading final document',
+            error: error.message
+        });
+    }
+};

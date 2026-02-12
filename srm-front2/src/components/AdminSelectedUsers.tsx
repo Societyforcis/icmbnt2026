@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Calendar, Mail, User, ExternalLink, Download } from 'react-feather';
+import { FileText, Calendar, Mail, User, ExternalLink, Download, Send } from 'react-feather';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
@@ -14,6 +14,8 @@ interface SelectedUser {
     status: string;
     paperUrl: string;
     copyrightUrl: string;
+    finalDocUrl?: string;
+    finalDocSubmittedAt?: string;
 }
 
 const AdminSelectedUsers = () => {
@@ -45,6 +47,50 @@ const AdminSelectedUsers = () => {
             });
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleSendSelectionEmail = async (submissionId: string) => {
+        try {
+            const result = await Swal.fire({
+                title: 'Send Selection Email?',
+                text: 'This will notify the author and request final document upload (.doc format).',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#F5A051',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, Send Email'
+            });
+
+            if (result.isConfirmed) {
+                const token = localStorage.getItem('token');
+                const apiUrl = localStorage.getItem('role') === 'Admin'
+                    ? `${import.meta.env.VITE_API_URL}/api/admin/selected-users/send-email`
+                    : `${import.meta.env.VITE_API_URL}/api/editor/selected-users/send-email`;
+
+                const response = await axios.post(
+                    apiUrl,
+                    { submissionId },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                if (response.data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sent!',
+                        text: 'Selection email has been sent successfully.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            }
+        } catch (error: any) {
+            console.error('Error sending selection email:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.response?.data?.message || 'Failed to send email'
+            });
         }
     };
 
@@ -190,6 +236,25 @@ const AdminSelectedUsers = () => {
                                                 Copyright
                                                 <ExternalLink className="w-3 h-3" />
                                             </a>
+                                            {user.finalDocUrl && (
+                                                <a
+                                                    href={user.finalDocUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-2 px-3 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
+                                                >
+                                                    <FileText className="w-4 h-4" />
+                                                    Final Doc (DOC)
+                                                    <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                            )}
+                                            <button
+                                                onClick={() => handleSendSelectionEmail(user.submissionId)}
+                                                className="inline-flex items-center gap-2 px-3 py-2 bg-[#F5A051] text-white rounded-lg hover:bg-[#e69040] transition-colors text-sm font-medium"
+                                            >
+                                                <Send className="w-4 h-4" />
+                                                Upload Final Docs
+                                            </button>
                                         </div>
                                     </div>
                                 </div>

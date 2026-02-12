@@ -10,7 +10,8 @@ import {
     sendMessageToEditor,
     getConferenceSelectedUsers,
     getAllPdfsAdmin,
-    deletePdfAdmin
+    deletePdfAdmin,
+    sendSelectedUserEmail
 } from '../controllers/adminController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/roleCheck.js';
@@ -38,6 +39,7 @@ router.get('/dashboard-stats', getDashboardStats);
 
 // Conference selected users
 router.get('/selected-users', getConferenceSelectedUsers);
+router.post('/selected-users/send-email', sendSelectedUserEmail);
 
 // PDF Management (admin only)
 router.get('/pdfs', getAllPdfsAdmin);
