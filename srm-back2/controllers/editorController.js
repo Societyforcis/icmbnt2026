@@ -2678,12 +2678,16 @@ export const sendReReviewEmails = async (req, res) => {
             });
         }
 
-        // Get paper details
-        const paper = await PaperSubmission.findById(paperId).populate('assignedReviewers', 'email username');
+        // Get paper details - check both collections
+        let paper = await PaperSubmission.findById(paperId).populate('assignedReviewers', 'email username');
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId).populate('assignedReviewers', 'email username');
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
-                message: 'Paper not found'
+                message: 'Paper not found in any collection'
             });
         }
 
@@ -2709,14 +2713,15 @@ export const sendReReviewEmails = async (req, res) => {
         for (const reviewer of paper.assignedReviewers) {
             try {
                 // Find the reviewer's assignment in the Paper model
-                const assignment = paper.reviewAssignments.find(
-                    a => a.reviewer.toString() === reviewer._id.toString()
+                const assignment = (paper.reviewAssignments || []).find(
+                    a => a.reviewer && a.reviewer.toString() === reviewer._id.toString()
                 );
 
                 if (assignment && assignment.status !== 'Accepted') {
                     assignment.status = 'Accepted';
+                    assignment.deadline = deadline; // 🔥 Update deadline for re-review
                     assignment.respondedAt = Date.now();
-                    console.log(`✅ Auto-accepted re-review assignment for reviewer ${reviewer.email}`);
+                    console.log(`✅ Auto-accepted re-review assignment for reviewer ${reviewer.email} with new deadline ${deadline}`);
                 }
 
                 // Send re-review email

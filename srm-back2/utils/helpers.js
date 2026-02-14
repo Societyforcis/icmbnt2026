@@ -3,27 +3,44 @@ import { PaperSubmission } from '../models/Paper.js';
 // Generate submission ID based on category
 export const generateSubmissionId = async (category) => {
     const prefix = category.split(' ')[0].substring(0, 2).toUpperCase();
+    const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
 
-    // Find the highest existing ID for this category
-    const highestSubmission = await PaperSubmission.findOne(
-        { submissionId: new RegExp(`^${prefix}\\d{3}$`) },
-        { submissionId: 1 }
-    ).sort({ submissionId: -1 });
+    // Find the highest existing ID for this category from both collections
+    const [highestMain, highestMulti] = await Promise.all([
+        PaperSubmission.findOne(
+            { submissionId: new RegExp(`^${prefix}\\d{3}$`) },
+            { submissionId: 1 }
+        ).sort({ submissionId: -1 }),
+        MultiplePaperSubmission.findOne(
+            { submissionId: new RegExp(`^${prefix}\\d{3}$`) },
+            { submissionId: 1 }
+        ).sort({ submissionId: -1 })
+    ]);
 
     let nextNum = 1;
+    let highestId = null;
 
-    if (highestSubmission) {
-        const highestNum = parseInt(highestSubmission.submissionId.substring(2));
+    if (highestMain && highestMulti) {
+        highestId = highestMain.submissionId > highestMulti.submissionId ? highestMain.submissionId : highestMulti.submissionId;
+    } else {
+        highestId = highestMain?.submissionId || highestMulti?.submissionId;
+    }
+
+    if (highestId) {
+        const highestNum = parseInt(highestId.substring(2));
         nextNum = highestNum + 1;
     }
 
     const paddedNum = nextNum.toString().padStart(3, '0');
     const newId = `${prefix}${paddedNum}`;
 
-    // Check if this ID already exists
-    const existingSubmission = await PaperSubmission.findOne({ submissionId: newId });
+    // Check if this ID already exists in either collection
+    const [existsMain, existsMulti] = await Promise.all([
+        PaperSubmission.findOne({ submissionId: newId }),
+        MultiplePaperSubmission.findOne({ submissionId: newId })
+    ]);
 
-    if (existingSubmission) {
+    if (existsMain || existsMulti) {
         console.log(`ID ${newId} already exists, incrementing number...`);
         return generateSubmissionIdWithNum(category, nextNum + 1);
     }
@@ -36,10 +53,14 @@ const generateSubmissionIdWithNum = async (category, num) => {
     const prefix = category.split(' ')[0].substring(0, 2).toUpperCase();
     const paddedNum = num.toString().padStart(3, '0');
     const newId = `${prefix}${paddedNum}`;
+    const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
 
-    const existingSubmission = await PaperSubmission.findOne({ submissionId: newId });
+    const [existsMain, existsMulti] = await Promise.all([
+        PaperSubmission.findOne({ submissionId: newId }),
+        MultiplePaperSubmission.findOne({ submissionId: newId })
+    ]);
 
-    if (existingSubmission) {
+    if (existsMain || existsMulti) {
         console.log(`ID ${newId} already exists, incrementing number...`);
         return generateSubmissionIdWithNum(category, num + 1);
     }

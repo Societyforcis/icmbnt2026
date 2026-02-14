@@ -782,7 +782,7 @@ export const sendAcceptanceEmail = async (authorEmail, authorName, paperTitle, s
                     <strong>ICMBNT 2026 Organizing Committee</strong><br>
                     Society for Cyber Intelligent Systems<br>
                     Puducherry, India<br>
-                    Email: icmbnt2026@gmail.com
+                    Email: admin@icmbnt2026.societycis.org
                 </p>
             </div>
         `,
@@ -877,7 +877,7 @@ export const sendRegistrationConfirmationEmail = async (registrationData) => {
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: #495057;">📞 Need Help?</p>
                     <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">
                         For any queries or further information, please contact us at:<br>
-                        <strong>Email:</strong> <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc; text-decoration: none;">icmbnt2026@gmail.com</a><br>
+                        <strong>Email:</strong> <a href="mailto:admin@icmbnt2026.societycis.org" style="color: #0066cc; text-decoration: none;">admin@icmbnt2026.societycis.org</a><br>
                         <strong>Website:</strong> <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a>
                     </p>
                 </div>
@@ -890,7 +890,7 @@ export const sendRegistrationConfirmationEmail = async (registrationData) => {
                     <strong>ICMBNT 2026 Organizing Committee</strong><br>
                     Society for Cyber Intelligent Systems<br>
                     Puducherry, India<br>
-                    Email: icmbnt2026@gmail.com<br>
+                    Email: admin@icmbnt2026.societycis.org<br>
                     Website: <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a>
                 </p>
             </div>
@@ -1424,7 +1424,7 @@ export const sendListenerPaymentVerificationEmail = async (listenerData) => {
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: #495057; font-size: 14px;">❓ Need Help or Have Questions?</p>
                     <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">
                         Please feel free to reach out to us for any questions or assistance:<br>
-                        📧 <strong>Email:</strong> <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc; text-decoration: none;">icmbnt2026@gmail.com</a><br>
+                        📧 <strong>Email:</strong> <a href="mailto:admin@icmbnt2026.societycis.org" style="color: #0066cc; text-decoration: none;">admin@icmbnt2026.societycis.org</a><br>
                         🌐 <strong>Website:</strong> <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a><br>
                     </p>
                 </div>
@@ -1448,7 +1448,7 @@ export const sendListenerPaymentVerificationEmail = async (listenerData) => {
                     <strong>ICMBNT 2026 Organizing Committee</strong><br>
                     Society for Cyber Intelligent Systems<br>
                     Puducherry, India<br>
-                    Email: <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc; text-decoration: none;">icmbnt2026@gmail.com</a><br>
+                    Email: <a href="mailto:admin@icmbnt2026.societycis.org" style="color: #0066cc; text-decoration: none;">admin@icmbnt2026.societycis.org</a><br>
                     Website: <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a>
                 </p>
             </div>
@@ -1580,20 +1580,20 @@ export const sendPaymentRejectionEmail = async (rejectionData) => {
                         <li>You need to submit a new registration with corrected payment details</li>
                         <li>Make sure to upload a clear screenshot of your payment confirmation</li>
                         <li>Double-check the transaction ID before submitting</li>
-                        <li>If you have questions, contact us at <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc;">icmbnt2026@gmail.com</a></li>
+                        <li>If you have questions, contact us at <a href="mailto:admin@icmbnt2026.societycis.org" style="color: #0066cc;">admin@icmbnt2026.societycis.org</a></li>
                     </ul>
                 </div>
 
                 <p style="font-size: 13px; line-height: 1.6; color: #666; margin-top: 25px; margin-bottom: 10px;">
                     We apologize for any inconvenience. If you believe this rejection was made in error or need assistance, 
-                    please contact us immediately at <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc;">icmbnt2026@gmail.com</a>.
+                    please contact us immediately at <a href="mailto:admin@icmbnt2026.societycis.org" style="color: #0066cc;">admin@icmbnt2026.societycis.org</a>.
                 </p>
 
                 <p style="font-size: 13px; color: #999; margin: 15px 0 0 0; border-top: 1px solid #ddd; padding-top: 15px;">
                     <strong>ICMBNT 2026 Organizing Committee</strong><br>
                     Society for Cyber Intelligent Systems<br>
                     Puducherry, India<br>
-                    Email: <a href="mailto:icmbnt2026@gmail.com" style="color: #0066cc; text-decoration: none;">icmbnt2026@gmail.com</a><br>
+                    Email: <a href="mailto:admin@icmbnt2026.societycis.org" style="color: #0066cc; text-decoration: none;">admin@icmbnt2026.societycis.org</a><br>
                     Website: <a href="${frontendUrl}" style="color: #0066cc; text-decoration: none;">${frontendUrl}</a>
                 </p>
             </div>

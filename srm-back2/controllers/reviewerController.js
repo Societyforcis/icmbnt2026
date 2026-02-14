@@ -57,17 +57,35 @@ export const getAssignedPapers = async (req, res) => {
 // Get paper details for review
 export const getPaperForReview = async (req, res) => {
     try {
-        const { submissionId } = req.params;
+        const { submissionId: id } = req.params; // Named submissionId in route, but we'll treat as generic id
         const reviewerId = req.user.userId;
 
-        let paper = await PaperSubmission.findOne({ submissionId })
-            .populate('assignedEditor', 'username email')
-            .populate('assignedReviewers', 'username email');
+        let paper;
 
-        if (!paper) {
-            paper = await MultiplePaperSubmission.findOne({ submissionId })
+        // Try finding by ObjectId first (recommended for precision)
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            paper = await PaperSubmission.findById(id)
                 .populate('assignedEditor', 'username email')
                 .populate('assignedReviewers', 'username email');
+
+            if (!paper) {
+                paper = await MultiplePaperSubmission.findById(id)
+                    .populate('assignedEditor', 'username email')
+                    .populate('assignedReviewers', 'username email');
+            }
+        }
+
+        // If not found by ObjectId, try finding by submissionId (legacy support)
+        if (!paper) {
+            paper = await PaperSubmission.findOne({ submissionId: id })
+                .populate('assignedEditor', 'username email')
+                .populate('assignedReviewers', 'username email');
+
+            if (!paper) {
+                paper = await MultiplePaperSubmission.findOne({ submissionId: id })
+                    .populate('assignedEditor', 'username email')
+                    .populate('assignedReviewers', 'username email');
+            }
         }
 
         if (!paper) {
@@ -113,7 +131,7 @@ export const getPaperForReview = async (req, res) => {
             }).sort({ round: 1 }).lean()
         ]);
 
-        console.log(`📋 Found ${previousReviews.length} previous reviews for paper ${submissionId} by reviewer ${reviewerId}`);
+        console.log(`📋 Found ${previousReviews.length} previous reviews for paper ${paper.submissionId} by reviewer ${reviewerId}`);
 
         return res.status(200).json({
             success: true,
@@ -162,7 +180,7 @@ export const getPaperForReview = async (req, res) => {
 // Submit review
 export const submitReview = async (req, res) => {
     try {
-        const { submissionId } = req.params;
+        const { submissionId: id } = req.params;
         const reviewerId = req.user.userId;
         const {
             comments,
@@ -187,10 +205,24 @@ export const submitReview = async (req, res) => {
         }
 
         // Find paper
-        let paper = await PaperSubmission.findOne({ submissionId });
+        let paper;
+
+        // Try finding by ObjectId first
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            paper = await PaperSubmission.findById(id);
+            if (!paper) {
+                const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                paper = await MultiplePaperSubmission.findById(id);
+            }
+        }
+
+        // Fallback to submissionId
         if (!paper) {
-            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
-            paper = await MultiplePaperSubmission.findOne({ submissionId });
+            paper = await PaperSubmission.findOne({ submissionId: id });
+            if (!paper) {
+                const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                paper = await MultiplePaperSubmission.findOne({ submissionId: id });
+            }
         }
 
         if (!paper) {
@@ -378,14 +410,28 @@ export const submitReview = async (req, res) => {
 // Get review draft for editing
 export const getReviewDraft = async (req, res) => {
     try {
-        const { submissionId } = req.params;
+        const { submissionId: id } = req.params;
         const { round } = req.query;  // Get round from query parameter
         const reviewerId = req.user.userId;
 
-        let paper = await PaperSubmission.findOne({ submissionId });
+        let paper;
+
+        // Try finding by ObjectId first
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            paper = await PaperSubmission.findById(id);
+            if (!paper) {
+                const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                paper = await MultiplePaperSubmission.findById(id);
+            }
+        }
+
+        // Fallback to submissionId
         if (!paper) {
-            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
-            paper = await MultiplePaperSubmission.findOne({ submissionId });
+            paper = await PaperSubmission.findOne({ submissionId: id });
+            if (!paper) {
+                const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                paper = await MultiplePaperSubmission.findOne({ submissionId: id });
+            }
         }
 
         if (!paper) {
@@ -408,7 +454,7 @@ export const getReviewDraft = async (req, res) => {
 
         const review = await ReviewerReview.findOne(query);
 
-        console.log(`📝 Draft query for paper ${submissionId}, round ${round || 'any'}:`, review ? 'Found' : 'Not found');
+        console.log(`📝 Draft query for paper ${paper.submissionId}, round ${round || 'any'}:`, review ? 'Found' : 'Not found');
 
         // Return 200 with null if no draft exists (not an error)
         return res.status(200).json({
@@ -858,13 +904,27 @@ export const acceptAssignment = async (req, res) => {
 export const acceptAssignmentBySubmission = async (req, res) => {
     try {
         const reviewerId = req.user.userId;
-        const { submissionId } = req.params;
+        const { submissionId: id } = req.params;
 
         // Find the paper
-        let paper = await PaperSubmission.findOne({ submissionId });
+        let paper;
+
+        // Try finding by ObjectId first
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            paper = await PaperSubmission.findById(id);
+            if (!paper) {
+                const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                paper = await MultiplePaperSubmission.findById(id);
+            }
+        }
+
+        // Fallback to submissionId
         if (!paper) {
-            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
-            paper = await MultiplePaperSubmission.findOne({ submissionId });
+            paper = await PaperSubmission.findOne({ submissionId: id });
+            if (!paper) {
+                const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                paper = await MultiplePaperSubmission.findOne({ submissionId: id });
+            }
         }
 
         if (!paper) {
@@ -902,7 +962,7 @@ export const acceptAssignmentBySubmission = async (req, res) => {
             console.log('Note: ReviewerAssignment not found for sync');
         }
 
-        console.log(`✅ Reviewer ${reviewerId} accepted assignment for paper ${submissionId}`);
+        console.log(`✅ Reviewer ${reviewerId} accepted assignment for paper ${paper.submissionId}`);
 
         return res.status(200).json({
             success: true,
@@ -1000,7 +1060,7 @@ export const rejectAssignment = async (req, res) => {
 // Submit re-review (Round 2) for papers with revision requests
 export const submitReReview = async (req, res) => {
     try {
-        const { submissionId } = req.params;
+        const { submissionId: id } = req.params;
         const reviewerId = req.user.userId;
         const {
             recommendation,
@@ -1023,9 +1083,22 @@ export const submitReReview = async (req, res) => {
         }
 
         // Find paper
-        let paper = await PaperSubmission.findOne({ submissionId });
+        let paper;
+
+        // Try finding by ObjectId first
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            paper = await PaperSubmission.findById(id);
+            if (!paper) {
+                paper = await MultiplePaperSubmission.findById(id);
+            }
+        }
+
+        // Fallback to submissionId
         if (!paper) {
-            paper = await MultiplePaperSubmission.findOne({ submissionId });
+            paper = await PaperSubmission.findOne({ submissionId: id });
+            if (!paper) {
+                paper = await MultiplePaperSubmission.findOne({ submissionId: id });
+            }
         }
 
         if (!paper) {
@@ -1114,14 +1187,19 @@ export const submitReReview = async (req, res) => {
 // Get message thread for a reviewer
 export const getMessageThread = async (req, res) => {
     try {
-        const { submissionId } = req.params;
+        const { submissionId: id } = req.params;
         const reviewerId = req.user.userId;
 
+        // Build query
+        const query = { reviewerId };
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            query.paperId = id;
+        } else {
+            query.submissionId = id;
+        }
+
         // Find threads for this reviewer and submission
-        const messageThread = await ReviewerMessage.findOne({
-            submissionId,
-            reviewerId
-        })
+        const messageThread = await ReviewerMessage.findOne(query)
             .populate('reviewerId', 'username email')
             .populate('editorId', 'username email');
 
@@ -1131,7 +1209,7 @@ export const getMessageThread = async (req, res) => {
                 messageThread: {
                     conversation: [],
                     editorReviewerConversation: false,
-                    submissionId,
+                    submissionId: id,
                     reviewerId
                 }
             });
@@ -1154,7 +1232,7 @@ export const getMessageThread = async (req, res) => {
 // Send message from reviewer to editor
 export const sendMessage = async (req, res) => {
     try {
-        const { submissionId, message } = req.body;
+        const { submissionId: id, message } = req.body;
         const reviewerId = req.user.userId;
         const reviewer = await User.findById(reviewerId);
 
@@ -1162,10 +1240,24 @@ export const sendMessage = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Message is empty' });
         }
 
-        let paper = await PaperSubmission.findOne({ submissionId });
+        let paper;
+
+        // Try finding by ObjectId first
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            paper = await PaperSubmission.findById(id);
+            if (!paper) {
+                const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                paper = await MultiplePaperSubmission.findById(id);
+            }
+        }
+
+        // Fallback to submissionId
         if (!paper) {
-            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
-            paper = await MultiplePaperSubmission.findOne({ submissionId });
+            paper = await PaperSubmission.findOne({ submissionId: id });
+            if (!paper) {
+                const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                paper = await MultiplePaperSubmission.findOne({ submissionId: id });
+            }
         }
 
         if (!paper) {
@@ -1173,14 +1265,19 @@ export const sendMessage = async (req, res) => {
         }
 
         // Find or create message thread
-        let messageThread = await ReviewerMessage.findOne({
-            submissionId,
-            reviewerId
-        });
+        const threadQuery = { reviewerId };
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            threadQuery.paperId = id;
+        } else {
+            threadQuery.submissionId = id;
+        }
+
+        let messageThread = await ReviewerMessage.findOne(threadQuery);
 
         if (!messageThread) {
             messageThread = new ReviewerMessage({
-                submissionId,
+                submissionId: paper.submissionId,
+                paperId: paper._id,
                 reviewerId,
                 editorId: paper.assignedEditor, // Default to assigned editor
                 authorId: paper.authorId || paper.email

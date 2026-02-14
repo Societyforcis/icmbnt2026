@@ -42,7 +42,7 @@ export const getAuthorCopyrightDashboard = async (req, res) => {
 
         const papersWithCopyright = await Promise.all(allPapers.map(async (p) => {
             // Get or create copyright record if paper is in acceptable status
-            if (p.status === 'Accepted' || p.status === 'Published' || p.status === 'Revised Submitted' || p.status === 'Review Received' || p.status === 'Revision Required') {
+            if (p.status === 'Accepted' || p.status === 'Published') {
                 let copyright = await Copyright.findOne({ submissionId: p.submissionId });
                 if (!copyright) {
                     copyright = await Copyright.create({

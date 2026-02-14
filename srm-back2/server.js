@@ -234,21 +234,13 @@ app.get('/revision-status', verifyJWT, async (req, res) => {
         const { Revision } = await import('./models/Revision.js');
         const userEmail = req.user.email;
 
-        const revision = await Revision.findOne({ authorEmail: userEmail })
+        const revisions = await Revision.find({ authorEmail: userEmail })
             .populate('reviewerComments.reviewerId', 'username email');
-
-        if (!revision) {
-            return res.status(200).json({
-                success: true,
-                hasRevision: false,
-                revision: null
-            });
-        }
 
         return res.status(200).json({
             success: true,
-            hasRevision: true,
-            revision
+            hasRevision: revisions.length > 0,
+            revisions
         });
     } catch (error) {
         console.error('Error fetching revision status:', error);

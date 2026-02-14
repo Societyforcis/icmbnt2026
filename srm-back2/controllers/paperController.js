@@ -556,13 +556,13 @@ export const submitRevision = async (req, res) => {
     console.log('Files received:', req.files ? Object.keys(req.files).length + ' files' : 'No files');
 
     try {
-        const { submissionId, authorEmail } = req.body;
+        const { paperId, submissionId, authorEmail } = req.body;
 
         // Validate required fields
-        if (!submissionId || !authorEmail) {
+        if ((!paperId && !submissionId) || !authorEmail) {
             return res.status(400).json({
                 success: false,
-                message: "Missing required fields: submissionId, authorEmail"
+                message: "Missing required fields: paperId or submissionId, and authorEmail"
             });
         }
 
@@ -574,10 +574,21 @@ export const submitRevision = async (req, res) => {
             });
         }
 
-        // Find the original submission
-        let paper = await PaperSubmission.findOne({ submissionId });
-        if (!paper) {
-            paper = await MultiplePaperSubmission.findOne({ submissionId });
+        // Find the original submission - prioritize paperId (ObjectId) for precision
+        let paper;
+        if (paperId) {
+            paper = await PaperSubmission.findById(paperId);
+            if (!paper) {
+                paper = await MultiplePaperSubmission.findById(paperId);
+            }
+        }
+
+        // Fallback to submissionId if paperId not found or not provided
+        if (!paper && submissionId) {
+            paper = await PaperSubmission.findOne({ submissionId });
+            if (!paper) {
+                paper = await MultiplePaperSubmission.findOne({ submissionId });
+            }
         }
 
         if (!paper) {
@@ -758,15 +769,20 @@ export const submitRevision = async (req, res) => {
 // Get revision data for a paper (used by reviewers to see revision details)
 export const getRevisionData = async (req, res) => {
     try {
-        const { submissionId } = req.params;
+        const { submissionId: id } = req.params;
         const { revisionNumber = 1 } = req.query;  // Get revision number from query params
-        console.log(`🔍 Looking for revision ${revisionNumber} with submissionId:`, submissionId);
+        console.log(`🔍 Looking for revision ${revisionNumber} with ID:`, id);
+
+        // Build query - check both paperId (ObjectId) and submissionId (string)
+        const query = { revisionNumber: parseInt(revisionNumber) };
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            query.paperId = id;
+        } else {
+            query.submissionId = id;
+        }
 
         // Find the specific revision
-        const revision = await Revision.findOne({
-            submissionId,
-            revisionNumber: parseInt(revisionNumber)
-        });
+        const revision = await Revision.findOne(query);
         console.log('📋 Revision found:', !!revision, revision ? `Highlighted: ${revision.highlightedPdfUrl ? '✅' : '❌'}` : 'N/A');
 
         if (!revision) {
@@ -780,6 +796,7 @@ export const getRevisionData = async (req, res) => {
             success: true,
             revision: {
                 submissionId: revision.submissionId,
+                paperId: revision.paperId,
                 revisionNumber: revision.revisionNumber,
                 revisionRound: revision.revisionRound,
                 cleanPdfUrl: revision.cleanPdfUrl,
@@ -802,12 +819,20 @@ export const getRevisionData = async (req, res) => {
 // Get all revisions for a paper (to know how many revisions exist)
 export const getAllRevisions = async (req, res) => {
     try {
-        const { submissionId } = req.params;
+        const { submissionId: id } = req.params;
+
+        // Build query
+        const query = {};
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            query.paperId = id;
+        } else {
+            query.submissionId = id;
+        }
 
         // Find all revisions for this submission
-        const revisions = await Revision.find({ submissionId })
+        const revisions = await Revision.find(query)
             .sort({ revisionNumber: 1 })
-            .select('submissionId revisionNumber revisionStatus submittedAt');
+            .select('submissionId paperId revisionNumber revisionStatus submittedAt');
 
         return res.status(200).json({
             success: true,
