@@ -403,6 +403,29 @@ const ReviewerDashboard = () => {
         }
     };
 
+    const handleAcceptAssignment = async (submissionId: string) => {
+        if (!window.confirm(`Are you sure you want to accept the review assignment for ${submissionId}?`)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+
+            const response = await axios.post(
+                `${API_URL}/api/reviewer/papers/${submissionId}/accept-assignment`,
+                {},
+                { headers }
+            );
+
+            if (response.data.success) {
+                alert('Assignment accepted successfully! You can now view and review the paper.');
+                fetchAssignedPapers(); // Refresh the list
+            }
+        } catch (error: any) {
+            console.error('Error accepting assignment:', error);
+            alert(error.response?.data?.message || 'Failed to accept assignment');
+        }
+    };
+
     const handleLogout = () => {
         localStorage.clear();
         window.dispatchEvent(new Event('authStateChanged'));
@@ -539,66 +562,85 @@ const ReviewerDashboard = () => {
                                         });
 
                                         return (
-                                            <button
+                                            <div
                                                 key={paper._id}
-                                                onClick={() => {
-                                                    // Check if reviewer has accepted this assignment
-                                                    const assignmentStatus = paper.assignmentDetails?.status;
-                                                    const allowedStatuses = ['Accepted', 'Submitted', 'Review Submitted'];
-                                                    if (allowedStatuses.includes(assignmentStatus || '')) {
-                                                        // If accepted or submitted, load the paper for review
-                                                        console.log('✅ Status is valid - Loading paper...');
-                                                        loadPaperForReview(paper.submissionId);
-                                                    } else {
-                                                        // If not accepted, show message
-                                                        console.log('⚠️ Status is NOT Accepted/Submitted:', assignmentStatus);
-                                                        alert(`⚠️ Please accept this assignment via the confirmation email link before you can view the paper. Current status: ${assignmentStatus || 'Unknown'}`);
-                                                    }
-                                                }}
-                                                className={`p-4 rounded-lg text-left transition border-2 ${selectedPaper?._id === paper._id
-                                                    ? 'bg-blue-100 border-blue-600 shadow-lg scale-105'
-                                                    : 'bg-gray-50 border-gray-200 hover:border-blue-400 hover:bg-blue-50'
+                                                className={`p-4 rounded-lg transition border-2 flex flex-col justify-between ${selectedPaper?._id === paper._id
+                                                    ? 'bg-blue-100 border-blue-600 shadow-lg'
+                                                    : 'bg-gray-50 border-gray-200 hover:border-blue-400 hover:bg-white hover:shadow-md'
                                                     }`}
                                             >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="flex-1">
-                                                        <p className="text-sm font-bold text-gray-800">
-                                                            {paper.submissionId}
-                                                        </p>
-                                                        <p className="text-sm font-medium text-gray-700 mt-1 line-clamp-2">
-                                                            {paper.paperTitle}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 mt-2">
-                                                            Author: {paper.authorName}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500">
-                                                            Category: {paper.category}
-                                                        </p>
+                                                <div>
+                                                    <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2 mb-2">
+                                                        <div className="flex-1">
+                                                            <span className="text-[10px] font-bold bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                                                {paper.submissionId}
+                                                            </span>
+                                                            <h4 className="text-sm font-bold text-gray-800 mt-1 line-clamp-1">
+                                                                {paper.paperTitle}
+                                                            </h4>
+                                                        </div>
+                                                        {selectedPaper?._id === paper._id && (
+                                                            <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                                                        )}
                                                     </div>
-                                                    {selectedPaper?._id === paper._id && (
-                                                        <CheckCircle className="w-6 h-6 text-blue-600 flex-shrink-0" />
+
+                                                    <div className="space-y-1 mb-3">
+                                                        <p className="text-xs text-gray-600 flex items-center gap-1">
+                                                            <span className="font-semibold w-16">Author:</span> {paper.authorName}
+                                                        </p>
+                                                        <p className="text-xs text-gray-600 flex items-center gap-1">
+                                                            <span className="font-semibold w-16">Category:</span> {paper.category}
+                                                        </p>
+                                                        {paper.assignmentDetails && (
+                                                            <p className={`text-xs font-bold flex items-center gap-1 ${getDeadlineStatus(paper.assignmentDetails.deadline).color}`}>
+                                                                <Clock className="w-3 h-3" />
+                                                                {getDeadlineStatus(paper.assignmentDetails.deadline).text}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-auto pt-3 border-t border-gray-100">
+                                                    {paper.assignmentDetails && (
+                                                        <div className="space-y-3">
+                                                            {/* Status Indicator */}
+                                                            <div className={`text-center py-1 rounded-md text-[10px] font-bold uppercase tracking-tighter ${paper.assignmentDetails.status === 'Accepted'
+                                                                ? 'bg-green-50 text-green-700 ring-1 ring-green-200'
+                                                                : paper.assignmentDetails.status === 'Rejected'
+                                                                    ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
+                                                                    : 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200 animate-pulse'
+                                                                }`}>
+                                                                {paper.assignmentDetails.status === 'Accepted' && '✅ Assignment Accepted'}
+                                                                {paper.assignmentDetails.status === 'Pending' && '⏳ Pending Your Response'}
+                                                                {paper.assignmentDetails.status === 'Rejected' && '❌ Assignment Rejected'}
+                                                                {(paper.assignmentDetails.status === 'Submitted' || paper.assignmentDetails.status === 'Review Submitted') && '✓ Review Successfully Submitted'}
+                                                            </div>
+
+                                                            {/* Action Buttons */}
+                                                            {paper.assignmentDetails.status === 'Pending' ? (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleAcceptAssignment(paper.submissionId);
+                                                                    }}
+                                                                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs transition shadow-sm hover:shadow-md flex items-center justify-center gap-2"
+                                                                >
+                                                                    <CheckCircle className="w-4 h-4" />
+                                                                    Accept Review Assignment
+                                                                </button>
+                                                            ) : (['Accepted', 'Submitted', 'Review Submitted'].includes(paper.assignmentDetails.status)) ? (
+                                                                <button
+                                                                    onClick={() => loadPaperForReview(paper.submissionId)}
+                                                                    className="w-full py-2 bg-gray-800 hover:bg-black text-white rounded-lg font-bold text-xs transition shadow-sm hover:shadow-md flex items-center justify-center gap-2"
+                                                                >
+                                                                    <FileText className="w-4 h-4" />
+                                                                    {paper.assignmentDetails.status === 'Accepted' ? 'View & Review Paper' : 'View Submitted Review'}
+                                                                </button>
+                                                            ) : null}
+                                                        </div>
                                                     )}
                                                 </div>
-                                                {paper.assignmentDetails && (
-                                                    <div className="mt-3 space-y-2">
-                                                        <div className={`text-xs font-medium ${getDeadlineStatus(paper.assignmentDetails.deadline).color}`}>
-                                                            {getDeadlineStatus(paper.assignmentDetails.deadline).text}
-                                                        </div>
-                                                        {/* Show Assignment Status */}
-                                                        <div className={`inline-block px-2 py-1 rounded text-xs font-semibold ${paper.assignmentDetails.status === 'Accepted'
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : paper.assignmentDetails.status === 'Rejected'
-                                                                ? 'bg-red-100 text-red-800'
-                                                                : 'bg-yellow-100 text-yellow-800'
-                                                            }`}>
-                                                            {paper.assignmentDetails.status === 'Accepted' && '✅ Accepted'}
-                                                            {paper.assignmentDetails.status === 'Pending' && '⏳ Pending Acceptance'}
-                                                            {paper.assignmentDetails.status === 'Rejected' && '❌ Rejected'}
-                                                            {(paper.assignmentDetails.status === 'Submitted' || paper.assignmentDetails.status === 'Review Submitted') && '✓ Review Submitted'}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </button>
+                                            </div>
                                         );
                                     })}
                                 </div>

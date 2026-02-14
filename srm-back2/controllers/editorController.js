@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { User } from '../models/User.js';
 import { PaperSubmission } from '../models/Paper.js';
+import { MultiplePaperSubmission } from '../models/MultiplePaper.js';
 import { ReviewerReview } from '../models/ReviewerReview.js';
 import { ReviewerMessage } from '../models/ReviewerMessage.js';
 import { Revision } from '../models/Revision.js';
@@ -66,9 +67,16 @@ export const getAssignedPapers = async (req, res) => {
     try {
         const editorId = req.user.userId;
 
-        const papers = await PaperSubmission.find({ assignedEditor: editorId })
-            .populate('assignedReviewers', 'username email')
-            .sort({ createdAt: -1 });
+        const [mainPapers, multiPapers] = await Promise.all([
+            PaperSubmission.find({ assignedEditor: editorId })
+                .populate('assignedReviewers', 'username email'),
+            MultiplePaperSubmission.find({ assignedEditor: editorId })
+                .populate('assignedReviewers', 'username email')
+        ]);
+
+        const papers = [...mainPapers, ...multiPapers].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
 
         return res.status(200).json({
             success: true,
@@ -168,9 +176,18 @@ export const getAllReviewers = async (req, res) => {
         const enrichedReviewers = await Promise.all(
             reviewers.map(async (reviewer) => {
                 // Get all papers assigned to this reviewer
-                const papers = await PaperSubmission.find({
-                    'reviewAssignments.reviewer': reviewer._id
-                }).select('reviewAssignments status');
+                const [primaryPapers, multiPapers] = await Promise.all([
+                    PaperSubmission.find({
+                        'reviewAssignments.reviewer': reviewer._id
+                    }).select('reviewAssignments status'),
+                    (async () => {
+                        const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                        return MultiplePaperSubmission.find({
+                            'reviewAssignments.reviewer': reviewer._id
+                        }).select('reviewAssignments status');
+                    })()
+                ]);
+                const papers = [...primaryPapers, ...multiPapers];
 
                 // Count assigned papers
                 const assignedPapersCount = papers.length;
@@ -242,7 +259,11 @@ export const assignReviewers = async (req, res) => {
         const { paperId, reviewerIds, deadlineDays, deadline: deadlineStr } = req.body;
 
         // Find the paper
-        const paper = await PaperSubmission.findById(paperId);
+        let paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId);
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -308,7 +329,8 @@ export const assignReviewers = async (req, res) => {
         }));
 
         // ADD to existing assignments (not replace)
-        const updatedPaper = await PaperSubmission.findByIdAndUpdate(
+        const Model = await PaperSubmission.findById(paperId) ? PaperSubmission : MultiplePaperSubmission;
+        const updatedPaper = await Model.findByIdAndUpdate(
             paperId,
             {
                 $push: {
@@ -394,7 +416,11 @@ export const getPaperReviews = async (req, res) => {
     try {
         const { paperId } = req.params;
 
-        const paper = await PaperSubmission.findById(paperId);
+        let paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId);
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -442,7 +468,11 @@ export const makeFinalDecision = async (req, res) => {
             });
         }
 
-        const paper = await PaperSubmission.findById(paperId);
+        let paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId);
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -507,12 +537,18 @@ export const getEditorDashboardStats = async (req, res) => {
     try {
         const editorId = req.user.userId;
 
+        const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+
         // Use Promise.all for parallel count queries
         const [
             totalAssigned,
             needsAssignment,
             underReview,
-            awaitingDecision
+            awaitingDecision,
+            multiTotalAssigned,
+            multiNeedsAssignment,
+            multiUnderReview,
+            multiAwaitingDecision
         ] = await Promise.all([
             PaperSubmission.countDocuments({ assignedEditor: editorId }),
             PaperSubmission.countDocuments({
@@ -526,38 +562,71 @@ export const getEditorDashboardStats = async (req, res) => {
             PaperSubmission.countDocuments({
                 assignedEditor: editorId,
                 status: 'Review Received'
+            }),
+            MultiplePaperSubmission.countDocuments({ assignedEditor: editorId }),
+            MultiplePaperSubmission.countDocuments({
+                assignedEditor: editorId,
+                assignedReviewers: { $size: 0 }
+            }),
+            MultiplePaperSubmission.countDocuments({
+                assignedEditor: editorId,
+                status: 'Under Review'
+            }),
+            MultiplePaperSubmission.countDocuments({
+                assignedEditor: editorId,
+                status: 'Review Received'
             })
         ]);
 
-        // Get papers by status
-        const papersByStatus = await PaperSubmission.aggregate([
-            {
-                $match: { assignedEditor: editorId }
-            },
-            {
-                $group: {
-                    _id: '$status',
-                    count: { $sum: 1 }
-                }
-            }
+        // Get papers requiring action
+        const [primaryAction, multiAction] = await Promise.all([
+            PaperSubmission.find({
+                assignedEditor: editorId,
+                $or: [
+                    { assignedReviewers: { $size: 0 } },
+                    { status: 'Review Received' }
+                ]
+            }).limit(10),
+            MultiplePaperSubmission.find({
+                assignedEditor: editorId,
+                $or: [
+                    { assignedReviewers: { $size: 0 } },
+                    { status: 'Review Received' }
+                ]
+            }).limit(10)
         ]);
 
-        // Get papers requiring action
-        const papersRequiringAction = await PaperSubmission.find({
-            assignedEditor: editorId,
-            $or: [
-                { assignedReviewers: { $size: 0 } },
-                { status: 'Review Received' }
-            ]
-        }).limit(10);
+        const papersRequiringAction = [...primaryAction, ...multiAction].slice(0, 10);
+
+        // Get papers by status from both collections
+        const [primaryStatus, multiStatus] = await Promise.all([
+            PaperSubmission.aggregate([
+                { $match: { assignedEditor: editorId } },
+                { $group: { _id: '$status', count: { $sum: 1 } } }
+            ]),
+            MultiplePaperSubmission.aggregate([
+                { $match: { assignedEditor: editorId } },
+                { $group: { _id: '$status', count: { $sum: 1 } } }
+            ])
+        ]);
+
+        // Merge status counts
+        const statusMap = {};
+        primaryStatus.forEach(s => { statusMap[s._id] = (statusMap[s._id] || 0) + s.count; });
+        multiStatus.forEach(s => { statusMap[s._id] = (statusMap[s._id] || 0) + s.count; });
+
+        const papersByStatus = Object.keys(statusMap).map(status => ({
+            _id: status,
+            count: statusMap[status]
+        }));
 
         return res.status(200).json({
             success: true,
             stats: {
-                totalAssigned,
-                needsAssignment,
-                underReview,
-                awaitingDecision,
+                totalAssigned: totalAssigned + multiTotalAssigned,
+                needsAssignment: needsAssignment + multiNeedsAssignment,
+                underReview: underReview + multiUnderReview,
+                awaitingDecision: awaitingDecision + multiAwaitingDecision,
                 papersByStatus,
                 papersRequiringAction
             }
@@ -589,12 +658,21 @@ export const getAllPapers = async (req, res) => {
             ];
         }
 
-        // Exclude pdfBase64 and versions from list view (too large)
-        const papers = await PaperSubmission.find(query)
-            .select('-pdfBase64 -versions')
-            .populate('assignedEditor', 'username email')
-            .populate('assignedReviewers', 'username email')
-            .sort({ createdAt: -1 });
+        // Fetch from both collections
+        const [primaryPapers, multiPapers] = await Promise.all([
+            PaperSubmission.find(query)
+                .select('-pdfBase64 -versions')
+                .populate('assignedEditor', 'username email')
+                .populate('assignedReviewers', 'username email'),
+            MultiplePaperSubmission.find(query)
+                .select('-pdfBase64 -versions')
+                .populate('assignedEditor', 'username email')
+                .populate('assignedReviewers', 'username email')
+        ]);
+
+        const papers = [...primaryPapers, ...multiPapers].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
 
         return res.status(200).json({
             success: true,
@@ -618,7 +696,11 @@ export const getPdfBase64 = async (req, res) => {
         const editorId = req.user.userId;
 
         // Find paper by submission ID
-        const paper = await PaperSubmission.findOne({ submissionId });
+        let paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+            paper = await MultiplePaperSubmission.findOne({ submissionId });
+        }
 
         if (!paper) {
             return res.status(404).json({
@@ -705,7 +787,11 @@ export const sendMessage = async (req, res) => {
         }
 
         // Get paper (submissionId is a string like "BU001")
-        const paper = await PaperSubmission.findOne({ submissionId });
+        let paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+            paper = await MultiplePaperSubmission.findOne({ submissionId });
+        }
 
         if (!paper) {
             return res.status(404).json({ success: false, message: 'Paper not found' });
@@ -871,8 +957,13 @@ export const getAllMessages = async (req, res) => {
         // Get paper details for each message based on submissionId
         const enrichedMessages = await Promise.all(
             messages.map(async (msg) => {
-                const paper = await PaperSubmission.findOne({ submissionId: msg.submissionId })
+                let paper = await PaperSubmission.findOne({ submissionId: msg.submissionId })
                     .select('submissionId paperTitle');
+                if (!paper) {
+                    const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                    paper = await MultiplePaperSubmission.findOne({ submissionId: msg.submissionId })
+                        .select('submissionId paperTitle');
+                }
                 return {
                     ...msg.toObject(),
                     paperDetails: paper || null
@@ -901,9 +992,15 @@ export const getNonRespondingReviewers = async (req, res) => {
         const userId = req.user.userId;
 
         // Get all papers assigned to this editor
-        const papers = await PaperSubmission.find({ assignedEditor: userId })
-            .populate('reviewAssignments')
-            .select('submissionId paperTitle reviewAssignments');
+        const [mainPapers, multiPapers] = await Promise.all([
+            PaperSubmission.find({ assignedEditor: userId })
+                .populate('reviewAssignments')
+                .select('submissionId paperTitle reviewAssignments'),
+            MultiplePaperSubmission.find({ assignedEditor: userId })
+                .populate('reviewAssignments')
+                .select('submissionId paperTitle reviewAssignments')
+        ]);
+        const papers = [...mainPapers, ...multiPapers];
 
         if (!papers || papers.length === 0) {
             return res.status(200).json({
@@ -978,8 +1075,13 @@ export const sendReviewerReminder = async (req, res) => {
         }
 
         // Get paper submission
-        const paper = await PaperSubmission.findOne({ submissionId })
+        let paper = await PaperSubmission.findOne({ submissionId })
             .populate('reviewAssignments');
+
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findOne({ submissionId })
+                .populate('reviewAssignments');
+        }
 
         if (!paper) {
             return res.status(404).json({
@@ -1079,8 +1181,13 @@ export const sendBulkReminders = async (req, res) => {
                 const { submissionId, reviewerId, reviewerEmail } = reminder;
 
                 // Get paper submission
-                const paper = await PaperSubmission.findOne({ submissionId })
+                let paper = await PaperSubmission.findOne({ submissionId })
                     .populate('reviewAssignments');
+                if (!paper) {
+                    const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                    paper = await MultiplePaperSubmission.findOne({ submissionId })
+                        .populate('reviewAssignments');
+                }
 
                 if (!paper) {
                     results.failed.push({
@@ -1271,7 +1378,12 @@ export const sendMessageToReviewer = async (req, res) => {
         }
 
         // Get paper info
-        const paper = await PaperSubmission.findOne({ submissionId });
+        let paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+            paper = await MultiplePaperSubmission.findOne({ submissionId });
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -1391,7 +1503,12 @@ export const sendMessageToAuthor = async (req, res) => {
         }
 
         // Get paper info
-        const paper = await PaperSubmission.findOne({ submissionId });
+        let paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+            paper = await MultiplePaperSubmission.findOne({ submissionId });
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -1531,7 +1648,11 @@ export const requestRevision = async (req, res) => {
         }
 
         // Get paper
-        const paper = await PaperSubmission.findById(paperId);
+        let paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId);
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -1799,8 +1920,13 @@ export const acceptPaper = async (req, res) => {
         const editorId = req.user.userId;
 
         // Validate paper exists
-        const paper = await PaperSubmission.findById(paperId)
+        let paper = await PaperSubmission.findById(paperId)
             .populate('assignedReviewers', 'email username');
+
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId)
+                .populate('assignedReviewers', 'email username');
+        }
 
         if (!paper) {
             return res.status(404).json({
@@ -1990,7 +2116,11 @@ export const rejectPaper = async (req, res) => {
         }
 
         // Find the paper
-        const paper = await PaperSubmission.findById(paperId);
+        let paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId);
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -2211,7 +2341,12 @@ export const submitRevisedPaper = async (req, res) => {
         await revision.save();
 
         // Update paper with revised PDF
-        const paper = await PaperSubmission.findOne({ submissionId });
+        let paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+            paper = await MultiplePaperSubmission.findOne({ submissionId });
+        }
+
         if (paper) {
             paper.pdfUrl = revisedPdfUrl;
             paper.pdfPublicId = revisedPdfPublicId;
@@ -2315,7 +2450,11 @@ export const removeReviewerFromPaper = async (req, res) => {
         }
 
         // Find the paper
-        const paper = await PaperSubmission.findById(paperId);
+        let paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId);
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,

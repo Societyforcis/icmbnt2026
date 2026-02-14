@@ -48,6 +48,9 @@ const PaperSubmission = () => {
   const [showRevisionUpload, setShowRevisionUpload] = useState(false);
   const [showReuploadModal, setShowReuploadModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
+  const [selectedPaperIndex, setSelectedPaperIndex] = useState(0);
+  const [showSubmitAnother, setShowSubmitAnother] = useState(false);
   const navigate = useNavigate();
 
   // Check for authentication and existing submission when component mounts
@@ -79,6 +82,7 @@ const PaperSubmission = () => {
         if (response.data.hasSubmission) {
           setHasExistingSubmission(true);
           setExistingSubmission(response.data.submission);
+          setAllSubmissions(response.data.submissions || [response.data.submission]);
         }
 
         // Check for revision status
@@ -91,10 +95,6 @@ const PaperSubmission = () => {
         if (revisionResponse.data.hasRevision) {
           setHasRevision(true);
           setRevisionStatus(revisionResponse.data.revision);
-        }
-        if (response.data.hasSubmission) {
-          setHasExistingSubmission(true);
-          setExistingSubmission(response.data.submission);
         }
       } catch (error) {
         console.error("Error fetching user submission:", error);
@@ -220,13 +220,30 @@ const PaperSubmission = () => {
             {/* Existing Submission Section */}
             {!loading && hasExistingSubmission && existingSubmission && !submitSuccess && (
               <section className="bg-white p-6 sm:p-8 md:p-10 rounded-lg shadow-lg sm:shadow-xl border-t-4 border-blue-800 mb-8">
-                <div className="bg-blue-50 p-4 rounded-md mb-6">
+                <div className="bg-blue-50 p-4 rounded-md mb-6 flex justify-between items-center">
                   <div className="flex items-center">
                     <FaExclamationTriangle className="text-blue-600 mr-3 flex-shrink-0" />
                     <p className="text-blue-700">
-                      You have a submitted paper.
+                      You have {allSubmissions.length} submitted {allSubmissions.length === 1 ? 'paper' : 'papers'}.
                     </p>
                   </div>
+                  {allSubmissions.length > 1 && (
+                    <select
+                      value={selectedPaperIndex}
+                      onChange={(e) => {
+                        const index = parseInt(e.target.value);
+                        setSelectedPaperIndex(index);
+                        setExistingSubmission(allSubmissions[index]);
+                      }}
+                      className="bg-white border border-blue-200 rounded px-3 py-1 text-sm text-blue-800"
+                    >
+                      {allSubmissions.map((sub, idx) => (
+                        <option key={sub.submissionId} value={idx}>
+                          {sub.submissionId} - {sub.paperTitle.substring(0, 20)}...
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex items-center">
@@ -347,7 +364,42 @@ const PaperSubmission = () => {
                       Proceed to Copyright Dashboard
                     </button>
                   )}
+
+                  <button
+                    onClick={() => {
+                      setShowSubmitAnother(!showSubmitAnother);
+                      setShowHistory(false);
+                      setShowReuploadModal(false);
+                    }}
+                    className={`px-6 py-3 rounded-md transition-all duration-300 flex items-center justify-center shadow-md hover:shadow-lg w-full sm:w-auto ${showSubmitAnother ? 'bg-orange-800 text-white' : 'bg-[#F5A051] text-white hover:bg-[#e08c3e]'
+                      }`}
+                  >
+                    <FaUpload className="mr-2" />
+                    {showSubmitAnother ? 'Cancel New Submission' : 'Submit Another Paper'}
+                  </button>
                 </div>
+
+                {/* Submit Another Paper Form */}
+                {showSubmitAnother && (
+                  <div className="mt-8 p-6 bg-orange-50 rounded-xl border-2 border-dashed border-orange-200 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <FaUpload className="text-orange-600" />
+                        Submit Another Research Paper
+                      </h3>
+                    </div>
+                    <SubmitPaperForm
+                      isOpen={true}
+                      onClose={() => setShowSubmitAnother(false)}
+                      embedded={true}
+                      onSubmissionSuccess={() => {
+                        setShowSubmitAnother(false);
+                        handleSubmissionSuccess();
+                      }}
+                      hasExistingSubmission={true}
+                    />
+                  </div>
+                )}
 
 
                 {/* Inline History Timeline */}

@@ -12,16 +12,22 @@ import {
     reuploadPaper,
     getPaperHistory,
     checkFinalSelection,
-    uploadFinalDoc
+    uploadFinalDoc,
+    submitMultiplePaper
 } from '../controllers/paperController.js';
+import { getPaperCounts } from '../controllers/paperCountController.js';
 import { verifyJWT } from '../middleware/auth.js';
 import { uploadPaperPDF, uploadFinalDocument } from '../middleware/upload.js';
 import { requireRole } from '../middleware/roleCheck.js';
 
 const router = express.Router();
 
+// Paper Count Analytics
+router.get('/count', verifyJWT, getPaperCounts);
+
 // Author routes
 router.post('/submit', verifyJWT, uploadPaperPDF.single('pdf'), submitPaper);
+router.post('/submit-multiple', verifyJWT, uploadPaperPDF.single('pdf'), submitMultiplePaper);
 router.get('/my-submission', verifyJWT, getUserSubmission);
 router.get('/check-selection', verifyJWT, checkFinalSelection);
 router.put('/edit/:submissionId', verifyJWT, uploadPaperPDF.single('pdf'), editSubmission);

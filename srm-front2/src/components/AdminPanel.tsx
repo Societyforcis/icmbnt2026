@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, Trash2, Mail, User, Lock, AlertCircle, Check, Filter, MessageCircle, Send, X } from 'react-feather';
+import { UserPlus, Trash2, Mail, User, Lock, AlertCircle, Check, Filter, MessageCircle, Send, X, FileText } from 'react-feather';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 import PageTransition from './PageTransition';
@@ -32,6 +32,8 @@ const AdminPanel = () => {
   const [messagingEditor, setMessagingEditor] = useState<any | null>(null);
   const [editorMessage, setEditorMessage] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+  const [papers, setPapers] = useState<any[]>([]);
 
   // Paper tracking states
   const [trackingSubmissionId, setTrackingSubmissionId] = useState('');
@@ -50,6 +52,8 @@ const AdminPanel = () => {
   useEffect(() => {
     if (isAdmin) {
       fetchEditors();
+      fetchAdminStats();
+      fetchAdminPapers();
     }
   }, [isAdmin]);
 
@@ -172,6 +176,34 @@ const AdminPanel = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchAdminStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${apiUrl}/api/admin/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setStats(response.data.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+    }
+  };
+
+  const fetchAdminPapers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${apiUrl}/api/editor/papers`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setPapers(response.data.papers);
+      }
+    } catch (error) {
+      console.error('Error fetching admin papers:', error);
     }
   };
 
@@ -434,9 +466,27 @@ const AdminPanel = () => {
       <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Panel</h1>
-            <p className="text-gray-600">Manage editors and system users</p>
+          <div className="mb-8 flex justify-between items-end">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Panel</h1>
+              <p className="text-gray-600">Overview of system operations and users</p>
+            </div>
+            {stats && (
+              <div className="flex gap-4">
+                <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-blue-100 flex flex-col items-center">
+                  <span className="text-xs font-bold text-blue-600 uppercase">Total Papers</span>
+                  <span className="text-2xl font-black text-gray-900">{stats.papers.total}</span>
+                </div>
+                <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-green-100 flex flex-col items-center">
+                  <span className="text-xs font-bold text-green-600 uppercase">Accepted</span>
+                  <span className="text-2xl font-black text-gray-900">{stats.papers.accepted}</span>
+                </div>
+                <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-orange-100 flex flex-col items-center">
+                  <span className="text-xs font-bold text-orange-600 uppercase">Users</span>
+                  <span className="text-2xl font-black text-gray-900">{stats.users.total}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Tabs Navigation */}
@@ -503,6 +553,24 @@ const AdminPanel = () => {
                 }`}
             >
               📄 PDF Management
+            </button>
+            <button
+              onClick={() => setActiveTab('multiplePapers')}
+              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'multiplePapers'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+            >
+              📚 Multiple Submissions
+            </button>
+            <button
+              onClick={() => setActiveTab('allSubmissions')}
+              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'allSubmissions'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+            >
+              📋 All Submissions
             </button>
             <button
               onClick={() => setActiveTab('tracking')}
@@ -883,6 +951,177 @@ const AdminPanel = () => {
           {activeTab === 'pdfs' && (
             <AdminPdfManagement />
           )}
+
+          {/* Multiple Submissions Tab */}
+          {activeTab === 'multiplePapers' && (
+            <div className="bg-white rounded-2xl shadow-lg border border-indigo-100 overflow-hidden">
+              <div className="bg-indigo-600 px-8 py-6">
+                <h3 className="text-2xl font-bold text-white">Authors with Multiple Papers</h3>
+                <p className="text-indigo-100 text-sm mt-1">Review and manage researchers who have submitted multiple works.</p>
+              </div>
+              <div className="p-8">
+                {(() => {
+                  const grouped = papers.reduce((acc: any, paper) => {
+                    if (!acc[paper.email]) acc[paper.email] = [];
+                    acc[paper.email].push(paper);
+                    return acc;
+                  }, {});
+
+                  const multiSubmissions = Object.keys(grouped)
+                    .filter(email => grouped[email].length > 1)
+                    .map(email => ({
+                      email,
+                      authorName: grouped[email][0].authorName,
+                      papers: grouped[email]
+                    }));
+
+                  if (multiSubmissions.length === 0) {
+                    return (
+                      <div className="text-center py-20">
+                        <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                          <HistoryIcon className="w-10 h-10 text-indigo-300" />
+                        </div>
+                        <p className="text-gray-400 text-xl font-medium">No authors with multiple submissions found.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-8">
+                      {multiSubmissions.map((author, authorIdx) => (
+                        <div key={authorIdx} className="bg-gray-50 rounded-3xl p-6 border border-gray-200">
+                          <div className="flex justify-between items-center mb-6">
+                            <div>
+                              <h4 className="text-xl font-black text-gray-900">{author.authorName}</h4>
+                              <p className="text-indigo-600 font-bold">{author.email}</p>
+                            </div>
+                            <div className="bg-white px-6 py-2 rounded-2xl shadow-sm border border-indigo-200 flex items-center gap-2">
+                              <span className="text-indigo-600 font-black text-2xl">{author.papers.length}</span>
+                              <span className="text-xs font-bold text-gray-500 uppercase">Papers</span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {author.papers.map((paper: any) => (
+                              <div key={paper._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition group">
+                                <div>
+                                  <div className="flex justify-between items-start mb-2">
+                                    <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase tracking-widest">{paper.submissionId}</span>
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${paper.status === 'Accepted' ? 'bg-green-100 text-green-700' :
+                                      paper.status === 'Rejected' ? 'bg-red-100 text-red-700' :
+                                        'bg-yellow-100 text-yellow-700'
+                                      }`}>{paper.status}</span>
+                                  </div>
+                                  <h5 className="text-sm font-bold text-gray-800 line-clamp-2 mb-1 group-hover:text-indigo-600 transition-colors">{paper.paperTitle}</h5>
+                                  <p className="text-[11px] text-gray-500 font-medium">📅 {new Date(paper.createdAt).toLocaleDateString()}</p>
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center">
+                                  <p className="text-[10px] font-bold text-gray-400 capitalize">{paper.category}</p>
+                                  <button
+                                    onClick={() => navigate('/admin/tracking', { state: { submissionId: paper.submissionId } })}
+                                    className="text-indigo-600 hover:text-indigo-800 transition transform hover:scale-110"
+                                  >
+                                    <HistoryIcon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+          {/* All Submissions Tab */}
+          {activeTab === 'allSubmissions' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl shadow-lg p-8 border border-green-100">
+                <div className="flex justify-between items-center mb-8">
+                  <div>
+                    <h2 className="text-3xl font-black text-gray-900">Global Paper Repository</h2>
+                    <p className="text-gray-500">Full list of all research papers submitted to ICMBNT 2026.</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <select
+                      onChange={(e) => setRoleFilter(e.target.value)}
+                      className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Submitted">Submitted</option>
+                      <option value="Accepted">Accepted</option>
+                      <option value="Rejected">Rejected</option>
+                      <option value="Under Review">Under Review</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b-2 border-gray-100">
+                        <th className="px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">ID</th>
+                        <th className="px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">Paper Title</th>
+                        <th className="px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">Author / Email</th>
+                        <th className="px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">Status</th>
+                        <th className="px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">Date</th>
+                        <th className="px-4 py-4 text-right text-xs font-black text-gray-400 uppercase tracking-widest">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {papers
+                        .filter(p => roleFilter === 'All' || p.status === roleFilter)
+                        .filter(p => !searchTerm || p.paperTitle.toLowerCase().includes(searchTerm.toLowerCase()) || p.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                        .map((paper) => (
+                          <tr key={paper._id} className="hover:bg-gray-50 transition-colors group">
+                            <td className="px-4 py-4">
+                              <span className="text-xs font-black bg-blue-50 text-blue-600 px-2 py-1 rounded">{paper.submissionId}</span>
+                            </td>
+                            <td className="px-4 py-4">
+                              <p className="text-sm font-bold text-gray-800 line-clamp-1">{paper.paperTitle}</p>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{paper.category}</p>
+                            </td>
+                            <td className="px-4 py-4">
+                              <p className="text-sm font-bold text-gray-900">{paper.authorName}</p>
+                              <p className="text-xs text-blue-500 font-medium">{paper.email}</p>
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${paper.status === 'Accepted' ? 'bg-green-100 text-green-700' :
+                                paper.status === 'Rejected' ? 'bg-red-100 text-red-700' :
+                                  'bg-yellow-100 text-yellow-700'
+                                }`}>{paper.status}</span>
+                            </td>
+                            <td className="px-4 py-4 text-xs font-bold text-gray-500">
+                              {new Date(paper.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <button
+                                onClick={() => {
+                                  setActiveTab('tracking');
+                                  setTrackingSubmissionId(paper.submissionId);
+                                  setSelectedTrackingId(paper.submissionId);
+                                }}
+                                className="p-2 bg-white border border-gray-200 rounded-xl shadow-sm text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-all transform hover:scale-110"
+                              >
+                                <HistoryIcon className="w-5 h-5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                {papers.length === 0 && (
+                  <div className="text-center py-20">
+                    <FileText className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                    <p className="text-gray-400 font-bold">No submissions found in the database.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Paper Tracking Tab */}
           {activeTab === 'tracking' && (
             <div className="space-y-6">

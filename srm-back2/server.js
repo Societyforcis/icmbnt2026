@@ -191,33 +191,32 @@ app.use('/api/support-messages', supportMessageRoutes);
 app.get('/user-submission', verifyJWT, async (req, res) => {
     try {
         const userEmail = req.user.email;
-        const submission = await PaperSubmission.findOne({ email: userEmail });
+        const { MultiplePaperSubmission } = await import('./models/MultiplePaper.js');
 
-        if (!submission) {
+        // Fetch all paper submissions for this email
+        const [mainSubmissions, multiSubmissions] = await Promise.all([
+            PaperSubmission.find({ email: userEmail }),
+            MultiplePaperSubmission.find({ email: userEmail })
+        ]);
+
+        const paperSubmissions = [...mainSubmissions, ...multiSubmissions].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        if (paperSubmissions.length === 0) {
             return res.status(200).json({
                 success: true,
                 hasSubmission: false,
-                submission: null
+                submission: null,
+                submissions: []
             });
         }
 
         return res.status(200).json({
             success: true,
             hasSubmission: true,
-            submission: {
-                _id: submission._id,
-                submissionId: submission.submissionId,
-                bookingId: submission._id, // Using MongoDB ID as bookingId
-                paperTitle: submission.paperTitle,
-                authorName: submission.authorName,
-                email: submission.email,
-                category: submission.category,
-                topic: submission.topic,
-                abstractFileUrl: submission.abstractFileUrl,
-                pdfUrl: submission.pdfUrl,
-                status: submission.status,
-                submissionDate: submission.createdAt
-            }
+            submission: paperSubmissions[0],
+            submissions: paperSubmissions
         });
     } catch (error) {
         console.error('Error fetching user submission:', error);

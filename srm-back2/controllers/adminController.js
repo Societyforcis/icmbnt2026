@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { User } from '../models/User.js';
 import { PaperSubmission } from '../models/Paper.js';
+import { MultiplePaperSubmission } from '../models/MultiplePaper.js';
 import { Review } from '../models/Review.js';
 import { Revision } from '../models/Revision.js';
 import { generateRandomPassword } from '../utils/helpers.js';
@@ -119,7 +120,11 @@ export const assignEditor = async (req, res) => {
         const { paperId, editorId } = req.body;
 
         // Find the paper
-        const paper = await PaperSubmission.findById(paperId);
+        let paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId);
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -174,7 +179,12 @@ export const reassignEditor = async (req, res) => {
     try {
         const { paperId, newEditorId } = req.body;
 
-        const paper = await PaperSubmission.findById(paperId);
+        // Find the paper
+        let paper = await PaperSubmission.findById(paperId);
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId);
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -260,68 +270,101 @@ export const getDashboardStats = async (req, res) => {
     try {
         // Use Promise.all for parallel count queries
         const [
-            totalPapers,
-            submittedPapers,
-            underReview,
-            accepted,
-            rejected,
+            mainPapers,
+            multiPapers,
+            mainSubmitted,
+            multiSubmitted,
+            mainUnderReview,
+            multiUnderReview,
+            mainAccepted,
+            multiAccepted,
+            mainRejected,
+            multiRejected,
             totalUsers,
             authors,
             editors,
             reviewers
         ] = await Promise.all([
             PaperSubmission.countDocuments(),
+            MultiplePaperSubmission.countDocuments(),
             PaperSubmission.countDocuments({ status: 'Submitted' }),
+            MultiplePaperSubmission.countDocuments({ status: 'Submitted' }),
             PaperSubmission.countDocuments({ status: 'Under Review' }),
+            MultiplePaperSubmission.countDocuments({ status: 'Under Review' }),
             PaperSubmission.countDocuments({ status: 'Accepted' }),
+            MultiplePaperSubmission.countDocuments({ status: 'Accepted' }),
             PaperSubmission.countDocuments({ status: 'Rejected' }),
+            MultiplePaperSubmission.countDocuments({ status: 'Rejected' }),
             User.countDocuments(),
             User.countDocuments({ role: 'Author' }),
             User.countDocuments({ role: 'Editor' }),
             User.countDocuments({ role: 'Reviewer' })
         ]);
 
-        // Get papers by status
-        const papersByStatus = await PaperSubmission.aggregate([
-            {
-                $group: {
-                    _id: '$status',
-                    count: { $sum: 1 }
-                }
-            }
+        const totalPapers = mainPapers + multiPapers;
+        const submittedPapers = mainSubmitted + multiSubmitted;
+        const underReview = mainUnderReview + multiUnderReview;
+        const accepted = mainAccepted + multiAccepted;
+        const rejected = mainRejected + multiRejected;
+
+        // Get papers by status from both
+        const [mainByStatus, multiByStatus] = await Promise.all([
+            PaperSubmission.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+            MultiplePaperSubmission.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }])
         ]);
 
-        // Get recent submissions in parallel with other aggregate tasks if possible,
-        // but here we just optimize the query itself
-        const recentSubmissions = await PaperSubmission.find()
-            .populate('assignedEditor', 'username email')
-            .sort({ createdAt: -1 })
-            .limit(10)
-            .lean();
+        const combinedMap = {};
+        [...mainByStatus, ...multiByStatus].forEach(item => {
+            combinedMap[item._id] = (combinedMap[item._id] || 0) + item.count;
+        });
+        const papersByStatus = Object.keys(combinedMap).map(status => ({ _id: status, count: combinedMap[status] }));
 
-        // Get monthly submission trends (last 6 months)
+        const [recentMain, recentMulti] = await Promise.all([
+            PaperSubmission.find()
+                .populate('assignedEditor', 'username email')
+                .sort({ createdAt: -1 })
+                .limit(10)
+                .lean(),
+            MultiplePaperSubmission.find()
+                .populate('assignedEditor', 'username email')
+                .sort({ createdAt: -1 })
+                .limit(10)
+                .lean()
+        ]);
+
+        const recentSubmissions = [...recentMain, ...recentMulti]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 10);
+
+        // Get monthly submission trends (last 6 months) from both collections
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-        const monthlyTrends = await PaperSubmission.aggregate([
-            {
-                $match: {
-                    createdAt: { $gte: sixMonthsAgo }
-                }
-            },
-            {
-                $group: {
-                    _id: {
-                        year: { $year: '$createdAt' },
-                        month: { $month: '$createdAt' }
-                    },
-                    count: { $sum: 1 }
-                }
-            },
-            {
-                $sort: { '_id.year': 1, '_id.month': 1 }
-            }
+        const [mainTrends, multiTrends] = await Promise.all([
+            PaperSubmission.aggregate([
+                { $match: { createdAt: { $gte: sixMonthsAgo } } },
+                { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
+                { $sort: { '_id.year': 1, '_id.month': 1 } }
+            ]),
+            MultiplePaperSubmission.aggregate([
+                { $match: { createdAt: { $gte: sixMonthsAgo } } },
+                { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
+                { $sort: { '_id.year': 1, '_id.month': 1 } }
+            ])
         ]);
+
+        const trendsMap = {};
+        [...mainTrends, ...multiTrends].forEach(item => {
+            const key = `${item._id.year}-${item._id.month}`;
+            if (!trendsMap[key]) {
+                trendsMap[key] = { _id: item._id, count: 0 };
+            }
+            trendsMap[key].count += item.count;
+        });
+
+        const monthlyTrends = Object.values(trendsMap).sort((a, b) =>
+            (a._id.year - b._id.year) || (a._id.month - b._id.month)
+        );
 
         return res.status(200).json({
             success: true,

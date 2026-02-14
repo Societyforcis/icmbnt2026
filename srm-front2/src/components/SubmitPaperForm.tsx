@@ -68,6 +68,7 @@ interface SubmitPaperFormProps {
   onSubmissionSuccess: () => void;
   isRevision?: boolean;
   revisionData?: any;
+  hasExistingSubmission?: boolean;
 }
 
 interface SubmissionResponse {
@@ -81,7 +82,7 @@ interface SubmissionResponse {
   };
 }
 
-const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embedded = false, onSubmissionSuccess, isRevision = false, revisionData = null }) => {
+const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embedded = false, onSubmissionSuccess, isRevision = false, revisionData = null, hasExistingSubmission = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isStandalone, setIsStandalone] = useState(false);
@@ -191,7 +192,7 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
 
         if (response.data.success) {
           toast.success('Revised paper submitted successfully!');
-          
+
           console.log('✅ Revision submitted:', response.data);
 
           // Reset form
@@ -251,8 +252,11 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
       const token = localStorage.getItem('token');
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+      // Use different endpoint if user already has a submission
+      const endpoint = hasExistingSubmission ? '/api/papers/submit-multiple' : '/api/papers/submit';
+
       const response = await axios.post<SubmissionResponse>(
-        `${apiUrl}/api/papers/submit`,
+        `${apiUrl}${endpoint}`,
         submissionFormData,
         {
           headers: {
@@ -263,16 +267,18 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
       );
 
       if (response.data.success) {
-        const successMessage = `Paper submitted successfully! Submission ID: ${response.data.submissionId}`;
-        
+        const successMessage = hasExistingSubmission
+          ? `Additional paper submitted successfully! Submission ID: ${response.data.submissionId}`
+          : `Paper submitted successfully! Submission ID: ${response.data.submissionId}`;
+
         toast.success(successMessage);
-        
+
         // Store submission ID in localStorage for future reference
         if (response.data.submissionId) {
           localStorage.setItem('lastSubmissionId', response.data.submissionId);
         }
 
-    
+
         setFormData({
           paperTitle: "",
           authorName: "",
@@ -432,9 +438,8 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
               required
               placeholder="Enter your email"
               readOnly={!!formData.email}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F5A051] ${
-                formData.email ? 'bg-gray-100 cursor-not-allowed' : ''
-              }`}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F5A051] ${formData.email ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
               value={formData.email}
               onChange={handleChange}
             />
@@ -575,9 +580,8 @@ const SubmitPaperForm: React.FC<SubmitPaperFormProps> = ({ isOpen, onClose, embe
                   required
                   placeholder="Enter your email"
                   readOnly={!!formData.email}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F5A051] ${
-                    formData.email ? 'bg-gray-100 cursor-not-allowed' : ''
-                  }`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F5A051] ${formData.email ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                   value={formData.email}
                   onChange={handleChange}
                 />

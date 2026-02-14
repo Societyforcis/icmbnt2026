@@ -43,6 +43,8 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<{ email?: string, username?: string, role?: string }>({});
   const [submission, setSubmission] = useState<PaperSubmission | null>(null);
+  const [submissions, setSubmissions] = useState<PaperSubmission[]>([]);
+  const [selectedPaperIndex, setSelectedPaperIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [hasSubmission, setHasSubmission] = useState(false);
 
@@ -97,6 +99,12 @@ const Dashboard: React.FC = () => {
     fetchSubmission();
   }, [navigate]);
 
+  useEffect(() => {
+    if (submissions.length > 0) {
+      checkSelectionStatus();
+    }
+  }, [selectedPaperIndex, submissions]);
+
   const fetchSubmission = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -105,7 +113,9 @@ const Dashboard: React.FC = () => {
       });
 
       if (response.data.success && response.data.hasSubmission) {
-        setSubmission(response.data.submission);
+        const subs = response.data.submissions || [response.data.submission];
+        setSubmissions(subs);
+        setSubmission(subs[selectedPaperIndex] || subs[0]);
         setHasSubmission(true);
         // Once we have submission, also check selection status
         checkSelectionStatus();
@@ -124,8 +134,20 @@ const Dashboard: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data.success && response.data.isSelected) {
-        setIsFinalSelected(true);
-        setSelectedUserData(response.data.selectedUser);
+        const selectedUsers = response.data.selectedUsers || [response.data.selectedUser];
+        const currentPaper = submissions[selectedPaperIndex];
+
+        const matchingSelection = selectedUsers.find((s: any) =>
+          s.submissionId?.toLowerCase() === currentPaper?.submissionId?.toLowerCase()
+        );
+
+        if (matchingSelection) {
+          setIsFinalSelected(true);
+          setSelectedUserData(matchingSelection);
+        } else {
+          setIsFinalSelected(false);
+          setSelectedUserData(null);
+        }
       }
     } catch (error) {
       console.error('Error checking selection status:', error);
@@ -198,11 +220,6 @@ const Dashboard: React.FC = () => {
         return <CheckCircle className="w-5 h-5 text-green-600" />;
       case 'Rejected':
         return <XCircle className="w-5 h-5 text-red-600" />;
-      case 'Under Review':
-      case 'Review Received':
-        return <Users className="w-5 h-5 text-yellow-600" />;
-      case 'Revision Required':
-        return <AlertCircle className="w-5 h-5 text-orange-600" />;
       default:
         return <Clock className="w-5 h-5 text-blue-600" />;
     }
@@ -211,26 +228,19 @@ const Dashboard: React.FC = () => {
   const getWorkflowProgress = (status: string) => {
     const workflow = [
       'Submitted',
-      'Editor Assigned',
       'Under Review',
       'Review Received',
-      'Decision Made'
+      'Decision Made',
+      'Finalized'
     ];
 
-    const statusIndex: Record<string, number> = {
-      'Submitted': 0,
-      'Editor Assigned': 1,
-      'Under Review': 2,
-      'Review Received': 3,
-      'Revision Required': 3,
-      'Revised Submitted': 2,
-      'Conditionally Accept': 4,
-      'Accepted': 4,
-      'Rejected': 4,
-      'Published': 4
-    };
+    let currentIndex = 0;
+    if (['Submitted', 'Editor Assigned'].includes(status)) currentIndex = 0;
+    else if (status === 'Under Review') currentIndex = 1;
+    else if (status === 'Review Received') currentIndex = 2;
+    else if (['Revision Required', 'Revised Submitted', 'Conditionally Accept'].includes(status)) currentIndex = 3;
+    else if (['Accepted', 'Rejected', 'Published'].includes(status)) currentIndex = 4;
 
-    const currentIndex = statusIndex[status] || 0;
     return { workflow, currentIndex };
   };
 
@@ -251,73 +261,95 @@ const Dashboard: React.FC = () => {
     <PageTransition>
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          {/* Header */}
-          <header className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Author Dashboard</h1>
-            <p className="mt-2 text-lg text-gray-600">
-              Welcome back, {user.username || 'User'}!
-            </p>
-          </header>
+          <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-blue-50">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <Users className="w-8 h-8 text-blue-600" />
+                Author Dashboard
+              </h1>
+              <p className="text-gray-500 mt-1 font-medium">Welcome back, <span className="text-blue-600">{user.username || 'Author'}</span>! Managing {submissions.length} paper(s)</p>
+            </div>
+            <button
+              onClick={() => navigate('/paper-submission')}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-200 transition-all flex items-center gap-2 font-bold shadow-md active:scale-95"
+            >
+              <Upload className="w-5 h-5 font-bold" />
+              Submit Another Paper
+            </button>
+          </div>
 
-          {/* Paper Submission Status */}
           {hasSubmission && submission ? (
             <div className="space-y-6">
+              {/* Paper Selection Tabs if multiple papers */}
+              {submissions.length > 1 && (
+                <div className="bg-white p-2 rounded-xl shadow-sm flex gap-2 overflow-x-auto border border-gray-100 mb-6">
+                  {submissions.map((p, idx) => (
+                    <button
+                      key={p._id}
+                      onClick={() => {
+                        setSelectedPaperIndex(idx);
+                        setSubmission(p);
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${selectedPaperIndex === idx
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                    >
+                      {p.submissionId} - {p.paperTitle.substring(0, 20)}...
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Status Card */}
               <div className="bg-white shadow-lg rounded-lg overflow-hidden">
                 <div className="bg-gradient-to-r from-blue-900 to-[#F5A051] px-6 py-4">
                   <h2 className="text-xl font-semibold text-white">Your Paper Submission</h2>
                 </div>
-
                 <div className="p-6">
-                  {/* Paper Details */}
-                  <div className="mb-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">{submission.paperTitle}</h3>
-                        <p className="text-gray-600">Submission ID: <span className="font-semibold text-blue-600">{submission.submissionId}</span></p>
-                        <p className="text-gray-600">Category: <span className="font-semibold">{submission.category}</span></p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(submission.status)}
-                        <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(submission.status)}`}>
-                          {submission.status}
-                        </span>
-                      </div>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">{submission.paperTitle}</h3>
+                      <p className="text-gray-600">Submission ID: <span className="font-semibold text-blue-600">{submission.submissionId}</span></p>
+                      <p className="text-gray-600">Category: <span className="font-semibold">{submission.category}</span></p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(submission.status)}
+                      <span className={`px-4 py-2 rounded-full text-sm font-bold ${getStatusColor(submission.status)} shadow-sm`}>
+                        {submission.status}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Workflow Progress */}
-                  <div className="mb-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Review Progress</h4>
+                  {/* Progress workflow */}
+                  <div className="mb-10 px-4">
+                    <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6">Review Progress</h4>
                     <div className="relative">
                       {(() => {
                         const { workflow, currentIndex } = getWorkflowProgress(submission.status);
                         return (
                           <div className="flex items-center justify-between">
                             {workflow.map((step, index) => (
-                              <div key={step} className="flex flex-col items-center flex-1">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${index <= currentIndex
-                                  ? 'bg-green-500 text-white'
-                                  : 'bg-gray-300 text-gray-600'
+                              <div key={step} className="flex flex-col items-center flex-1 relative z-10">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 ${index <= currentIndex
+                                  ? 'bg-green-500 text-white ring-4 ring-green-100'
+                                  : 'bg-gray-200 text-gray-500'
                                   }`}>
                                   {index < currentIndex ? (
                                     <CheckCircle className="w-6 h-6" />
                                   ) : index === currentIndex ? (
-                                    <Clock className="w-6 h-6" />
+                                    <Clock className="w-6 h-6 animate-pulse" />
                                   ) : (
-                                    <span>{index + 1}</span>
+                                    <span className="text-sm font-bold">{index + 1}</span>
                                   )}
                                 </div>
-                                <p className={`mt-2 text-xs text-center ${index <= currentIndex ? 'text-gray-900 font-semibold' : 'text-gray-500'
+                                <p className={`mt-3 text-xs font-bold text-center ${index <= currentIndex ? 'text-gray-900' : 'text-gray-400'
                                   }`}>
                                   {step}
                                 </p>
                                 {index < workflow.length - 1 && (
-                                  <div className={`absolute top-5 h-0.5 ${index < currentIndex ? 'bg-green-500' : 'bg-gray-300'
-                                    }`} style={{
-                                      left: `${(index + 1) * (100 / workflow.length)}%`,
-                                      width: `${100 / workflow.length}%`
-                                    }} />
+                                  <div className={`absolute top-5 left-[50%] w-full h-1 -z-10 transition-all duration-500 ${index < currentIndex ? 'bg-green-500' : 'bg-gray-200'
+                                    }`} />
                                 )}
                               </div>
                             ))}
@@ -327,167 +359,197 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Editor & Reviewers Info */}
-                  {(submission.assignedEditor || submission.assignedReviewers) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    {/* Editor/Reviewer info */}
+                    <div className="space-y-4">
                       {submission.assignedEditor && (
-                        <div className="bg-purple-50 p-4 rounded-lg">
-                          <h5 className="font-semibold text-gray-900 mb-2">Assigned Editor</h5>
-                          <p className="text-gray-700">{submission.assignedEditor.username}</p>
+                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                          <h5 className="text-sm font-bold text-blue-900 mb-1 flex items-center gap-2">
+                            <Users className="w-4 h-4" /> Assigned Editor
+                          </h5>
+                          <p className="text-blue-800 font-medium">{submission.assignedEditor.username}</p>
                         </div>
                       )}
                       {submission.assignedReviewers && submission.assignedReviewers.length > 0 && (
-                        <div className="bg-yellow-50 p-4 rounded-lg">
-                          <h5 className="font-semibold text-gray-900 mb-2">
-                            Reviewers ({submission.assignedReviewers.length})
+                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                          <h5 className="text-sm font-bold text-orange-900 mb-1 flex items-center gap-2">
+                            <Users className="w-4 h-4" /> Peer Reviewers
                           </h5>
-                          <p className="text-gray-700">
-                            {submission.status === 'Under Review'
-                              ? 'Review in progress...'
-                              : `${submission.assignedReviewers.length} reviewer(s) assigned`}
+                          <p className="text-orange-800 font-medium">
+                            {submission.status === 'Under Review' ? 'Your paper is being reviewed by experts.' : `${submission.assignedReviewers.length} Reviewer(s) assigned.`}
                           </p>
                         </div>
                       )}
                     </div>
-                  )}
 
-                  {/* Decision & Comments */}
-                  {submission.finalDecision && (
-                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-                      <h5 className="font-semibold text-gray-900 mb-2">Editor Decision: {submission.finalDecision}</h5>
-                      {submission.editorComments && (
-                        <div className="mt-3">
-                          <p className="text-sm font-semibold text-gray-700">Comments:</p>
-                          <p className="text-gray-700 mt-1">{submission.editorComments}</p>
+                    {/* Decision info */}
+                    {submission.finalDecision && (
+                      <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 h-full">
+                        <h5 className="text-lg font-bold text-indigo-900 mb-4 flex items-center gap-2">
+                          <AlertCircle className="w-5 h-5" /> Editor Decision
+                        </h5>
+                        <div className="space-y-4">
+                          <p className="text-indigo-800 font-bold bg-white px-4 py-2 rounded-lg border border-indigo-200 inline-block">
+                            {submission.finalDecision}
+                          </p>
+                          {submission.editorComments && (
+                            <div>
+                              <p className="text-sm font-bold text-indigo-900">Editor Feedback:</p>
+                              <p className="text-indigo-800 mt-1 italic">"{submission.editorComments}"</p>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {submission.editorCorrections && (
-                        <div className="mt-3">
-                          <p className="text-sm font-semibold text-gray-700">Required Corrections:</p>
-                          <p className="text-gray-700 mt-1">{submission.editorCorrections}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
 
-                  <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-100">
                     <button
                       onClick={() => {
-                        setShowPdfModal(true);
                         setSelectedPdfUrl(submission.pdfUrl);
+                        setShowPdfModal(true);
                       }}
-                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+                      className="inline-flex items-center px-6 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition shadow-md active:scale-95"
                     >
-                      <FileText className="w-4 h-4 mr-2" />
-                      View PDF
+                      <FileText className="w-5 h-5 mr-2" />
+                      View Paper
                     </button>
-
                     <button
                       onClick={() => setShowHistoryModal(true)}
-                      className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition"
+                      className="inline-flex items-center px-6 py-2.5 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition shadow-md active:scale-95"
                     >
-                      <History className="w-4 h-4 mr-2" />
-                      View History
+                      <History className="w-5 h-5 mr-2" />
+                      History
                     </button>
-
-                    {submission.status !== 'Accepted' && submission.status !== 'Rejected' && (
-                      <button
-                        onClick={() => setShowReuploadModal(true)}
-                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition"
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        Re-upload Paper
-                      </button>
-                    )}
-
-                    {submission.status === 'Revision Required' && (
+                    {['Revision Required', 'Decision Made'].includes(submission.status) && (
                       <button
                         onClick={() => navigate(`/edit-submission/${submission.submissionId}`)}
-                        className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition"
+                        className="inline-flex items-center px-6 py-2.5 bg-orange-600 text-white font-bold rounded-lg hover:bg-orange-700 transition shadow-md active:scale-95 animate-pulse"
                       >
                         Submit Revision
+                      </button>
+                    )}
+                    {['Submitted', 'Editor Assigned', 'Review Received'].includes(submission.status) && (
+                      <button
+                        onClick={() => setShowReuploadModal(true)}
+                        className="inline-flex items-center px-6 py-2.5 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition shadow-md active:scale-95"
+                      >
+                        <Upload className="w-5 h-5 mr-2" />
+                        Re-upload
                       </button>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Final Selected Next Steps */}
+              {/* Final Selected Next Steps Section */}
               {isFinalSelected && (
-                <div className="bg-white shadow-lg rounded-lg overflow-hidden border-2 border-green-500 animate__animated animate__fadeIn">
-                  <div className="bg-green-600 px-6 py-4 flex items-center gap-2">
-                    <CheckCircle className="w-6 h-6 text-white" />
-                    <h2 className="text-xl font-semibold text-white">Congratulations! You are Final Selected</h2>
+                <div className="bg-white shadow-lg rounded-2xl overflow-hidden border-2 border-green-500 transition-all hover:shadow-2xl">
+                  <div className="bg-green-600 px-6 py-5 flex items-center gap-3">
+                    <div className="bg-white/20 p-2 rounded-lg">
+                      <CheckCircle className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white uppercase tracking-tight">Paper Selected for Conference</h2>
+                      <p className="text-green-100 text-sm opacity-90">Please complete the final document submission below</p>
+                    </div>
                   </div>
-                  <div className="p-6">
-                    <p className="text-gray-700 mb-6 font-medium">
-                      Your paper has been final selected for the conference. As a final step, please upload the conference selected paper in <strong>.doc or .docx</strong> format.
-                    </p>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* Upload Form */}
-                      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <Upload className="w-5 h-5 text-[#F5A051]" />
-                          Upload Final Document (.doc / .docx)
-                        </h3>
-                        <form onSubmit={handleFinalDocUpload} className="space-y-4">
-                          <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-white">
-                            <input
-                              type="file"
-                              accept=".doc,.docx,.pdf"
-                              onChange={(e) => setFinalDocFile(e.target.files?.[0] || null)}
-                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                              required
-                            />
-                            <p className="mt-2 text-xs text-gray-500">Supported formats: .doc, .docx (Max 15MB)</p>
-                          </div>
-                          <button
-                            type="submit"
-                            disabled={isUploadingFinal || !finalDocFile}
-                            className={`w-full py-2 px-4 rounded-md text-white font-semibold shadow-md transition ${isUploadingFinal || !finalDocFile ? 'bg-gray-400' : 'bg-[#F5A051] hover:bg-[#e08c3e]'
-                              } flex items-center justify-center gap-2`}
-                          >
-                            {isUploadingFinal ? (
-                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                            ) : null}
-                            {isUploadingFinal ? 'Uploading...' : (selectedUserData?.finalDocUrl ? 'Re-upload Document' : 'Upload Final Document')}
-                          </button>
-                        </form>
+                  <div className="p-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                      {/* Instructions */}
+                      <div className="lg:col-span-5 space-y-6">
+                        <div className="bg-green-50 rounded-2xl p-6 border border-green-100">
+                          <h3 className="text-xl font-bold text-green-900 mb-4 flex items-center gap-2">
+                            <AlertCircle className="w-6 h-6" /> Instructions
+                          </h3>
+                          <ul className="space-y-4">
+                            <li className="flex gap-3 text-green-800">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-200 flex items-center justify-center text-xs font-bold mt-0.5">1</span>
+                              <p className="text-sm">Download your reviewed paper and verify all expert comments are addressed items.</p>
+                            </li>
+                            <li className="flex gap-3 text-green-800">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-200 flex items-center justify-center text-xs font-bold mt-0.5">2</span>
+                              <p className="text-sm font-bold">The final document MUST be in Microsoft Word (.doc or .docx) format.</p>
+                            </li>
+                            <li className="flex gap-3 text-green-800">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-200 flex items-center justify-center text-xs font-bold mt-0.5">3</span>
+                              <p className="text-sm">Ensure your contact info and author list are final and correct before uploading.</p>
+                            </li>
+                          </ul>
+                        </div>
                       </div>
 
-                      {/* Status & Download */}
-                      <div className="flex flex-col justify-center bg-green-50 p-6 rounded-lg border border-green-100">
-                        <h3 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
-                          <CheckCircle className="w-5 h-5" />
-                          Submission Status
-                        </h3>
-                        {selectedUserData?.finalDocUrl ? (
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-2 text-green-700 font-bold bg-white p-3 rounded border border-green-200">
-                              <CheckCircle className="w-5 h-5" />
-                              <span>Final Document Uploaded Successfully</span>
+                      {/* Upload Interface */}
+                      <div className="lg:col-span-7">
+                        <div className="bg-white border-2 border-dashed border-gray-200 rounded-3xl p-8 relative hover:border-blue-400 transition-colors">
+                          <form onSubmit={handleFinalDocUpload} className="space-y-6">
+                            <div className="flex flex-col items-center justify-center text-center">
+                              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
+                                <Upload className="w-10 h-10 text-blue-500" />
+                              </div>
+                              <h4 className="text-xl font-bold text-gray-900 mb-2">Upload Camera Ready Version</h4>
+                              <p className="text-gray-500 text-sm mb-6 max-w-xs mx-auto">Click below to select your final Word document (.doc, .docx)</p>
+
+                              <input
+                                type="file"
+                                accept=".doc,.docx,.pdf"
+                                onChange={(e) => setFinalDocFile(e.target.files?.[0] || null)}
+                                className="block w-full text-sm text-gray-500 
+                                        file:mr-4 file:py-3 file:px-8
+                                        file:rounded-full file:border-0
+                                        file:text-sm file:font-bold
+                                        file:bg-blue-600 file:text-white
+                                        hover:file:bg-blue-700
+                                        cursor-pointer
+                                        border border-gray-100 p-2 rounded-2xl bg-gray-50 mb-4"
+                              />
+
+                              {finalDocFile && (
+                                <div className="flex items-center gap-2 text-blue-600 font-bold bg-blue-50 px-4 py-2 rounded-lg mb-4">
+                                  <FileText className="w-4 h-4" />
+                                  {finalDocFile.name}
+                                </div>
+                              )}
+
+                              <button
+                                type="submit"
+                                disabled={isUploadingFinal || !finalDocFile}
+                                className={`w-full py-4 px-8 rounded-2xl text-white font-extrabold shadow-xl transition-all ${isUploadingFinal || !finalDocFile
+                                  ? 'bg-gray-300 pointer-events-none'
+                                  : 'bg-gradient-to-r from-blue-600 to-indigo-700 hover:shadow-blue-200 hover:-translate-y-1'
+                                  } flex items-center justify-center gap-3`}
+                              >
+                                {isUploadingFinal ? (
+                                  <div className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                ) : <CheckCircle className="w-6 h-6" />}
+                                {isUploadingFinal ? 'Processing Upload...' : 'CONFIRM AND UPLOAD FINAL VERSION'}
+                              </button>
                             </div>
-                            <p className="text-sm text-gray-600">
-                              Submitted on: <span className="font-semibold text-gray-800">{new Date(selectedUserData.finalDocSubmittedAt).toLocaleString()}</span>
-                            </p>
-                            <a
-                              href={selectedUserData.finalDocUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition w-full justify-center font-bold shadow-md"
-                            >
-                              <FileText className="w-5 h-4 mr-2" />
-                              View Uploaded Document
-                            </a>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center text-center py-4 bg-white rounded-lg border border-orange-100 p-6">
-                            <Clock className="w-12 h-12 text-orange-400 mb-2 animate-pulse" />
-                            <p className="text-gray-700 font-medium">Waiting for your final document submission</p>
-                            <p className="text-xs text-gray-500 mt-2">Please upload your paper in .doc format above</p>
-                          </div>
-                        )}
+                          </form>
+
+                          {selectedUserData?.finalDocUrl && (
+                            <div className="mt-8 pt-8 border-t border-gray-100">
+                              <div className="flex items-center justify-between bg-green-50 p-4 rounded-2xl border border-green-100">
+                                <div className="flex items-center gap-3">
+                                  <CheckCircle className="text-green-600" />
+                                  <div>
+                                    <p className="text-green-900 font-bold mb-0.5">Previously Uploaded</p>
+                                    <p className="text-green-700 text-xs">ID: {selectedUserData.submissionId}</p>
+                                  </div>
+                                </div>
+                                <a
+                                  href={selectedUserData.finalDocUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="bg-white text-green-700 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:shadow-md transition"
+                                >
+                                  Download
+                                </a>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -495,222 +557,79 @@ const Dashboard: React.FC = () => {
               )}
             </div>
           ) : (
-            /* No Submission - Show Quick Actions */
-            <div className="space-y-6">
-              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-                <div className="px-4 py-5 sm:px-6">
-                  <h2 className="text-lg leading-6 font-medium text-gray-900">
-                    Conference Information
-                  </h2>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                    Important dates and submission guidelines for ICMBNT 2026
-                  </p>
-                </div>
-                <div className="border-t border-gray-200">
-                  <dl>
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Paper Status</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                          No submission yet
-                        </span>
-                      </dd>
-                    </div>
-                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Important Dates</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        <ul className="border border-gray-200 rounded-md divide-y divide-gray-200">
-                          <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                            <div className="w-0 flex-1 flex items-center">
-                              <span className="flex-1 w-0 truncate">Manuscript Submission Deadline</span>
-                            </div>
-                            <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium text-red-600">10 February 2026</span>
-                            </div>
-                          </li>
-                          <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                            <div className="w-0 flex-1 flex items-center">
-                              <span className="flex-1 w-0 truncate">Acceptance Notification</span>
-                            </div>
-                            <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium">12 February 2026</span>
-                            </div>
-                          </li>
-                          <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                            <div className="w-0 flex-1 flex items-center">
-                              <span className="flex-1 w-0 truncate">Registration Deadline</span>
-                            </div>
-                            <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium">15 February 2026</span>
-                            </div>
-                          </li>
-                          <li className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                            <div className="w-0 flex-1 flex items-center">
-                              <span className="flex-1 w-0 truncate">Conference Dates</span>
-                            </div>
-                            <div className="ml-4 flex-shrink-0">
-                              <span className="font-medium">12-13 March 2026</span>
-                            </div>
-                          </li>
-                        </ul>
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
+            <div className="bg-white shadow rounded-lg p-10 text-center">
+              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <FileText className="w-10 h-10 text-gray-400" />
               </div>
-
-              {/* Quick Actions */}
-              <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-indigo-500 rounded-md p-3">
-                        <FileText className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dt className="text-lg font-medium text-gray-900 truncate">Submit a Paper</dt>
-                        <dd className="mt-1 text-sm text-gray-500">
-                          Submit your research paper
-                        </dd>
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <a href="/paper-submission" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                        Submit now &rarr;
-                      </a>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                        <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dt className="text-lg font-medium text-gray-900 truncate">Paper Guidelines</dt>
-                        <dd className="mt-1 text-sm text-gray-500">View submission requirements</dd>
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <a href="/call-for-papers" className="text-sm font-medium text-green-600 hover:text-green-500">
-                        View guidelines &rarr;
-                      </a>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-[#F5A051] rounded-md p-3">
-                        <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dt className="text-lg font-medium text-gray-900 truncate">Register for Event</dt>
-                        <dd className="mt-1 text-sm text-gray-500">
-                          Complete conference registration
-                        </dd>
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <a href="/registrations" className="text-sm font-medium text-[#F5A051] hover:text-[#e08c3e]">
-                        Register now &rarr;
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">No Submissions Found</h2>
+              <p className="text-gray-500 mb-8 max-w-sm mx-auto">
+                You haven't submitted any papers yet. Start by submitting your research abstract for ICMBNT 2026.
+              </p>
+              <button
+                onClick={() => navigate('/paper-submission')}
+                className="px-10 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-200 active:scale-95"
+              >
+                Submit Your First Paper
+              </button>
             </div>
           )}
         </div>
 
-        {/* PDF Modal Viewer */}
+        {/* PDF Modal */}
         {showPdfModal && selectedPdfUrl && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="text-xl font-semibold text-gray-900">Paper PDF Viewer</h3>
+          <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-5xl h-[95vh] rounded-2xl overflow-hidden flex flex-col relative">
+              <div className="bg-gray-100 p-4 border-b flex justify-between items-center shadow-sm">
                 <div className="flex items-center gap-4">
-                  {/* Page Navigation */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage <= 1}
-                      className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      ◀ Prev
-                    </button>
-                    <span className="text-sm font-medium">
-                      Page {currentPage} / {numPages || '?'}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage(Math.min(numPages || 1, currentPage + 1))}
-                      disabled={currentPage >= (numPages || 1)}
-                      className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next ▶
-                    </button>
-                  </div>
-
-                  {/* Close Button */}
                   <button
-                    onClick={() => {
-                      setShowPdfModal(false);
-                      setSelectedPdfUrl(null);
-                      setCurrentPage(1);
-                    }}
-                    className="p-2 hover:bg-gray-100 rounded-full transition"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 bg-white rounded-lg shadow disabled:opacity-50"
+                  >◀</button>
+                  <span className="font-bold text-gray-700">Page {currentPage} of {numPages || '?'}</span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(numPages || prev, prev + 1))}
+                    disabled={currentPage === numPages}
+                    className="p-2 bg-white rounded-lg shadow disabled:opacity-50"
+                  >▶</button>
                 </div>
+                <button
+                  onClick={() => setShowPdfModal(false)}
+                  className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
+                ><X /></button>
               </div>
-
-              {/* PDF Display */}
-              <div className="flex-1 overflow-auto p-4 bg-gray-100">
-                <div className="flex justify-center">
-                  <Document
-                    file={selectedPdfUrl}
-                    onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-                    loading={<div className="text-center py-8">Loading PDF...</div>}
-                    error={<div className="text-center py-8 text-red-600">Failed to load PDF</div>}
-                  >
-                    <Page
-                      pageNumber={currentPage}
-                      className="shadow-lg"
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                    />
-                  </Document>
-                </div>
+              <div className="flex-1 overflow-auto bg-gray-200 p-8 flex justify-center">
+                <Document
+                  file={selectedPdfUrl}
+                  onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                  loading={<div className="animate-pulse text-blue-600 font-bold">Rendering Document...</div>}
+                >
+                  <Page
+                    pageNumber={currentPage}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                    className="shadow-2xl"
+                    width={800}
+                  />
+                </Document>
               </div>
             </div>
           </div>
         )}
+
         {/* Paper History Modal */}
         {showHistoryModal && submission && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                  <History className="w-5 h-5" />
-                  Paper Submission History
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate__animated animate__fadeIn">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col">
+              <div className="p-6 border-b flex items-center justify-between bg-gray-50 rounded-t-3xl">
+                <h3 className="text-2xl font-extrabold text-blue-900 flex items-center gap-3">
+                  <History className="text-blue-500" /> Paper History
                 </h3>
-                <button
-                  onClick={() => setShowHistoryModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition"
-                >
-                  <X className="w-6 h-6" />
+                <button onClick={() => setShowHistoryModal(false)} className="bg-white p-2 rounded-full shadow-sm hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors">
+                  <X />
                 </button>
               </div>
-              <div className="flex-1 overflow-auto p-6">
+              <div className="flex-1 overflow-y-auto p-8 bg-white">
                 <PaperHistoryTimeline submissionId={submission.submissionId} />
               </div>
             </div>

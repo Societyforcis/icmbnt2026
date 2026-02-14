@@ -47,6 +47,8 @@ const CopyrightDashboard: React.FC = () => {
     const [messageInput, setMessageInput] = useState('');
     const [uploading, setUploading] = useState(false);
     const [file, setFile] = useState<File | null>(null);
+    const [allPapers, setAllPapers] = useState<any[]>([]);
+    const [selectedPaperIndex, setSelectedPaperIndex] = useState(0);
 
     // Final Selection & Document Upload states
     const [isFinalSelected, setIsFinalSelected] = useState(false);
@@ -59,6 +61,12 @@ const CopyrightDashboard: React.FC = () => {
     useEffect(() => {
         fetchDashboardData();
     }, []);
+
+    useEffect(() => {
+        if (allPapers.length > 0) {
+            checkSelectionStatus();
+        }
+    }, [selectedPaperIndex, allPapers]);
 
     const fetchDashboardData = async () => {
         try {
@@ -74,6 +82,8 @@ const CopyrightDashboard: React.FC = () => {
 
             if (response.data.success) {
                 setHasPaper(response.data.hasPaper);
+                const papers = response.data.data?.allPapers || (response.data.data?.paper ? [response.data.data.paper] : []);
+                setAllPapers(papers);
                 setDashboardData(response.data.data || null);
                 setEligible(true);
                 // Also check selection status
@@ -90,12 +100,15 @@ const CopyrightDashboard: React.FC = () => {
     };
 
     const handleSendMessage = async () => {
-        if (!messageInput.trim() || !dashboardData || !dashboardData.copyright) return;
+        const paper = allPapers[selectedPaperIndex];
+        const copyright = paper?.copyright;
+
+        if (!messageInput.trim() || !copyright) return;
 
         try {
             const token = localStorage.getItem('token');
             const response = await axios.post(`${API_URL}/api/copyright/message`, {
-                copyrightId: dashboardData.copyright._id,
+                copyrightId: copyright._id,
                 message: messageInput
             }, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -117,19 +130,16 @@ const CopyrightDashboard: React.FC = () => {
     };
 
     const handleFileUpload = async () => {
-        if (!file || !dashboardData) return;
+        const paper = allPapers[selectedPaperIndex];
+        if (!file || !paper) return;
 
         setUploading(true);
         try {
             const token = localStorage.getItem('token');
 
-            // 1. Upload to Cloudinary (Simulated for this tool, assuming Cloudinary logic is handled elsewhere or via standard upload)
-            // For now, I'll use a placeholder or assume the backend handles it.
-            // Since I don't see a specific upload endpoint with Cloudinary in copyrightController, 
-            // I'll simulate the upload and send the URL.
-
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('submissionId', paper.submissionId);
 
             // 2. Update backend (Backend now handles the Cloudinary upload securely)
             const response = await axios.post(`${API_URL}/api/copyright/author/upload`, formData, {
@@ -140,10 +150,18 @@ const CopyrightDashboard: React.FC = () => {
             });
 
             if (response.data.success) {
-                setDashboardData({
-                    ...dashboardData,
-                    copyright: response.data.data
-                });
+                const updatedCopyright = response.data.data;
+                const updatedPapers = [...allPapers];
+                updatedPapers[selectedPaperIndex] = {
+                    ...updatedPapers[selectedPaperIndex],
+                    copyright: updatedCopyright
+                };
+                setAllPapers(updatedPapers);
+
+                setDashboardData((prev: any) => ({
+                    ...prev,
+                    copyright: updatedCopyright
+                }));
                 setFile(null);
                 alert('Copyright form uploaded successfully!');
             }
@@ -160,10 +178,23 @@ const CopyrightDashboard: React.FC = () => {
             const response = await axios.get(`${API_URL}/api/papers/check-selection`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
             if (response.data.success && response.data.isSelected) {
-                setIsFinalSelected(true);
-                setSelectedUserData(response.data.selectedUser);
-                console.log('Final selection data loaded:', response.data.selectedUser);
+                const selectedUsers = response.data.selectedUsers || [response.data.selectedUser];
+                const currentPaper = allPapers[selectedPaperIndex];
+
+                // Find matching selection record for current paper
+                const matchingSelection = selectedUsers.find((s: any) =>
+                    s.submissionId?.toLowerCase() === currentPaper?.submissionId?.toLowerCase()
+                );
+
+                if (matchingSelection) {
+                    setIsFinalSelected(true);
+                    setSelectedUserData(matchingSelection);
+                } else {
+                    setIsFinalSelected(false);
+                    setSelectedUserData(null);
+                }
             }
         } catch (error) {
             console.error('Error checking selection status:', error);
@@ -321,8 +352,8 @@ const CopyrightDashboard: React.FC = () => {
         );
     }
 
-    const paper = dashboardData?.paper;
-    const copyright = dashboardData?.copyright;
+    const paper = allPapers[selectedPaperIndex];
+    const copyright = paper?.copyright;
 
     // 2. Case: Paper submitted but not accepted or revised submitted
     if (paper && paper.status !== 'Accepted' && paper.status !== 'Published' && paper.status !== 'Revised Submitted') {
@@ -332,14 +363,42 @@ const CopyrightDashboard: React.FC = () => {
                     <div className="max-w-4xl mx-auto">
                         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
                             <div className="bg-gradient-to-r from-blue-900 to-primary p-8 text-white relative">
-                                <h1 className="text-3xl font-bold mb-2">Submission Status</h1>
-                                <p className="opacity-80">Track your research paper evaluation progress.</p>
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h1 className="text-3xl font-bold mb-2">Submission Status</h1>
+                                        <p className="opacity-80">Track your research paper evaluation progress.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => navigate('/paper-submission')}
+                                        className="bg-white text-primary px-5 py-2.5 rounded-xl font-bold hover:bg-gray-100 transition shadow-lg flex items-center gap-2"
+                                    >
+                                        <Upload className="w-5 h-5" />
+                                        Upload Another Paper
+                                    </button>
+                                </div>
                                 <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden md:block opacity-20">
                                     <Clock className="w-24 h-24" />
                                 </div>
                             </div>
 
                             <div className="p-8">
+                                {/* Multiple Paper Tabs */}
+                                {allPapers.length > 1 && (
+                                    <div className="flex gap-2 mb-8 overflow-x-auto pb-2 border-b border-gray-100">
+                                        {allPapers.map((p, idx) => (
+                                            <button
+                                                key={p._id || p.submissionId}
+                                                onClick={() => setSelectedPaperIndex(idx)}
+                                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${selectedPaperIndex === idx
+                                                    ? 'bg-primary text-white shadow-md select-none'
+                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                    }`}
+                                            >
+                                                {p.submissionId} - {p.paperTitle.substring(0, 20)}...
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 <div className="flex flex-col md:flex-row items-center gap-6 mb-10 p-6 bg-blue-50 rounded-2xl border border-blue-100">
                                     <div className="bg-white p-4 rounded-full shadow-sm">
                                         <Clock className="w-10 h-10 text-primary" />
@@ -412,6 +471,13 @@ const CopyrightDashboard: React.FC = () => {
                                 }`}>
                                 {copyright.status}
                             </span>
+                            <button
+                                onClick={() => navigate('/paper-submission')}
+                                className="ml-4 bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-primary/90 transition shadow-sm flex items-center gap-2 text-sm"
+                            >
+                                <Upload className="w-4 h-4" />
+                                Submit Another
+                            </button>
                         </div>
                     </div>
 
@@ -744,7 +810,7 @@ const CopyrightDashboard: React.FC = () => {
                                         <p>No messages yet.<br />Start communication with admin.</p>
                                     </div>
                                 ) : (
-                                    copyright.messages.map((msg, idx) => (
+                                    copyright.messages.map((msg: Message, idx: number) => (
                                         <div key={idx} className={`flex ${msg.sender === 'Author' ? 'justify-end' : 'justify-start'}`}>
                                             <div className={`max-w-[85%] p-3 rounded-2xl shadow-sm ${msg.sender === 'Author'
                                                 ? 'bg-primary text-white rounded-tr-none'

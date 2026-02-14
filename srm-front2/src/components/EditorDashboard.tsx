@@ -20,7 +20,8 @@ import {
     Cloud,
     MessageSquare,
     Send,
-    RefreshCw
+    RefreshCw,
+    Layers
 } from 'lucide-react';
 import ReviewerFilterPanel, { Reviewer } from './ReviewerFilterPanel';
 import ReviewerDetailsPanel from './ReviewerDetailsPanel';
@@ -138,6 +139,7 @@ const EditorDashboard = () => {
 
     // Author message state for paper cards
     const [selectedPaperForAuthorMessage, setSelectedPaperForAuthorMessage] = useState<string | null>(null);
+    const [expandedAuthors, setExpandedAuthors] = useState<string[]>([]);
 
     // Message and Reviewer Filter states
     const [, setFilteredReviewers] = useState<any[]>([]);
@@ -896,6 +898,13 @@ const EditorDashboard = () => {
                         collapsed={!sidebarOpen}
                     />
                     <NavItem
+                        icon={Users}
+                        label="Multiple Submissions"
+                        active={activeTab === 'multiplePapers'}
+                        onClick={() => setActiveTab('multiplePapers')}
+                        collapsed={!sidebarOpen}
+                    />
+                    <NavItem
                         icon={CheckCircle}
                         label="Selected Users"
                         active={activeTab === 'selectedUsers'}
@@ -929,6 +938,7 @@ const EditorDashboard = () => {
                         {activeTab === 'pdfs' && 'PDF Management'}
                         {activeTab === 'createReviewer' && 'Create New Reviewer'}
                         {activeTab === 'allReviewers' && 'All Reviewers'}
+                        {activeTab === 'multiplePapers' && 'Multiple Paper Submissions'}
                         {activeTab === 'selectedUsers' && 'Conference Selected Users'}
                     </h2>
                 </div>
@@ -1014,6 +1024,84 @@ const EditorDashboard = () => {
                         <AdminSelectedUsers />
                     )}
 
+                    {activeTab === 'multiplePapers' && (
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-blue-100">
+                            <div className="p-6 border-b border-gray-100 bg-blue-50/30">
+                                <h3 className="text-xl font-bold text-blue-900 flex items-center gap-2">
+                                    <FileText className="w-6 h-6 text-blue-600" />
+                                    Authors with Multiple Submissions
+                                </h3>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    List of registered users who have submitted more than one research paper.
+                                </p>
+                            </div>
+                            <div className="p-6">
+                                {(() => {
+                                    const grouped = papers.reduce((acc: any, paper) => {
+                                        if (!acc[paper.email]) acc[paper.email] = [];
+                                        acc[paper.email].push(paper);
+                                        return acc;
+                                    }, {});
+
+                                    const multiSubmissions = Object.keys(grouped)
+                                        .filter(email => grouped[email].length > 1)
+                                        .map(email => ({
+                                            email,
+                                            authorName: grouped[email][0].authorName,
+                                            papers: grouped[email]
+                                        }));
+
+                                    if (multiSubmissions.length === 0) {
+                                        return (
+                                            <div className="text-center py-20 text-gray-400">
+                                                <Users className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                                                <p className="text-lg font-medium">No authors with multiple submissions yet.</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className="space-y-6">
+                                            {multiSubmissions.map((author, idx) => (
+                                                <div key={idx} className="border border-gray-100 rounded-2xl p-6 bg-gray-50/50 hover:border-blue-200 transition-colors">
+                                                    <div className="flex justify-between items-start mb-4">
+                                                        <div>
+                                                            <h4 className="text-lg font-bold text-gray-900">{author.authorName}</h4>
+                                                            <p className="text-sm text-blue-600 font-medium">{author.email}</p>
+                                                        </div>
+                                                        <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-xs font-bold shadow-sm">
+                                                            {author.papers.length} Papers
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                                        {author.papers.map((paper: any) => (
+                                                            <div key={paper._id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center group hover:shadow-md transition">
+                                                                <div className="flex-1">
+                                                                    <p className="text-xs font-bold text-blue-500 mb-1">{paper.submissionId}</p>
+                                                                    <h5 className="text-sm font-bold text-gray-800 line-clamp-1">{paper.paperTitle}</h5>
+                                                                    <p className="text-xs text-gray-500 mt-1">{paper.category}</p>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setActiveTab('papers');
+                                                                        setViewingPaper(paper);
+                                                                    }}
+                                                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                                                >
+                                                                    <Eye className="w-5 h-5" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'papers' && !viewingPaper && (
                         <div className="space-y-6">
                             <div className="bg-white rounded-lg shadow-md p-6">
@@ -1068,181 +1156,235 @@ const EditorDashboard = () => {
                                 </div>
 
                                 <div className="grid gap-4">
-                                    {papers.filter(p => {
-                                        const matchesSearch = !searchTerm ||
-                                            p.paperTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.authorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.submissionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.email.toLowerCase().includes(searchTerm.toLowerCase());
+                                    {(() => {
+                                        const filteredPapers = papers.filter(p => {
+                                            const matchesSearch = !searchTerm ||
+                                                p.paperTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                p.authorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                p.submissionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                p.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-                                        const matchesStatus = !statusFilter || p.status === statusFilter;
+                                            const matchesStatus = !statusFilter || p.status === statusFilter;
 
-                                        return matchesSearch && matchesStatus;
-                                    }).map((paper) => (
-                                        <div key={paper._id}>
-                                            <div className="border rounded-lg p-4 hover:shadow-md transition cursor-pointer bg-white hover:bg-gray-50"
-                                                onClick={() => setViewingPaper(paper)}>
-                                                <div className="flex justify-between items-start">
-                                                    <div className="flex-1">
-                                                        <h4 className="font-semibold text-lg text-blue-600 hover:underline">{paper.paperTitle}</h4>
-                                                        <p className="text-sm text-gray-600 mt-1">
-                                                            <span className="font-medium">ID:</span> {paper.submissionId} |
-                                                            <span className="font-medium ml-2">Author:</span> {paper.authorName} |
-                                                            <span className="font-medium ml-2">Category:</span> {paper.category}
-                                                        </p>
+                                            return matchesSearch && matchesStatus;
+                                        });
 
-                                                        {/* Reviewer Status Information */}
-                                                        <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
-                                                            {paper.assignedReviewers && paper.assignedReviewers.length > 0 ? (
-                                                                <div>
-                                                                    <p className="text-sm font-medium text-gray-700 mb-2">
-                                                                        Reviewers: {paper.assignedReviewers.length} assigned
+                                        const groupedByEmail = filteredPapers.reduce((acc: any, paper) => {
+                                            if (!acc[paper.email]) acc[paper.email] = [];
+                                            acc[paper.email].push(paper);
+                                            return acc;
+                                        }, {});
+
+                                        return Object.entries(groupedByEmail).map(([email, authorPapers]: [string, any]) => {
+                                            const isExpanded = expandedAuthors.includes(email);
+                                            const hasMultiple = authorPapers.length > 1;
+
+                                            if (!hasMultiple) {
+                                                const paper = authorPapers[0];
+                                                return (
+                                                    <div key={paper._id}>
+                                                        <div className="border rounded-lg p-4 hover:shadow-md transition cursor-pointer bg-white hover:bg-gray-50"
+                                                            onClick={() => setViewingPaper(paper)}>
+                                                            <div className="flex justify-between items-start">
+                                                                <div className="flex-1">
+                                                                    <h4 className="font-semibold text-lg text-blue-600 hover:underline">{paper.paperTitle}</h4>
+                                                                    <p className="text-sm text-gray-600 mt-1">
+                                                                        <span className="font-medium">ID:</span> {paper.submissionId} |
+                                                                        <span className="font-medium ml-2">Author:</span> {paper.authorName} |
+                                                                        <span className="font-medium ml-2">Category:</span> {paper.category}
                                                                     </p>
-                                                                    <div className="space-y-1">
-                                                                        {paper.assignedReviewers.map((reviewer: any, idx: number) => {
-                                                                            // Find the assignment to get status
-                                                                            const assignment = paper.reviewAssignments?.find(
-                                                                                (a: any) => a.reviewer === reviewer._id || a.reviewer?.toString() === reviewer._id?.toString()
-                                                                            );
-                                                                            const status = assignment?.status || 'Pending';
 
-                                                                            let statusColor = 'bg-yellow-100 text-yellow-800';
-                                                                            if (status === 'Submitted') {
-                                                                                statusColor = 'bg-green-100 text-green-800';
-                                                                            } else if (status === 'Overdue') {
-                                                                                statusColor = 'bg-red-100 text-red-800';
-                                                                            }
+                                                                    {/* Reviewer Status Information */}
+                                                                    <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
+                                                                        {paper.assignedReviewers && paper.assignedReviewers.length > 0 ? (
+                                                                            <div>
+                                                                                <p className="text-sm font-medium text-gray-700 mb-2">
+                                                                                    Reviewers: {paper.assignedReviewers.length} assigned
+                                                                                </p>
+                                                                                <div className="space-y-1">
+                                                                                    {paper.assignedReviewers.map((reviewer: any, idx: number) => {
+                                                                                        const assignment = paper.reviewAssignments?.find(
+                                                                                            (a: any) => a.reviewer === reviewer._id || a.reviewer?.toString() === reviewer._id?.toString()
+                                                                                        );
+                                                                                        const status = assignment?.status || 'Pending';
 
-                                                                            return (
-                                                                                <div key={idx} className="text-xs flex items-center justify-between">
-                                                                                    <span className="text-gray-600">{reviewer.username || reviewer.email}</span>
-                                                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
-                                                                                        {status}
-                                                                                    </span>
+                                                                                        let statusColor = 'bg-yellow-100 text-yellow-800';
+                                                                                        if (status === 'Submitted') {
+                                                                                            statusColor = 'bg-green-100 text-green-800';
+                                                                                        } else if (status === 'Overdue') {
+                                                                                            statusColor = 'bg-red-100 text-red-800';
+                                                                                        }
+
+                                                                                        return (
+                                                                                            <div key={idx} className="text-xs flex items-center justify-between">
+                                                                                                <span className="text-gray-600">{reviewer.username || reviewer.email}</span>
+                                                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+                                                                                                    {status}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
                                                                                 </div>
-                                                                            );
-                                                                        })}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <p className="text-sm text-gray-600 italic">
+                                                                                ⚠️ No reviewers assigned (Total available: {reviewers.length})
+                                                                            </p>
+                                                                        )}
                                                                     </div>
                                                                 </div>
-                                                            ) : (
-                                                                <p className="text-sm text-gray-600 italic">
-                                                                    ⚠️ No reviewers assigned (Total available: {reviewers.length})
-                                                                </p>
-                                                            )}
+                                                                <StatusBadge status={paper.status} />
+                                                            </div>
+
+                                                            <div className="flex gap-3 mt-4">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setViewingPaper(paper);
+                                                                    }}
+                                                                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 flex-1"
+                                                                >
+                                                                    <Eye className="w-4 h-4" />
+                                                                    View Details
+                                                                </button>
+
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedPaperForAuthorMessage(selectedPaperForAuthorMessage === paper._id ? null : paper._id);
+                                                                    }}
+                                                                    className={`px-4 py-2 rounded flex items-center gap-2 transition ${selectedPaperForAuthorMessage === paper._id
+                                                                        ? 'bg-blue-700 text-white'
+                                                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                                        }`}
+                                                                >
+                                                                    <MessageSquare className="w-4 h-4" />
+                                                                    {selectedPaperForAuthorMessage === paper._id ? 'Close' : 'Message Author'}
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <StatusBadge status={paper.status} />
-                                                </div>
 
-                                                <div className="flex gap-3 mt-4">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setViewingPaper(paper);
-                                                        }}
-                                                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 flex-1"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                        View Details
-                                                    </button>
-
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setSelectedPaperForAuthorMessage(selectedPaperForAuthorMessage === paper._id ? null : paper._id);
-                                                        }}
-
-                                                        className={`px-4 py-2 rounded flex items-center gap-2 transition ${selectedPaperForAuthorMessage === paper._id
-                                                            ? 'bg-blue-700 text-white'
-                                                            : 'bg-blue-600 text-white hover:bg-blue-700'
-                                                            }`}
-                                                        title="Send message to author"
-                                                    >
-
-                                                        <MessageSquare className="w-4 h-4" />
-                                                        {selectedPaperForAuthorMessage === paper._id ? 'Close' : 'Message Author'}
-                                                    </button>
-                                                </div>
-
-                                                {/* Inline Author Message Form */}
-                                                {selectedPaperForAuthorMessage === paper._id && (
-                                                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                                        <h5 className="font-semibold text-blue-900 mb-3">Send Message to {paper.authorName}</h5>
-                                                        <div className="space-y-3">
-                                                            <textarea
-                                                                value={authorMessageText}
-                                                                onChange={(e) => setAuthorMessageText(e.target.value)}
-                                                                placeholder="Type your message here... (Professional tone recommended)"
-                                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                                                                rows={5}
-                                                            />
-                                                            <div className="flex justify-between items-center text-sm text-gray-600">
-                                                                <span>{authorMessageText.length} characters</span>
-                                                                <div className="flex gap-2">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setAuthorMessageText('');
-                                                                            setSelectedPaperForAuthorMessage(null);
-                                                                        }}
-                                                                        className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 transition"
-                                                                        disabled={authorMessageLoading}
-                                                                    >
-                                                                        Cancel
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            if (!authorMessageText.trim()) {
-                                                                                alert('Please enter a message');
-                                                                                return;
-                                                                            }
-
-                                                                            setAuthorMessageLoading(true);
-                                                                            try {
-                                                                                const response = await axios.post(
-                                                                                    `${API_BASE_URL}/api/editor/send-message-to-author`,
-                                                                                    {
-                                                                                        authorEmail: paper.email,
-                                                                                        authorName: paper.authorName,
-                                                                                        submissionId: paper.submissionId,
-                                                                                        message: authorMessageText
-                                                                                    },
-                                                                                    {
-                                                                                        headers: {
-                                                                                            Authorization: `Bearer ${localStorage.getItem('token')}`
-                                                                                        }
+                                                        {/* Inline Author Message Form */}
+                                                        {selectedPaperForAuthorMessage === paper._id && (
+                                                            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                                                <h5 className="font-semibold text-blue-900 mb-3">Send Message to {paper.authorName}</h5>
+                                                                <div className="space-y-3">
+                                                                    <textarea
+                                                                        value={authorMessageText}
+                                                                        onChange={(e) => setAuthorMessageText(e.target.value)}
+                                                                        placeholder="Type your message here..."
+                                                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                                                        rows={5}
+                                                                    />
+                                                                    <div className="flex justify-end gap-2">
+                                                                        <button
+                                                                            onClick={() => setSelectedPaperForAuthorMessage(null)}
+                                                                            className="px-4 py-2 bg-gray-400 text-white rounded"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                if (!authorMessageText.trim()) return;
+                                                                                try {
+                                                                                    const response = await axios.post(
+                                                                                        `${API_BASE_URL}/api/editor/send-message-to-author`,
+                                                                                        {
+                                                                                            authorEmail: paper.email,
+                                                                                            authorName: paper.authorName,
+                                                                                            submissionId: paper.submissionId,
+                                                                                            message: authorMessageText
+                                                                                        },
+                                                                                        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+                                                                                    );
+                                                                                    if (response.data.success) {
+                                                                                        alert('Message sent!');
+                                                                                        setSelectedPaperForAuthorMessage(null);
+                                                                                        setAuthorMessageText('');
                                                                                     }
-                                                                                );
-
-                                                                                if (response.data.success) {
-                                                                                    alert('Message sent to author successfully!');
-                                                                                    setAuthorMessageText('');
-                                                                                    setSelectedPaperForAuthorMessage(null);
-                                                                                } else {
-                                                                                    alert('Failed to send message: ' + (response.data.message || 'Unknown error'));
+                                                                                } catch (err) {
+                                                                                    alert('Failed to send message');
                                                                                 }
-                                                                            } catch (error) {
-                                                                                console.error('Error sending message:', error);
-                                                                                alert('Error sending message. Please try again.');
-                                                                            } finally {
-                                                                                setAuthorMessageLoading(false);
-                                                                            }
-                                                                        }}
-                                                                        disabled={authorMessageLoading || !authorMessageText.trim()}
-                                                                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 transition flex items-center gap-2"
-                                                                    >
-                                                                        <Send className="w-4 h-4" />
-                                                                        {authorMessageLoading ? 'Sending...' : 'Send Message'}
-                                                                    </button>
+                                                                            }}
+                                                                            className="px-4 py-2 bg-blue-600 text-white rounded"
+                                                                        >
+                                                                            Send Message
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
+
+                                            // Multiple papers for this author
+                                            return (
+                                                <div key={email} className="border-2 border-orange-100 rounded-xl overflow-hidden bg-white shadow-sm hover:border-orange-200 transition">
+                                                    <div
+                                                        className="p-5 flex justify-between items-center cursor-pointer bg-gradient-to-r from-orange-50/50 to-transparent hover:from-orange-50 transition"
+                                                        onClick={() => {
+                                                            if (isExpanded) {
+                                                                setExpandedAuthors(expandedAuthors.filter(e => e !== email));
+                                                            } else {
+                                                                setExpandedAuthors([...expandedAuthors, email]);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="bg-orange-600 p-2.5 rounded-xl shadow-lg shadow-orange-100">
+                                                                <Layers className="w-5 h-5 text-white" />
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="font-bold text-gray-900 text-lg leading-tight">{authorPapers[0].authorName}</h4>
+                                                                <p className="text-sm text-orange-600 font-semibold mt-0.5">{email}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="text-right">
+                                                                <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold ring-1 ring-orange-200">
+                                                                    {authorPapers.length} Submissions
+                                                                </span>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1 uppercase tracking-wider">Click to view papers</p>
+                                                            </div>
+                                                            <div className={`p-1.5 rounded-full transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-orange-100 text-orange-600' : 'text-gray-400'}`}>
+                                                                <RefreshCw className={`w-5 h-5 ${isExpanded ? 'animate-spin-slow' : ''}`} />
                                                             </div>
                                                         </div>
                                                     </div>
-                                                )}
-                                            </div>
 
-                                        </div>
-                                    ))}
+                                                    {isExpanded && (
+                                                        <div className="p-4 bg-gray-50/50 border-t border-orange-50 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                            {authorPapers.map((paper: any) => (
+                                                                <div
+                                                                    key={paper._id}
+                                                                    className="bg-white p-4 rounded-xl border border-gray-100 hover:border-blue-300 cursor-pointer shadow-sm hover:shadow-md transition group"
+                                                                    onClick={() => setViewingPaper(paper)}
+                                                                >
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div className="flex-1">
+                                                                            <div className="flex items-center gap-2 mb-1">
+                                                                                <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded uppercase tracking-tighter ring-1 ring-blue-100">
+                                                                                    {paper.submissionId}
+                                                                                </span>
+                                                                                <StatusBadge status={paper.status} />
+                                                                            </div>
+                                                                            <h5 className="font-bold text-gray-800 group-hover:text-blue-600 transition line-clamp-1">{paper.paperTitle}</h5>
+                                                                            <p className="text-xs text-gray-500 mt-1 font-medium italic">{paper.category}</p>
+                                                                        </div>
+                                                                        <button className="p-2 bg-blue-50 text-blue-600 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-sm">
+                                                                            <Eye className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        });
+                                    })()}
                                 </div>
 
                                 {papers.filter(p =>
@@ -1263,12 +1405,53 @@ const EditorDashboard = () => {
                     {/* Paper Details View - Side by side layout */}
                     {activeTab === 'papers' && viewingPaper && (
                         <div className="space-y-4">
-                            <button
-                                onClick={() => setViewingPaper(null)}
-                                className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 flex items-center gap-2"
-                            >
-                                ← Back to Papers List
-                            </button>
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-lg shadow-sm">
+                                <button
+                                    onClick={() => setViewingPaper(null)}
+                                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2 transition font-medium border border-gray-200"
+                                >
+                                    ← Back to Papers List
+                                </button>
+
+                                {/* Multiple Submissions Context Switcher */}
+                                {(() => {
+                                    const otherSubmissions = papers.filter(p => p.email === viewingPaper.email && p._id !== viewingPaper._id);
+                                    if (otherSubmissions.length > 0) {
+                                        return (
+                                            <div className="flex flex-wrap items-center gap-3 bg-blue-50 px-4 py-3 rounded-xl border border-blue-100 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="bg-blue-600 p-1.5 rounded-lg shadow-blue-200 shadow-lg">
+                                                        <Layers className="w-4 h-4 text-white" />
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-xs font-bold text-blue-900 block leading-tight">Author's Other Submissions</span>
+                                                        <span className="text-[10px] text-blue-500 font-medium">{otherSubmissions.length} more paper(s) available</span>
+                                                    </div>
+                                                </div>
+                                                <select
+                                                    className="text-sm bg-white border border-blue-200 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-medium text-blue-800 transition"
+                                                    value={viewingPaper._id}
+                                                    onChange={async (e) => {
+                                                        const targetId = e.target.value;
+                                                        const selected = papers.find(p => p._id === targetId);
+                                                        if (selected) {
+                                                            setViewingPaper(selected);
+                                                            // Also fetch the reviews/reviewers for the newly selected paper
+                                                            fetchPaperReviewsAndReviewers(targetId);
+                                                        }
+                                                    }}
+                                                >
+                                                    <option value={viewingPaper._id}>Current: {viewingPaper.submissionId}</option>
+                                                    {otherSubmissions.map(other => (
+                                                        <option key={other._id} value={other._id}>{other.submissionId} - {other.paperTitle.length > 40 ? other.paperTitle.substring(0, 40) + '...' : other.paperTitle}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+                            </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 {/* Left Column - Paper Details & Reviewers */}

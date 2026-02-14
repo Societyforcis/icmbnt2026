@@ -1,4 +1,5 @@
 import { PaperSubmission } from '../models/Paper.js';
+import { MultiplePaperSubmission } from '../models/MultiplePaper.js';
 import { UserSubmission } from '../models/UserSubmission.js';
 import { Revision } from '../models/Revision.js';
 import { User } from '../models/User.js';
@@ -18,17 +19,8 @@ export const submitPaper = async (req, res) => {
             console.log('Email extracted from token:', email);
         }
 
-        const existingSubmission = await UserSubmission.findOne({ email });
-        if (existingSubmission) {
-            return res.status(400).json({
-                success: false,
-                message: "You have already submitted a paper. Please use the edit option in your dashboard if you need to make changes.",
-                existingSubmission: {
-                    submissionId: existingSubmission.submissionId,
-                    bookingId: existingSubmission.bookingId
-                }
-            });
-        }
+        // Check if user already has a submission record (for legacy tracking)
+        const existingUserRecord = await UserSubmission.findOne({ email });
 
         // Validate required fields
         if (!paperTitle || !authorName || !email || !category) {
@@ -94,18 +86,18 @@ export const submitPaper = async (req, res) => {
             }]
         });
 
-        // Create user submission tracking record
-        const userSubmission = new UserSubmission({
-            email,
-            submissionId,
-            bookingId
-        });
+        // Save the new paper submission
+        await newSubmission.save();
 
-        // Save both documents
-        await Promise.all([
-            newSubmission.save(),
-            userSubmission.save()
-        ]);
+        // Save user submission tracking only if it's the first one (to prevent unique email error)
+        if (!existingUserRecord) {
+            const userSubmission = new UserSubmission({
+                email,
+                submissionId,
+                bookingId
+            });
+            await userSubmission.save();
+        }
 
         console.log('Submission saved successfully with booking ID:', bookingId);
 
@@ -159,6 +151,71 @@ export const submitPaper = async (req, res) => {
     }
 };
 
+export const submitMultiplePaper = async (req, res) => {
+    console.log('--- MULTIPLE PAPER SUBMISSION ---');
+    try {
+        let { email, paperTitle, authorName, category, topic, abstract } = req.body;
+
+        if (!email && req.user && req.user.email) {
+            email = req.user.email;
+        }
+
+        if (!paperTitle || !authorName || !email || !category) {
+            return res.status(400).json({ success: false, message: "Missing required fields" });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "PDF file is required" });
+        }
+
+        const submissionId = await generateSubmissionId(category);
+        const cloudinaryResult = await uploadPdfToCloudinary(req.file.buffer, req.file.originalname);
+
+        const newSubmission = new MultiplePaperSubmission({
+            submissionId,
+            paperTitle,
+            authorName,
+            email,
+            category,
+            abstract: abstract || null,
+            pdfUrl: cloudinaryResult.url,
+            pdfPublicId: cloudinaryResult.publicId,
+            pdfFileName: cloudinaryResult.fileName,
+            status: 'Submitted',
+            isMultiple: true,
+            versions: [{
+                version: 1,
+                pdfUrl: cloudinaryResult.url,
+                pdfPublicId: cloudinaryResult.publicId,
+                pdfFileName: cloudinaryResult.fileName,
+                submittedAt: new Date()
+            }]
+        });
+
+        await newSubmission.save();
+
+        await sendPaperSubmissionEmail({ email, authorName, submissionId, paperTitle, category });
+
+        return res.status(201).json({
+            success: true,
+            message: "Additional paper submitted successfully",
+            submissionId,
+            paperDetails: {
+                title: paperTitle,
+                category,
+                status: 'Submitted',
+                fileName: cloudinaryResult.fileName
+            }
+        });
+    } catch (error) {
+        console.error('Error submitting multiple paper:', error);
+        return res.status(500).json({
+            success: false,
+            message: "Error processing paper submission",
+            error: error.message
+        });
+    }
+};
 
 export const getUserSubmission = async (req, res) => {
     try {
@@ -172,10 +229,19 @@ export const getUserSubmission = async (req, res) => {
             });
         }
 
-        const paperSubmission = await PaperSubmission.findOne({
-            submissionId: userSubmission.submissionId
-        }).populate('assignedEditor', 'username email')
-            .populate('assignedReviewers', 'username email');
+        // Fetch all paper submissions for this email
+        const [mainSubmissions, multiSubmissions] = await Promise.all([
+            PaperSubmission.find({ email })
+                .populate('assignedEditor', 'username email')
+                .populate('assignedReviewers', 'username email'),
+            MultiplePaperSubmission.find({ email })
+                .populate('assignedEditor', 'username email')
+                .populate('assignedReviewers', 'username email')
+        ]);
+
+        const paperSubmissions = [...mainSubmissions, ...multiSubmissions].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
 
         // Check for verified payment
         const { default: PaymentDoneFinalUser } = await import('../models/PaymentDoneFinalUser.js');
@@ -183,13 +249,17 @@ export const getUserSubmission = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            hasSubmission: true,
-            submission: {
-                ...paperSubmission.toObject(),
+            hasSubmission: paperSubmissions.length > 0,
+            submission: paperSubmissions.length > 0 ? {
+                ...paperSubmissions[0].toObject(),
                 bookingId: userSubmission.bookingId,
                 submissionDate: userSubmission.submissionDate,
                 isPaid: !!payment
-            }
+            } : null,
+            submissions: paperSubmissions.map(p => ({
+                ...p.toObject(),
+                isPaid: !!payment
+            }))
         });
     } catch (error) {
         console.error("Error fetching user submission:", error);
@@ -206,9 +276,15 @@ export const getPaperStatus = async (req, res) => {
     try {
         const { submissionId } = req.params;
 
-        const submission = await PaperSubmission.findOne({ submissionId })
+        let submission = await PaperSubmission.findOne({ submissionId })
             .populate('assignedEditor', 'username email')
             .populate('assignedReviewers', 'username email');
+
+        if (!submission) {
+            submission = await MultiplePaperSubmission.findOne({ submissionId })
+                .populate('assignedEditor', 'username email')
+                .populate('assignedReviewers', 'username email');
+        }
 
         if (!submission) {
             return res.status(404).json({
@@ -236,25 +312,16 @@ export const editSubmission = async (req, res) => {
         const { submissionId } = req.params;
         const { email } = req.user;
 
-        // Verify the submission belongs to the user
-        const userSubmission = await UserSubmission.findOne({
-            email,
-            submissionId
-        });
-
-        if (!userSubmission) {
-            return res.status(403).json({
-                success: false,
-                message: "You do not have permission to edit this submission"
-            });
+        // Verify the submission belongs to the user and get the paper
+        let paperSubmission = await PaperSubmission.findOne({ submissionId, email });
+        if (!paperSubmission) {
+            paperSubmission = await MultiplePaperSubmission.findOne({ submissionId, email });
         }
 
-        // Get the existing submission
-        const paperSubmission = await PaperSubmission.findOne({ submissionId });
         if (!paperSubmission) {
             return res.status(404).json({
                 success: false,
-                message: "Submission not found"
+                message: "Submission not found or you don't have permission to edit it"
             });
         }
 
@@ -338,23 +405,15 @@ export const reuploadPaper = async (req, res) => {
         }
 
         // Verify the submission belongs to the user
-        const userSubmission = await UserSubmission.findOne({
-            email,
-            submissionId
-        });
-
-        if (!userSubmission) {
-            return res.status(403).json({
-                success: false,
-                message: "You do not have permission to update this submission"
-            });
+        let paperSubmission = await PaperSubmission.findOne({ submissionId, email });
+        if (!paperSubmission) {
+            paperSubmission = await MultiplePaperSubmission.findOne({ submissionId, email });
         }
 
-        const paperSubmission = await PaperSubmission.findOne({ submissionId });
         if (!paperSubmission) {
             return res.status(404).json({
                 success: false,
-                message: "Submission not found"
+                message: "Submission not found or you don't have permission to update it"
             });
         }
 
@@ -427,10 +486,18 @@ export const getAllPapers = async (req, res) => {
             ];
         }
 
-        const papers = await PaperSubmission.find(query)
-            .populate('assignedEditor', 'username email')
-            .populate('assignedReviewers', 'username email')
-            .sort({ createdAt: -1 });
+        const [mainPapers, multiPapers] = await Promise.all([
+            PaperSubmission.find(query)
+                .populate('assignedEditor', 'username email')
+                .sort({ createdAt: -1 }),
+            MultiplePaperSubmission.find(query)
+                .populate('assignedEditor', 'username email')
+                .sort({ createdAt: -1 })
+        ]);
+
+        const papers = [...mainPapers, ...multiPapers].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
 
         return res.status(200).json({
             success: true,
@@ -452,9 +519,15 @@ export const getPaperById = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const paper = await PaperSubmission.findById(id)
+        let paper = await PaperSubmission.findById(id)
             .populate('assignedEditor', 'username email role')
             .populate('assignedReviewers', 'username email role');
+
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(id)
+                .populate('assignedEditor', 'username email role')
+                .populate('assignedReviewers', 'username email role');
+        }
 
         if (!paper) {
             return res.status(404).json({
@@ -502,7 +575,11 @@ export const submitRevision = async (req, res) => {
         }
 
         // Find the original submission
-        const paper = await PaperSubmission.findOne({ submissionId });
+        let paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findOne({ submissionId });
+        }
+
         if (!paper) {
             return res.status(404).json({
                 success: false,
@@ -758,9 +835,15 @@ export const getPaperHistory = async (req, res) => {
             query = { email: submissionId.toLowerCase() };
         }
 
-        const paper = await PaperSubmission.findOne(query)
+        let paper = await PaperSubmission.findOne(query)
             .populate('assignedEditor', 'username email')
             .populate('reviewAssignments.reviewer', 'username email');
+
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findOne(query)
+                .populate('assignedEditor', 'username email')
+                .populate('reviewAssignments.reviewer', 'username email');
+        }
 
         if (!paper) {
             return res.status(404).json({
@@ -971,19 +1054,22 @@ export const checkFinalSelection = async (req, res) => {
         const { email } = req.user;
         const ConferenceSelectedUser = (await import('../models/ConferenceSelectedUser.js')).default;
 
-        const selectedUser = await ConferenceSelectedUser.findOne({ authorEmail: email });
+        const selectedUsers = await ConferenceSelectedUser.find({ authorEmail: email });
 
-        if (!selectedUser) {
+        if (!selectedUsers || selectedUsers.length === 0) {
             return res.status(200).json({
                 success: true,
-                isSelected: false
+                isSelected: false,
+                selectedUsers: []
             });
         }
 
         return res.status(200).json({
             success: true,
             isSelected: true,
-            selectedUser
+            selectedUsers,
+            // For backward compatibility
+            selectedUser: selectedUsers[0]
         });
     } catch (error) {
         console.error('Error checking final selection:', error);

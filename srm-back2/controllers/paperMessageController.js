@@ -9,7 +9,12 @@ export const getPaperMessages = async (req, res) => {
         const authorEmail = req.user.email;
 
         // Verify the paper belongs to the author
-        const paper = await PaperSubmission.findOne({ submissionId, email: authorEmail });
+        let paper = await PaperSubmission.findOne({ submissionId, email: authorEmail });
+        if (!paper) {
+            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+            paper = await MultiplePaperSubmission.findOne({ submissionId, email: authorEmail });
+        }
+
         if (!paper) {
             return res.status(403).json({
                 success: false,
@@ -56,7 +61,12 @@ export const sendPaperMessage = async (req, res) => {
             return res.status(400).json({ success: false, message: "Message is empty" });
         }
 
-        const paper = await PaperSubmission.findOne({ submissionId });
+        let paper = await PaperSubmission.findOne({ submissionId });
+        if (!paper) {
+            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+            paper = await MultiplePaperSubmission.findOne({ submissionId });
+        }
+
         if (!paper) {
             return res.status(404).json({ success: false, message: "Paper not found" });
         }

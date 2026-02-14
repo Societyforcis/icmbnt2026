@@ -25,8 +25,7 @@ const paymentRegistrationSchema = new mongoose.Schema({
     },
     submissionId: {
         type: String,
-        required: false,
-        index: true
+        required: false
     },
     paperTitle: {
         type: String,

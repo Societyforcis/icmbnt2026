@@ -6,12 +6,14 @@ const DashboardRedirect = () => {
 
     useEffect(() => {
         const role = localStorage.getItem('role');
-        
+
         if (role === 'Reviewer') {
             navigate('/reviewer', { replace: true });
         } else if (role === 'Editor' || role === 'Admin') {
             // Stay on dashboard (EditorDashboard)
             return;
+        } else if (role === 'Author') {
+            navigate('/author-dashboard', { replace: true });
         } else {
             // No role found, redirect to login
             navigate('/login', { replace: true });

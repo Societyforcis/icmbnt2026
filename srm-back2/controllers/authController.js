@@ -348,10 +348,18 @@ export const checkAcceptanceStatus = async (req, res) => {
         console.log('🔍 Checking acceptance status for:', email);
 
         // Check PaperSubmission for accepted papers
-        const acceptedPaper = await PaperSubmission.findOne({
+        let acceptedPaper = await PaperSubmission.findOne({
             email: email,
             status: 'Accepted'
         }).sort({ updatedAt: -1 });
+
+        if (!acceptedPaper) {
+            const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+            acceptedPaper = await MultiplePaperSubmission.findOne({
+                email: email,
+                status: 'Accepted'
+            }).sort({ updatedAt: -1 });
+        }
 
         if (acceptedPaper) {
             console.log('✅ Found accepted paper:', acceptedPaper.submissionId);

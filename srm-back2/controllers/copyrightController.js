@@ -18,11 +18,18 @@ export const getAuthorCopyrightDashboard = async (req, res) => {
     try {
         const authorEmail = req.user.email;
 
-        // 1. Get paper submission info
+        // 1. Get all paper submissions
         const { PaperSubmission } = await import('../models/Paper.js');
-        const paper = await PaperSubmission.findOne({ email: authorEmail });
+        const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
 
-        if (!paper) {
+        const [mainPapers, multiPapers] = await Promise.all([
+            PaperSubmission.find({ email: authorEmail }),
+            MultiplePaperSubmission.find({ email: authorEmail })
+        ]);
+
+        const allPapers = [...mainPapers, ...multiPapers];
+
+        if (allPapers.length === 0) {
             return res.status(200).json({
                 success: true,
                 hasPaper: false,
@@ -30,28 +37,31 @@ export const getAuthorCopyrightDashboard = async (req, res) => {
             });
         }
 
-        // 2. Check for payment (optional/informational for now)
+        // For backward compatibility, the frontend might expect a single 'paper' object.
         const payment = await PaymentDoneFinalUser.findOne({ authorEmail });
 
-        // 3. Get or create copyright record if paper is accepted or published
-        let copyright = null;
-        if (paper.status === 'Accepted' || paper.status === 'Published' || paper.status === 'Revised Submitted') {
-            copyright = await Copyright.findOne({
-                submissionId: paper.submissionId
-            });
-
-            if (!copyright) {
-                // If it doesn't exist, we create it to enable messaging
-                copyright = await Copyright.create({
-                    paperId: paper._id,
-                    submissionId: paper.submissionId,
-                    authorEmail: authorEmail,
-                    authorName: paper.authorName,
-                    paperTitle: paper.paperTitle,
-                    status: 'Pending'
-                });
+        const papersWithCopyright = await Promise.all(allPapers.map(async (p) => {
+            // Get or create copyright record if paper is in acceptable status
+            if (p.status === 'Accepted' || p.status === 'Published' || p.status === 'Revised Submitted' || p.status === 'Review Received' || p.status === 'Revision Required') {
+                let copyright = await Copyright.findOne({ submissionId: p.submissionId });
+                if (!copyright) {
+                    copyright = await Copyright.create({
+                        paperId: p._id,
+                        submissionId: p.submissionId,
+                        authorEmail: authorEmail,
+                        authorName: p.authorName,
+                        paperTitle: p.paperTitle,
+                        status: 'Pending'
+                    });
+                }
+                const pobj = p.toObject ? p.toObject() : p;
+                return { ...pobj, copyright };
             }
-        }
+            return p.toObject ? p.toObject() : p;
+        }));
+
+        const paper = papersWithCopyright[0];
+        const copyright = paper.copyright || null;
 
         return res.status(200).json({
             success: true,
@@ -59,6 +69,7 @@ export const getAuthorCopyrightDashboard = async (req, res) => {
             data: {
                 payment,
                 paper,
+                allPapers: papersWithCopyright,
                 copyright
             }
         });
@@ -101,11 +112,14 @@ export const uploadCopyrightForm = async (req, res) => {
             });
         }
 
-        const copyright = await Copyright.findOne({ authorEmail });
+        const { submissionId } = req.body;
+
+        // Find copyright by both email and submissionId to be safe
+        const copyright = await Copyright.findOne({ authorEmail, submissionId });
         if (!copyright) {
             return res.status(404).json({
                 success: false,
-                message: 'Copyright record not found'
+                message: 'Copyright record not found for this submission'
             });
         }
 
@@ -232,12 +246,18 @@ export const reviewCopyrightForm = async (req, res) => {
         if (status === 'Approved') {
             try {
                 // Find paper and payment details for rich metadata
-                const [paper, payment] = await Promise.all([
-                    PaperSubmission.findOne({ submissionId: copyright.submissionId })
+                let paper = await PaperSubmission.findOne({ submissionId: copyright.submissionId })
+                    .populate('assignedEditor', 'email username')
+                    .populate('reviewAssignments.reviewer', 'email username');
+
+                if (!paper) {
+                    const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
+                    paper = await MultiplePaperSubmission.findOne({ submissionId: copyright.submissionId })
                         .populate('assignedEditor', 'email username')
-                        .populate('reviewAssignments.reviewer', 'email username'),
-                    PaymentDoneFinalUser.findOne({ authorEmail: copyright.authorEmail })
-                ]);
+                        .populate('reviewAssignments.reviewer', 'email username');
+                }
+
+                const payment = await PaymentDoneFinalUser.findOne({ authorEmail: copyright.authorEmail });
 
                 // Extract reviewer names/emails
                 const reviewersList = paper?.reviewAssignments?.map(a =>

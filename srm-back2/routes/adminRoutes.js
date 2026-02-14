@@ -18,31 +18,32 @@ import { requireAdmin } from '../middleware/roleCheck.js';
 
 const router = express.Router();
 
-// All admin routes require authentication and admin role
-router.use(verifyJWT, requireAdmin);
+// Basic authentication for all admin routes, roles checked per route below
+router.use(verifyJWT);
 
 // Editor management
-router.post('/editors', createEditor);
-router.get('/editors', getAllEditors);
-router.post('/editors/message', sendMessageToEditor);
+router.post('/editors', requireAdmin, createEditor);
+router.get('/editors', requireAdmin, getAllEditors);
+router.post('/editors/message', requireAdmin, sendMessageToEditor);
 
 // Paper assignment
-router.post('/assign-editor', assignEditor);
-router.post('/reassign-editor', reassignEditor);
+router.post('/assign-editor', requireAdmin, assignEditor);
+router.post('/reassign-editor', requireAdmin, reassignEditor);
 
 // User management
-router.get('/users', getAllUsers);
-router.delete('/users/:userId', deleteUser);
+router.get('/users', requireAdmin, getAllUsers);
+router.delete('/users/:userId', requireAdmin, deleteUser);
 
 // Dashboard statistics
-router.get('/dashboard-stats', getDashboardStats);
+router.get('/dashboard-stats', requireAdmin, getDashboardStats);
 
-// Conference selected users
-router.get('/selected-users', getConferenceSelectedUsers);
-router.post('/selected-users/send-email', sendSelectedUserEmail);
+// Conference selected users (Accessible by Editor and Admin)
+import { requireEditor } from '../middleware/roleCheck.js';
+router.get('/selected-users', requireEditor, getConferenceSelectedUsers);
+router.post('/selected-users/send-email', requireAdmin, sendSelectedUserEmail);
 
 // PDF Management (admin only)
-router.get('/pdfs', getAllPdfsAdmin);
-router.delete('/pdfs', deletePdfAdmin);
+router.get('/pdfs', requireAdmin, getAllPdfsAdmin);
+router.delete('/pdfs', requireAdmin, deletePdfAdmin);
 
 export default router;
