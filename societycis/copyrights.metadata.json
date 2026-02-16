@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"authorEmail":{"$numberInt":"1"}},"name":"authorEmail_1","background":true}],"uuid":"486187c979ff4ebdba4831a3f9d647d6","collectionName":"copyrights","type":"collection"}

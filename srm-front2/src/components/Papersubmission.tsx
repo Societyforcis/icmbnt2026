@@ -26,10 +26,12 @@ import PaperHistoryTimeline from './PaperHistoryTimeline';
 import { FaUpload, FaHistory } from "react-icons/fa";
 
 interface Submission {
+  _id: string;
   submissionId: string;
   bookingId: string;
   paperTitle: string;
   authorName: string;
+  email: string;
   category: string;
   topic: string;
   abstractFileUrl: string | null;
@@ -43,7 +45,7 @@ const PaperSubmission = () => {
   const [loading, setLoading] = useState(true);
   const [hasExistingSubmission, setHasExistingSubmission] = useState(false);
   const [existingSubmission, setExistingSubmission] = useState<Submission | null>(null);
-  const [revisionStatus, setRevisionStatus] = useState<any>(null);
+  const [allRevisions, setAllRevisions] = useState<any[]>([]);
   const [hasRevision, setHasRevision] = useState(false);
   const [showRevisionUpload, setShowRevisionUpload] = useState(false);
   const [showReuploadModal, setShowReuploadModal] = useState(false);
@@ -94,7 +96,7 @@ const PaperSubmission = () => {
 
         if (revisionResponse.data.hasRevision) {
           setHasRevision(true);
-          setRevisionStatus(revisionResponse.data.revision);
+          setAllRevisions(revisionResponse.data.revisions || []);
         }
       } catch (error) {
         console.error("Error fetching user submission:", error);
@@ -126,6 +128,11 @@ const PaperSubmission = () => {
       day: 'numeric'
     });
   };
+
+  // Get current paper revision if any - use _id for exact match to handle multiple papers
+  const currentPaperRevision = allRevisions.find(
+    (rev: any) => rev.paperId === existingSubmission?._id
+  );
 
   return (
     <PageTransition>
@@ -220,29 +227,36 @@ const PaperSubmission = () => {
             {/* Existing Submission Section */}
             {!loading && hasExistingSubmission && existingSubmission && !submitSuccess && (
               <section className="bg-white p-6 sm:p-8 md:p-10 rounded-lg shadow-lg sm:shadow-xl border-t-4 border-blue-800 mb-8">
-                <div className="bg-blue-50 p-4 rounded-md mb-6 flex justify-between items-center">
-                  <div className="flex items-center">
+                <div className="bg-blue-50 p-4 rounded-xl mb-6 flex flex-col sm:flex-row justify-between items-center border border-blue-100 shadow-sm">
+                  <div className="flex items-center mb-3 sm:mb-0">
                     <FaExclamationTriangle className="text-blue-600 mr-3 flex-shrink-0" />
-                    <p className="text-blue-700">
+                    <p className="text-blue-700 font-bold">
                       You have {allSubmissions.length} submitted {allSubmissions.length === 1 ? 'paper' : 'papers'}.
                     </p>
                   </div>
                   {allSubmissions.length > 1 && (
-                    <select
-                      value={selectedPaperIndex}
-                      onChange={(e) => {
-                        const index = parseInt(e.target.value);
-                        setSelectedPaperIndex(index);
-                        setExistingSubmission(allSubmissions[index]);
-                      }}
-                      className="bg-white border border-blue-200 rounded px-3 py-1 text-sm text-blue-800"
-                    >
-                      {allSubmissions.map((sub, idx) => (
-                        <option key={sub.submissionId} value={idx}>
-                          {sub.submissionId} - {sub.paperTitle.substring(0, 20)}...
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative w-full sm:w-auto">
+                      <select
+                        value={selectedPaperIndex}
+                        onChange={(e) => {
+                          const index = parseInt(e.target.value);
+                          setSelectedPaperIndex(index);
+                          setExistingSubmission(allSubmissions[index]);
+                        }}
+                        className="appearance-none bg-white border-2 border-blue-200 rounded-lg px-4 py-1.5 pr-8 text-sm font-bold text-blue-800 focus:outline-none focus:border-blue-500 shadow-sm cursor-pointer w-full transition-all hover:border-blue-300"
+                      >
+                        {allSubmissions.map((sub, idx) => (
+                          <option key={sub.submissionId} value={idx}>
+                            {sub.submissionId} - {sub.paperTitle.length > 25 ? sub.paperTitle.substring(0, 25) + '...' : sub.paperTitle}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-blue-600">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                        </svg>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -357,7 +371,7 @@ const PaperSubmission = () => {
 
                   {existingSubmission.status === 'Accepted' && (
                     <button
-                      onClick={() => navigate('/copyright-dashboard')}
+                      onClick={() => navigate('/author-dashboard')}
                       className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition-all duration-300 flex items-center justify-center shadow-md hover:shadow-lg w-full sm:w-auto"
                     >
                       <FaCheckCircle className="mr-2" />
@@ -447,8 +461,8 @@ const PaperSubmission = () => {
               </section>
             )}
 
-            {/* Revision Section - Show if paper is under revision */}
-            {!loading && hasRevision && revisionStatus && !submitSuccess && (
+            {/* Revision Section - Show ONLY if selected paper needs revision */}
+            {!loading && currentPaperRevision && existingSubmission?.status === 'Revision Required' && !submitSuccess && (
               <section className="bg-white p-6 sm:p-8 md:p-10 rounded-lg shadow-lg sm:shadow-xl border-t-4 border-red-600 mb-8">
                 <div className="bg-red-50 p-4 rounded-md mb-6">
                   <div className="flex items-center">
@@ -467,21 +481,21 @@ const PaperSubmission = () => {
                 {/* Revision Deadline */}
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md mb-6">
                   <p className="text-yellow-800">
-                    <strong>Revision Deadline:</strong> {formatDate(revisionStatus.revisionDeadline)}
+                    <strong>Revision Deadline:</strong> {formatDate(currentPaperRevision.revisionDeadline)}
                   </p>
                 </div>
 
                 {/* Editor's Message */}
                 <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-600 rounded-md">
                   <h3 className="font-bold text-blue-900 mb-2">Editor's Message:</h3>
-                  <p className="text-blue-800 whitespace-pre-wrap">{revisionStatus.revisionMessage}</p>
+                  <p className="text-blue-800 whitespace-pre-wrap">{currentPaperRevision.revisionMessage}</p>
                 </div>
 
                 {/* Reviewer Comments */}
                 <div className="mb-6">
                   <h3 className="text-xl font-bold text-gray-800 mb-4">Comments from Reviewers:</h3>
                   <div className="space-y-4">
-                    {revisionStatus.reviewerComments && revisionStatus.reviewerComments.map((comment: any, index: number) => (
+                    {currentPaperRevision.reviewerComments && currentPaperRevision.reviewerComments.map((comment: any, index: number) => (
                       <div key={index} className="p-4 bg-gray-50 border-l-4 border-orange-400 rounded-md">
                         <h4 className="font-bold text-orange-700 mb-3">Reviewer {index + 1}</h4>
 
@@ -516,7 +530,7 @@ const PaperSubmission = () => {
                 </div>
 
                 {/* Show Revision Upload Form or Button */}
-                {revisionStatus.revisionStatus === 'Pending' || revisionStatus.revisionStatus === 'Submitted' ? (
+                {currentPaperRevision.revisionStatus === 'Pending' || currentPaperRevision.revisionStatus === 'Submitted' ? (
                   <>
                     {!showRevisionUpload ? (
                       <button
@@ -529,11 +543,12 @@ const PaperSubmission = () => {
                     ) : (
                       <div className="mt-6">
                         <RevisionForm
-                          submissionId={revisionStatus.submissionId}
-                          authorEmail={revisionStatus.authorEmail}
-                          paperTitle={revisionStatus.paperTitle || existingSubmission?.paperTitle || ''}
-                          authorName={revisionStatus.authorName}
-                          revisionData={revisionStatus}
+                          paperId={existingSubmission?._id || ''}
+                          submissionId={currentPaperRevision.submissionId}
+                          authorEmail={currentPaperRevision.authorEmail}
+                          paperTitle={currentPaperRevision.paperTitle || existingSubmission?.paperTitle || ''}
+                          authorName={currentPaperRevision.authorName}
+                          revisionData={currentPaperRevision}
                           onSubmissionSuccess={handleSubmissionSuccess}
                           onClose={() => setShowRevisionUpload(false)}
                         />
@@ -543,7 +558,7 @@ const PaperSubmission = () => {
                 ) : (
                   <div className="p-4 bg-green-50 border-l-4 border-green-600 rounded-md">
                     <p className="text-green-800">
-                      <strong>Revised Paper Received:</strong> Your revised paper was received on {formatDate(revisionStatus.revisedPaperSubmittedAt || new Date())}.
+                      <strong>Revised Paper Received:</strong> Your revised paper was received on {formatDate(currentPaperRevision.revisedPaperSubmittedAt || new Date())}.
                       Our editorial team will review it and provide further updates.
                     </p>
                   </div>
@@ -608,8 +623,8 @@ const PaperSubmission = () => {
               <p className="mb-2">If you encounter any issues with the submission form, please contact:</p>
               <div className="flex items-center mt-3">
                 <FaEnvelope className="text-blue-800 mr-2" />
-                <a href="mailto:icmbnt2026@gmail.com" className="text-blue-800 hover:underline">
-                  icmbnt2026@gmail.com
+                <a href="mailto:admin@icmbnt2026.societycis.org" className="text-blue-800 hover:underline">
+                  admin@icmbnt2026.societycis.org
                 </a>
               </div>
             </div>

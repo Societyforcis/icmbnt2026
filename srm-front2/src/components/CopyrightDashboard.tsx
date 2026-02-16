@@ -22,27 +22,12 @@ interface Message {
     timestamp: string;
 }
 
-interface CopyrightData {
-    _id: string;
-    paperId: string;
-    submissionId: string;
-    authorEmail: string;
-    authorName: string;
-    paperTitle: string;
-    copyrightFormUrl: string | null;
-    status: 'Pending' | 'Submitted' | 'Approved' | 'Rejected';
-    messages: Message[];
-}
 
 const CopyrightDashboard: React.FC = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [eligible, setEligible] = useState(false);
-    const [dashboardData, setDashboardData] = useState<{
-        payment: any;
-        paper: any;
-        copyright: CopyrightData | null;
-    } | null>(null);
+    // Remove unused dashboardData state
     const [hasPaper, setHasPaper] = useState<boolean | null>(null);
     const [messageInput, setMessageInput] = useState('');
     const [uploading, setUploading] = useState(false);
@@ -84,15 +69,18 @@ const CopyrightDashboard: React.FC = () => {
                 setHasPaper(response.data.hasPaper);
                 const papers = response.data.data?.allPapers || (response.data.data?.paper ? [response.data.data.paper] : []);
                 setAllPapers(papers);
-                setDashboardData(response.data.data || null);
                 setEligible(true);
-                // Also check selection status
-                checkSelectionStatus();
+                // NOTE: Don't call checkSelectionStatus() here — allPapers state is stale.
+                // The useEffect watching [selectedPaperIndex, allPapers] will trigger it.
             }
         } catch (error: any) {
             console.error('Error fetching dashboard data:', error);
             if (error.response?.status === 403) {
                 setEligible(false);
+            } else {
+                // Network or server errors should not block the UI forever.
+                // Set eligible true so user sees a helpful message instead of "Access Denied".
+                setEligible(true);
             }
         } finally {
             setLoading(false);
@@ -114,14 +102,18 @@ const CopyrightDashboard: React.FC = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            if (response.data.success && dashboardData && dashboardData.copyright) {
-                setDashboardData({
-                    ...dashboardData,
-                    copyright: {
-                        ...dashboardData.copyright,
-                        messages: response.data.data
-                    }
-                });
+            if (response.data.success) {
+                const updatedCopyright = {
+                    ...copyright,
+                    messages: response.data.data
+                };
+
+                const updatedPapers = [...allPapers];
+                updatedPapers[selectedPaperIndex] = {
+                    ...updatedPapers[selectedPaperIndex],
+                    copyright: updatedCopyright
+                };
+                setAllPapers(updatedPapers);
                 setMessageInput('');
             }
         } catch (error) {
@@ -158,10 +150,6 @@ const CopyrightDashboard: React.FC = () => {
                 };
                 setAllPapers(updatedPapers);
 
-                setDashboardData((prev: any) => ({
-                    ...prev,
-                    copyright: updatedCopyright
-                }));
                 setFile(null);
                 alert('Copyright form uploaded successfully!');
             }
@@ -202,11 +190,12 @@ const CopyrightDashboard: React.FC = () => {
     };
 
     const handleFinalDocUpload = async () => {
+        const paper = allPapers[selectedPaperIndex];
         console.log('handleFinalDocUpload called');
         console.log('finalDocFile:', finalDocFile);
-        console.log('dashboardData.paper:', dashboardData?.paper);
+        console.log('Target paper:', paper);
 
-        if (!finalDocFile || !dashboardData?.paper?.submissionId) {
+        if (!finalDocFile || !paper?.submissionId) {
             alert('Please select a document first or submission info missing.');
             return;
         }
@@ -236,7 +225,7 @@ const CopyrightDashboard: React.FC = () => {
             const formData = new FormData();
             formData.append('finalDoc', finalDocFile);
 
-            const targetUrl = `${API_URL}/api/papers/upload-final-doc/${dashboardData.paper.submissionId}`;
+            const targetUrl = `${API_URL}/api/papers/upload-final-doc/${paper.submissionId}`;
             console.log('Final upload URL:', targetUrl);
 
             const response = await axios.post(
@@ -287,6 +276,7 @@ const CopyrightDashboard: React.FC = () => {
             console.log('--- UPLOAD PROCESS ENDED ---');
         }
     };
+
 
     if (loading) {
         return (
@@ -355,8 +345,12 @@ const CopyrightDashboard: React.FC = () => {
     const paper = allPapers[selectedPaperIndex];
     const copyright = paper?.copyright;
 
-    // 2. Case: Paper submitted but not accepted or revised submitted
-    if (paper && paper.status !== 'Accepted' && paper.status !== 'Published' && paper.status !== 'Revised Submitted') {
+    // Helper: check if a paper is in an accepted stage
+    const isAcceptedStatus = (status?: string) =>
+        status === 'Accepted' || status === 'Published' || status === 'Certificate Generated';
+
+    // 2. Case: Paper submitted but not accepted (Only 'Accepted', 'Published', 'Certificate Generated' papers see the full dashboard)
+    if (paper && !isAcceptedStatus(paper.status)) {
         return (
             <PageTransition>
                 <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
@@ -364,9 +358,36 @@ const CopyrightDashboard: React.FC = () => {
                         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
                             <div className="bg-gradient-to-r from-blue-900 to-primary p-8 text-white relative">
                                 <div className="flex justify-between items-start">
-                                    <div>
+                                    <div className="flex-1">
                                         <h1 className="text-3xl font-bold mb-2">Submission Status</h1>
-                                        <p className="opacity-80">Track your research paper evaluation progress.</p>
+                                        <p className="opacity-80 mb-4">Track your research paper evaluation progress.</p>
+
+                                        {/* Integrated Switcher for status view */}
+                                        {allPapers.length > 1 && (
+                                            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md p-1.5 rounded-xl border border-white/20">
+                                                <div className="bg-white/10 p-1 rounded-lg">
+                                                    <FileText className="w-3.5 h-3.5 text-white" />
+                                                </div>
+                                                <div className="relative">
+                                                    <select
+                                                        value={selectedPaperIndex}
+                                                        onChange={(e) => setSelectedPaperIndex(parseInt(e.target.value))}
+                                                        className="appearance-none bg-transparent border-none pr-8 text-xs font-bold text-white focus:outline-none cursor-pointer"
+                                                    >
+                                                        {allPapers.map((p, idx) => (
+                                                            <option key={p.submissionId || idx} value={idx} className="text-gray-900">
+                                                                [{p.status}] {p.submissionId} - {p.paperTitle.length > 30 ? p.paperTitle.substring(0, 30) + '...' : p.paperTitle}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-white/60">
+                                                        <svg className="fill-current h-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                                            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <button
                                         onClick={() => navigate('/paper-submission')}
@@ -382,23 +403,6 @@ const CopyrightDashboard: React.FC = () => {
                             </div>
 
                             <div className="p-8">
-                                {/* Multiple Paper Tabs */}
-                                {allPapers.length > 1 && (
-                                    <div className="flex gap-2 mb-8 overflow-x-auto pb-2 border-b border-gray-100">
-                                        {allPapers.map((p, idx) => (
-                                            <button
-                                                key={p._id || p.submissionId}
-                                                onClick={() => setSelectedPaperIndex(idx)}
-                                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${selectedPaperIndex === idx
-                                                    ? 'bg-primary text-white shadow-md select-none'
-                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                    }`}
-                                            >
-                                                {p.submissionId} - {p.paperTitle.substring(0, 20)}...
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
                                 <div className="flex flex-col md:flex-row items-center gap-6 mb-10 p-6 bg-blue-50 rounded-2xl border border-blue-100">
                                     <div className="bg-white p-4 rounded-full shadow-sm">
                                         <Clock className="w-10 h-10 text-primary" />
@@ -431,12 +435,65 @@ const CopyrightDashboard: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-r-xl">
+                                <div className={`p-6 rounded-r-xl border-l-4 shadow-sm ${paper.status === 'Revision Required' ? 'bg-amber-50 border-amber-400' :
+                                        paper.status === 'Revised Submitted' ? 'bg-blue-50 border-blue-400' :
+                                            paper.status === 'Rejected' ? 'bg-red-50 border-red-400' :
+                                                paper.status === 'Conditionally Accept' ? 'bg-emerald-50 border-emerald-400' :
+                                                    'bg-yellow-50 border-yellow-400'
+                                    }`}>
                                     <div className="flex gap-4">
-                                        <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
-                                        <p className="text-yellow-800">
-                                            <strong>Copyright submission is not yet available.</strong> Your paper is currently being processed. Once it is accepted by the review committee, you will be notified to upload the signed copyright form here.
-                                        </p>
+                                        {paper.status === 'Revision Required' ? (
+                                            <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0" />
+                                        ) : paper.status === 'Revised Submitted' ? (
+                                            <Clock className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                                        ) : paper.status === 'Rejected' ? (
+                                            <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                                        ) : paper.status === 'Conditionally Accept' ? (
+                                            <CheckCircle className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+                                        ) : (
+                                            <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
+                                        )}
+                                        <div>
+                                            {paper.status === 'Revision Required' ? (
+                                                <>
+                                                    <p className="text-amber-900 font-bold mb-1">Revision Required</p>
+                                                    <p className="text-amber-800 text-sm mb-4 leading-relaxed">
+                                                        The editorial board has requested revisions for this manuscript. Please review the comments and submit your revised version.
+                                                    </p>
+                                                    <button
+                                                        onClick={() => navigate('/dashboard')}
+                                                        className="bg-amber-600 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-amber-700 transition shadow-sm active:scale-95 flex items-center gap-2"
+                                                    >
+                                                        <FileText className="w-4 h-4" /> Go to Revisions
+                                                    </button>
+                                                </>
+                                            ) : paper.status === 'Revised Submitted' ? (
+                                                <>
+                                                    <p className="text-blue-900 font-bold mb-1">Revision Submitted</p>
+                                                    <p className="text-blue-800 text-sm">
+                                                        Your revised manuscript is currently being evaluated. We will notify you once a decision has been reached.
+                                                    </p>
+                                                </>
+                                            ) : paper.status === 'Rejected' ? (
+                                                <>
+                                                    <p className="text-red-900 font-bold mb-1">Paper Rejected</p>
+                                                    <p className="text-red-800 text-sm">
+                                                        Unfortunately, this manuscript has not been accepted for further processing. You can switch to your other submissions using the dropdown above.
+                                                    </p>
+                                                </>
+                                            ) : paper.status === 'Conditionally Accept' ? (
+                                                <>
+                                                    <p className="text-emerald-900 font-bold mb-1">Conditionally Accepted</p>
+                                                    <p className="text-emerald-800 text-sm">
+                                                        Your paper has been conditionally accepted. Please fulfill the final requirements to proceed to the copyright stage.
+                                                    </p>
+                                                </>
+                                            ) : (
+                                                <p className="text-yellow-800">
+                                                    <strong>Copyright submission is not yet available.</strong> Your paper is currently in the <strong>{paper.status}</strong> stage. Once it is officially accepted, you will be able to complete the copyright formalities here.
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -449,7 +506,7 @@ const CopyrightDashboard: React.FC = () => {
         );
     }
 
-    // 3. Case: Paper Accepted (Show copyright dashboard)
+
     if (!paper || !copyright) return null;
 
     return (
@@ -458,28 +515,58 @@ const CopyrightDashboard: React.FC = () => {
                 <div className="max-w-7xl mx-auto">
                     {/* Header */}
                     <div className="bg-white rounded-xl shadow-md p-6 mb-8 flex flex-col md:flex-row md:items-center justify-between border-l-4 border-primary">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Author Dashboard</h1>
-                            <p className="text-gray-600 mt-1">Manage your copyright submission and communicate with admins.</p>
+                        <div className="flex-1">
+                            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Author Dashboard</h1>
+                            <p className="text-gray-600 mt-1 mb-4">Manage your copyright submission and communicate with admins.</p>
+
+                            {/* Integrated Paper Switcher */}
+                            {allPapers.length > 1 && (
+                                <div className="flex items-center gap-3 bg-blue-50/50 p-2 rounded-xl border border-blue-100/50 w-fit">
+                                    <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                                        <FileText className="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedPaperIndex}
+                                            onChange={(e) => setSelectedPaperIndex(parseInt(e.target.value))}
+                                            className="appearance-none bg-transparent border-none pr-8 text-sm font-bold text-gray-800 focus:outline-none cursor-pointer"
+                                        >
+                                            {allPapers.map((p, idx) => (
+                                                <option key={p.submissionId || idx} value={idx}>
+                                                    [{p.status}] {p.submissionId} - {p.paperTitle.length > 40 ? p.paperTitle.substring(0, 40) + '...' : p.paperTitle}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-primary">
+                                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <div className="mt-4 md:mt-0 flex items-center gap-3">
-                            <span className="text-sm font-medium text-gray-500 uppercase tracking-wider">Status:</span>
-                            <span className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-sm ${copyright.status === 'Approved' ? 'bg-green-100 text-green-700 border border-green-200' :
-                                copyright.status === 'Rejected' ? 'bg-red-100 text-red-700 border border-red-200' :
-                                    copyright.status === 'Submitted' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                                        'bg-yellow-100 text-yellow-700 border border-yellow-200'
-                                }`}>
-                                {copyright.status}
-                            </span>
+                        <div className="mt-6 md:mt-0 flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</span>
+                                <span className={`px-3 py-1 rounded-full text-xs font-black shadow-sm ${copyright.status === 'Approved' ? 'bg-green-500 text-white' :
+                                    copyright.status === 'Rejected' ? 'bg-red-500 text-white' :
+                                        copyright.status === 'Submitted' ? 'bg-blue-500 text-white' :
+                                            'bg-amber-500 text-white'
+                                    }`}>
+                                    {copyright.status.toUpperCase()}
+                                </span>
+                            </div>
                             <button
                                 onClick={() => navigate('/paper-submission')}
-                                className="ml-4 bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-primary/90 transition shadow-sm flex items-center gap-2 text-sm"
+                                className="bg-primary text-white px-5 py-2.5 rounded-xl font-bold hover:bg-primary/90 transition shadow-lg shadow-blue-100 flex items-center gap-2 text-sm active:scale-95"
                             >
                                 <Upload className="w-4 h-4" />
                                 Submit Another
                             </button>
                         </div>
                     </div>
+
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Main Content: Upload & Info */}

@@ -323,8 +323,8 @@ const ConferenceCommittee: React.FC = () => {
               <h2 className="text-3xl font-bold text-gray-800">Our Committee</h2>
             </div>
             <p className="text-lg text-gray-600 max-w-4xl">
-              The organizing committee brings together leading experts from around the world in diverse academic fields. 
-              Our members represent top academic institutions and industry organizations committed to fostering 
+              The organizing committee brings together leading experts from around the world in diverse academic fields.
+              Our members represent top academic institutions and industry organizations committed to fostering
               innovation and collaboration in multidisciplinary research and education.
             </p>
           </div>
@@ -335,9 +335,8 @@ const ConferenceCommittee: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedRole("all")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedRole === "all" ? "bg-[#F5A051] text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedRole === "all" ? "bg-[#F5A051] text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
               >
                 All Roles
               </button>
@@ -345,9 +344,8 @@ const ConferenceCommittee: React.FC = () => {
                 <button
                   key={role}
                   onClick={() => setSelectedRole(role)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                    selectedRole === role ? "bg-[#F5A051] text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedRole === role ? "bg-[#F5A051] text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
                 >
                   {role}
                 </button>
@@ -481,10 +479,10 @@ const ConferenceCommittee: React.FC = () => {
               For inquiries related to the conference, submissions, or other matters, please reach out to our committee at the email below.
             </p>
             <a
-              href="mailto:icmbnt2026@gmail.com"
+              href="mailto:admin@icmbnt2026.societycis.org"
               className="inline-flex items-center px-6 py-3 bg-[#F5A051] text-white font-medium rounded-lg hover:bg-[#e08c3e] transition-colors"
             >
-              icmbnt2026@gmail.com
+              admin@icmbnt2026.societycis.org
               <Mail className="ml-2 w-4 h-4" />
             </a>
           </div>

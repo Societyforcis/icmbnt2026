@@ -3,6 +3,7 @@ import axios from 'axios';
 import { FaFilePdf, FaUpload, FaCheckCircle, FaSpinner } from 'react-icons/fa';
 
 interface RevisionFormProps {
+  paperId: string; // Add paperId for precise targeting
   submissionId: string;
   authorEmail: string;
   paperTitle: string;
@@ -13,6 +14,7 @@ interface RevisionFormProps {
 }
 
 const RevisionForm = ({
+  paperId,
   submissionId,
   authorEmail,
   paperTitle,
@@ -62,9 +64,10 @@ const RevisionForm = ({
 
     try {
       const formData = new FormData();
+      formData.append('paperId', paperId);
       formData.append('submissionId', submissionId);
       formData.append('authorEmail', authorEmail);
-      
+
       // Append all three PDFs with proper field names for multer
       formData.append('cleanPdf', cleanPdf);
       formData.append('highlightedPdf', highlightedPdf);
@@ -114,7 +117,7 @@ const RevisionForm = ({
   return (
     <div className="p-6 bg-white border-2 border-gray-300 rounded-lg">
       <h3 className="text-xl font-bold text-gray-800 mb-4">Submit Revised Paper</h3>
-      
+
       {/* Auto-filled Paper Details */}
       <div className="bg-gray-50 p-4 rounded-md mb-6 border-l-4 border-blue-500">
         <h4 className="font-bold text-gray-700 mb-3">Paper Details (Auto-filled)</h4>
@@ -180,11 +183,10 @@ const RevisionForm = ({
             />
             <label
               htmlFor="cleanPdf"
-              className={`flex items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition ${
-                cleanPdf
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 bg-gray-50 hover:border-gray-400'
-              }`}
+              className={`flex items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition ${cleanPdf
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+                }`}
             >
               <div className="text-center">
                 <FaUpload className={`text-2xl mx-auto mb-2 ${cleanPdf ? 'text-green-600' : 'text-gray-400'}`} />
@@ -214,11 +216,10 @@ const RevisionForm = ({
             />
             <label
               htmlFor="highlightedPdf"
-              className={`flex items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition ${
-                highlightedPdf
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 bg-gray-50 hover:border-gray-400'
-              }`}
+              className={`flex items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition ${highlightedPdf
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+                }`}
             >
               <div className="text-center">
                 <FaUpload className={`text-2xl mx-auto mb-2 ${highlightedPdf ? 'text-green-600' : 'text-gray-400'}`} />
@@ -248,11 +249,10 @@ const RevisionForm = ({
             />
             <label
               htmlFor="responsePdf"
-              className={`flex items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition ${
-                responsePdf
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 bg-gray-50 hover:border-gray-400'
-              }`}
+              className={`flex items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition ${responsePdf
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+                }`}
             >
               <div className="text-center">
                 <FaUpload className={`text-2xl mx-auto mb-2 ${responsePdf ? 'text-green-600' : 'text-gray-400'}`} />
@@ -287,11 +287,10 @@ const RevisionForm = ({
           <button
             type="submit"
             disabled={uploading || !cleanPdf || !highlightedPdf || !responsePdf}
-            className={`flex-1 px-6 py-3 rounded-lg font-bold text-white flex items-center justify-center gap-2 transition ${
-              uploading || !cleanPdf || !highlightedPdf || !responsePdf
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
+            className={`flex-1 px-6 py-3 rounded-lg font-bold text-white flex items-center justify-center gap-2 transition ${uploading || !cleanPdf || !highlightedPdf || !responsePdf
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-green-600 hover:bg-green-700'
+              }`}
           >
             {uploading ? (
               <>

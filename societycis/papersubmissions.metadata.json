@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"submissionId":{"$numberInt":"1"}},"name":"submissionId_1","background":true,"unique":true}],"uuid":"7a403d5f519744b08a0ae0ce0f70e30f","collectionName":"papersubmissions","type":"collection"}

@@ -161,7 +161,7 @@ const CallForPapers = () => {
                 Accepted and registered manuscript will be included in the conference proceedings.
               </li>
               <li className="text-gray-700">
-                Authors must submit their manuscript to the Email- ID: <a href="mailto:icmbnt2026@gmail.com" className="text-[#F5A051] hover:underline">icmbnt2026@gmail.com</a>
+                Authors must submit their manuscript to the Email- ID: <a href="mailto:admin@icmbnt2026.societycis.org" className="text-[#F5A051] hover:underline">admin@icmbnt2026.societycis.org</a>
               </li>
             </ol>
             <div className="mt-6 py-2 px-4 bg-blue-50 border-l-4 border-[#F5A051] text-gray-700">
@@ -480,8 +480,8 @@ const CallForPapers = () => {
             <div className="mt-6 bg-blue-100 border border-blue-300 rounded-lg p-4">
               <p className="text-blue-900 text-sm">
                 <strong>Need Help?</strong> If you face any issues during the registration process, please contact us at{' '}
-                <a href="mailto:icmbnt2026@gmail.com" className="text-blue-700 underline font-semibold">
-                  icmbnt2026@gmail.com
+                <a href="mailto:admin@icmbnt2026.societycis.org" className="text-blue-700 underline font-semibold">
+                  admin@icmbnt2026.societycis.org
                 </a>
               </p>
             </div>

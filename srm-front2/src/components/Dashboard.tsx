@@ -280,24 +280,40 @@ const Dashboard: React.FC = () => {
 
           {hasSubmission && submission ? (
             <div className="space-y-6">
-              {/* Paper Selection Tabs if multiple papers */}
+              {/* Paper Selection Dropdown if multiple papers */}
               {submissions.length > 1 && (
-                <div className="bg-white p-2 rounded-xl shadow-sm flex gap-2 overflow-x-auto border border-gray-100 mb-6">
-                  {submissions.map((p, idx) => (
-                    <button
-                      key={p._id}
-                      onClick={() => {
-                        setSelectedPaperIndex(idx);
-                        setSubmission(p);
+                <div className="bg-blue-50 p-4 rounded-2xl mb-8 flex flex-col sm:flex-row justify-between items-center border border-blue-100 shadow-sm animate__animated animate__fadeIn">
+                  <div className="flex items-center mb-3 sm:mb-0">
+                    <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                      <Users className="text-blue-600 w-5 h-5" />
+                    </div>
+                    <p className="text-blue-900 font-bold">
+                      You have {submissions.length} submitted {submissions.length === 1 ? 'paper' : 'papers'}.
+                    </p>
+                  </div>
+                  <div className="relative w-full sm:w-auto">
+                    <select
+                      id="paper-switcher"
+                      value={selectedPaperIndex}
+                      onChange={(e) => {
+                        const index = parseInt(e.target.value);
+                        setSelectedPaperIndex(index);
+                        setSubmission(submissions[index]);
                       }}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${selectedPaperIndex === idx
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100'
-                        }`}
+                      className="appearance-none bg-white border-2 border-blue-200 rounded-xl px-5 py-2.5 pr-10 text-sm font-bold text-blue-800 focus:outline-none focus:border-blue-500 shadow-sm cursor-pointer w-full transition-all hover:border-blue-400"
                     >
-                      {p.submissionId} - {p.paperTitle.substring(0, 20)}...
-                    </button>
-                  ))}
+                      {submissions.map((sub, idx) => (
+                        <option key={sub.submissionId} value={idx}>
+                          {sub.submissionId} - {sub.paperTitle.length > 30 ? sub.paperTitle.substring(0, 30) + '...' : sub.paperTitle}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-blue-600">
+                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               )}
 

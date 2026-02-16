@@ -231,10 +231,10 @@ export const getUserSubmission = async (req, res) => {
 
         // Fetch all paper submissions for this email
         const [mainSubmissions, multiSubmissions] = await Promise.all([
-            PaperSubmission.find({ email })
+            PaperSubmission.find({ email: { $regex: new RegExp(`^${email}$`, 'i') } })
                 .populate('assignedEditor', 'username email')
                 .populate('assignedReviewers', 'username email'),
-            MultiplePaperSubmission.find({ email })
+            MultiplePaperSubmission.find({ email: { $regex: new RegExp(`^${email}$`, 'i') } })
                 .populate('assignedEditor', 'username email')
                 .populate('assignedReviewers', 'username email')
         ]);

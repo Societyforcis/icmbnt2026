@@ -457,6 +457,14 @@ router.put('/admin/:id/verify', authMiddleware, adminMiddleware, async (req, res
 
     } catch (error) {
         console.error('❌ Error verifying payment:', error);
+        if (error.name === 'ValidationError') {
+            console.error('🔍 Validation Errors:', Object.keys(error.errors).map(key => `${key}: ${error.errors[key].message}`));
+            return res.status(400).json({
+                success: false,
+                message: 'Data validation failed during verification',
+                details: Object.values(error.errors).map(e => e.message)
+            });
+        }
         res.status(500).json({
             success: false,
             message: 'Failed to verify payment',

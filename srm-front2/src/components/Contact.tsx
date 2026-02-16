@@ -78,7 +78,7 @@ export default function Contact() {
               <Mail className="w-6 h-6 text-[#F5A051]" />
               <div>
                 <h3 className="font-medium text-gray-800">Email</h3>
-                <p className="text-gray-600">icmbnt2026@gmail.com</p>
+                <p className="text-gray-600">admin@icmbnt2026.societycis.org</p>
               </div>
             </div>
             <div className="flex items-start space-x-4">
@@ -92,7 +92,7 @@ export default function Contact() {
         </div>
 
         <div className="mt-20" data-aos="fade-up">
-           <h2 className="text-2xl font-semibold mb-6 text-center text-[#F5A051]">Find Us on the Map</h2>
+          <h2 className="text-2xl font-semibold mb-6 text-center text-[#F5A051]">Find Us on the Map</h2>
           <div className="w-full h-96 bg-white rounded-lg overflow-hidden shadow-md">
             <iframe
               title="Pondicherry Location Map"

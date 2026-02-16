@@ -186,8 +186,8 @@ const Venue = () => {
 
               <div className="inline-flex items-center justify-center bg-[#F5A051]/10 px-6 py-3 rounded-lg">
                 <Mail className="w-5 h-5 text-[#F5A051] mr-2" />
-                <a href="mailto:icmbnt2026@gmail.com" className="text-lg font-medium text-[#F5A051]">
-                  icmbnt2026@gmail.com
+                <a href="mailto:admin@icmbnt2026.societycis.org" className="text-lg font-medium text-[#F5A051]">
+                  admin@icmbnt2026.societycis.org
                 </a>
               </div>
 

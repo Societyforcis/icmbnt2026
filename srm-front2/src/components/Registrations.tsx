@@ -437,7 +437,7 @@ const Registrations: React.FC = () => {
                 </h3>
                 <p className="text-gray-600 mb-4">
                   After making your payment, download the Registration form and Copyright form, fill it out and
-                  email it to <span className="font-medium text-blue-800">icmbnt2026@gmail.com</span> along with your payment information.
+                  email it to <span className="font-medium text-blue-800">admin@icmbnt2026.societycis.org</span> along with your payment information.
                   The payee is accountable for all bank charges.
                 </p>
 
@@ -568,10 +568,10 @@ const Registrations: React.FC = () => {
           <p className="text-gray-600">
             For any queries regarding registration or payment, please contact us at
             <a
-              href="mailto:icmbnt2026@gmail.com"
+              href="mailto:admin@icmbnt2026.societycis.org"
               className="text-blue-800 hover:underline ml-1"
             >
-              icmbnt2026@gmail.com
+              admin@icmbnt2026.societycis.org
             </a>
           </p>
 

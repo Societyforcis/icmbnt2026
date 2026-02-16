@@ -589,6 +589,49 @@ const EditorDashboard = () => {
         }
     };
 
+    // Handle send re-review emails
+    const handleSendReReviewEmails = async (e?: React.MouseEvent) => {
+        console.log("now")
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        if (!viewingPaper) {
+            alert('No paper selected');
+            return;
+        }
+        console.log("now1")
+        // const confirmSend = window.confirm('Send re-review request emails to all reviewers for the revised paper?');
+        // if (!confirmSend) return;
+        console.log("now2")
+        setDecisionLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.post(
+                `${API_URL}/api/editor/send-re-review-emails`,
+                { paperId: viewingPaper._id },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            console.log("now3")
+
+            if (response.data.success) {
+                alert(`✅ Re-review emails sent to ${response.data.emailsSent} reviewer(s)!`);
+                if (viewingPaper?._id) {
+                    await fetchPaperReviewsAndReviewers(viewingPaper._id);
+                }
+            } else {
+                alert('Error: ' + (response.data.message || 'Failed to send re-review emails'));
+            }
+        } catch (error: any) {
+            console.error('Error sending re-review emails:', error);
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to send re-review emails';
+            alert('Error: ' + errorMsg);
+        } finally {
+            setDecisionLoading(false);
+        }
+    };
+
     // Handle send inquiry to reviewer
     const handleSendInquiry = async () => {
         if (!reviewerInquiryModal || !inquiryMessage.trim() || !viewingPaper) {
@@ -1528,32 +1571,10 @@ const EditorDashboard = () => {
                                                 {/* Re-Review Emails Button - Show when paper is "Revised Submitted" */}
                                                 {viewingPaper.status === 'Revised Submitted' && (
                                                     <button
-                                                        onClick={async () => {
-                                                            if (!window.confirm('Send re-review request emails to all reviewers for the revised paper?')) return;
-
-                                                            try {
-                                                                setDecisionLoading(true);
-                                                                const token = localStorage.getItem('token');
-                                                                const response = await axios.post(
-                                                                    `${API_URL}/api/editor/send-re-review-emails`,
-                                                                    { paperId: viewingPaper._id },
-                                                                    { headers: { Authorization: `Bearer ${token}` } }
-                                                                );
-
-                                                                if (response.data.success) {
-                                                                    alert(`✅ Re-review emails sent to ${response.data.emailsSent} reviewer(s)!`);
-                                                                } else {
-                                                                    alert('Error: ' + (response.data.message || 'Failed to send re-review emails'));
-                                                                }
-                                                            } catch (error) {
-                                                                console.error('Error sending re-review emails:', error);
-                                                                alert('Error: ' + ((error as any).response?.data?.message || 'Failed to send re-review emails'));
-                                                            } finally {
-                                                                setDecisionLoading(false);
-                                                            }
-                                                        }}
+                                                        type="button"
+                                                        onClick={(e) => handleSendReReviewEmails(e)}
                                                         disabled={decisionLoading}
-                                                        className="flex-1 px-3 py-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                        className="flex-1 px-4 py-3 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-bold transition shadow-lg active:scale-95"
                                                     >
                                                         {decisionLoading ? 'Sending...' : '📧 Send Re-Review Emails'}
                                                     </button>
@@ -1567,28 +1588,10 @@ const EditorDashboard = () => {
                                                             <>
                                                                 {/* Send Re-Review Emails Button */}
                                                                 <button
-                                                                    onClick={async () => {
-                                                                        setDecisionLoading(true);
-                                                                        try {
-                                                                            const token = localStorage.getItem('token');
-                                                                            await axios.post(
-                                                                                `${API_URL}/api/editor/send-re-review-emails`,
-                                                                                { paperId: viewingPaper._id },
-                                                                                { headers: { Authorization: `Bearer ${token}` } }
-                                                                            );
-                                                                            alert('✅ Re-review emails sent successfully');
-                                                                            if (viewingPaper?._id) {
-                                                                                await fetchPaperReviewsAndReviewers(viewingPaper._id);
-                                                                            }
-                                                                        } catch (error: any) {
-                                                                            console.error('Error sending re-review emails:', error);
-                                                                            alert('❌ ' + (error.response?.data?.message || 'Failed to send re-review emails'));
-                                                                        } finally {
-                                                                            setDecisionLoading(false);
-                                                                        }
-                                                                    }}
+                                                                    type="button"
+                                                                    onClick={(e) => handleSendReReviewEmails(e)}
                                                                     disabled={decisionLoading}
-                                                                    className="flex-1 px-3 py-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                                    className="flex-1 px-3 py-3 bg-blue-700 text-white rounded hover:bg-blue-800 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition shadow-md"
                                                                 >
                                                                     {decisionLoading ? 'Sending...' : '📧 Send Re-Review Emails'}
                                                                 </button>
@@ -1621,16 +1624,17 @@ const EditorDashboard = () => {
                                                                     return (
                                                                         <>
                                                                             {/* Accept Button - Show if ≥3 reviews submitted OR paper is "Revised Submitted" */}
-                                                                            <div className="relative group">
+                                                                            <div className="relative group flex-1">
                                                                                 <button
+                                                                                    type="button"
                                                                                     onClick={handleAcceptPaper}
                                                                                     disabled={(!allReviewsSubmitted && !isRevisedSubmitted) || decisionLoading}
-                                                                                    className="flex-1 px-3 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
+                                                                                    className="w-full px-3 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-sm flex items-center justify-center gap-2 font-medium transition"
                                                                                 >
                                                                                     {decisionLoading ? 'Processing...' : '✓ Accept'}
                                                                                 </button>
                                                                                 {!allReviewsSubmitted && !isRevisedSubmitted && (
-                                                                                    <div className="invisible group-hover:visible absolute z-10 bg-gray-800 text-white text-xs rounded py-2 px-3 bottom-full mb-2 whitespace-nowrap">
+                                                                                    <div className="invisible group-hover:visible absolute z-10 bg-gray-800 text-white text-xs rounded py-2 px-3 bottom-full mb-2 whitespace-nowrap left-1/2 -translate-x-1/2">
                                                                                         {acceptButtonMessage}
                                                                                     </div>
                                                                                 )}

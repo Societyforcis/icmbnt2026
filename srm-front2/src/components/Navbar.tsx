@@ -137,18 +137,48 @@ const Navbar: React.FC = () => {
                 </Link>
               </div>
 
-              {/* Author Dashboard Link (Only for Authors) */}
-              {isLoggedIn && localStorage.getItem('role') === 'Author' && (
-                <Link
-                  to="/author-dashboard"
-                  className={`flex items-center py-2 px-3 rounded-md transition-colors ${location.pathname === '/author-dashboard'
-                    ? 'bg-[#F5A051] text-white'
-                    : 'text-white hover:bg-gray-800'
-                    }`}
-                >
-                  <LayoutDashboard size={18} className="mr-2" />
-                  <span className="font-medium">Author Dashboard</span>
-                </Link>
+              {/* Role-based Dashboard Link (Logo and Role-based Links) */}
+              {isLoggedIn && (
+                <>
+                  {localStorage.getItem('role') === 'Author' && (
+                    <Link
+                      to="/author-dashboard"
+                      className={`flex items-center py-2 px-3 rounded-md transition-colors ${location.pathname === '/author-dashboard'
+                        ? 'bg-[#F5A051] text-white'
+                        : 'text-white hover:bg-gray-800'
+                        }`}
+                    >
+                      <LayoutDashboard size={18} className="mr-2" />
+                      <span className="font-medium">Author Dashboard</span>
+                    </Link>
+                  )}
+
+                  {(localStorage.getItem('role') === 'Editor' || localStorage.getItem('role') === 'Admin') && (
+                    <Link
+                      to="/dashboard"
+                      className={`flex items-center py-2 px-3 rounded-md transition-colors ${location.pathname === '/dashboard'
+                        ? 'bg-[#F5A051] text-white'
+                        : 'text-white hover:bg-gray-800'
+                        }`}
+                    >
+                      <LayoutDashboard size={18} className="mr-2" />
+                      <span className="font-medium">Editor Dashboard</span>
+                    </Link>
+                  )}
+
+                  {localStorage.getItem('role') === 'Reviewer' && (
+                    <Link
+                      to="/reviewer"
+                      className={`flex items-center py-2 px-3 rounded-md transition-colors ${location.pathname === '/reviewer'
+                        ? 'bg-[#F5A051] text-white'
+                        : 'text-white hover:bg-gray-800'
+                        }`}
+                    >
+                      <LayoutDashboard size={18} className="mr-2" />
+                      <span className="font-medium">Reviewer Dashboard</span>
+                    </Link>
+                  )}
+                </>
               )}
 
               {/* Admin Panel Link (Only for Admin users) */}
@@ -174,7 +204,7 @@ const Navbar: React.FC = () => {
                     title="Manage Copyright Forms"
                   >
                     <FileText size={18} className="mr-2" />
-                    <span className="font-medium">Author Dashboard</span>
+                    <span className="font-medium">Copyright Management</span>
                   </Link>
                 </div>
               )}
@@ -240,23 +270,53 @@ const Navbar: React.FC = () => {
                 </Link>
               </li>
 
-              {/* Dashboard link in mobile menu (only when logged in and NOT author) */}
-              {isLoggedIn && (localStorage.getItem('role') === 'Editor' || localStorage.getItem('role') === 'Admin' || localStorage.getItem('role') === 'Reviewer') && (
+              {/* Dashboard links in mobile menu based on role */}
+              {isLoggedIn && (
                 <>
-                  <li>
-                    <Link
-                      to={localStorage.getItem('role') === 'Reviewer' ? '/reviewer' : '/dashboard'}
-                      className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/dashboard') || isActive('/reviewer')}`}
-                    >
-                      <div className="flex items-center">
-                        <LayoutDashboard size={16} className="mr-2" />
-                        Dashboard
-                      </div>
-                    </Link>
-                  </li>
+                  {(localStorage.getItem('role') === 'Editor' || localStorage.getItem('role') === 'Admin') && (
+                    <li>
+                      <Link
+                        to="/dashboard"
+                        className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/dashboard')}`}
+                      >
+                        <div className="flex items-center">
+                          <LayoutDashboard size={16} className="mr-2" />
+                          Editor Dashboard
+                        </div>
+                      </Link>
+                    </li>
+                  )}
 
-                  {/* Admin Panel link in mobile menu (only for Admin users) */}
-                  {isLoggedIn && localStorage.getItem('role') === 'Admin' && (
+                  {localStorage.getItem('role') === 'Reviewer' && (
+                    <li>
+                      <Link
+                        to="/reviewer"
+                        className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/reviewer')}`}
+                      >
+                        <div className="flex items-center">
+                          <LayoutDashboard size={16} className="mr-2" />
+                          Reviewer Dashboard
+                        </div>
+                      </Link>
+                    </li>
+                  )}
+
+                  {localStorage.getItem('role') === 'Author' && (
+                    <li>
+                      <Link
+                        to="/author-dashboard"
+                        className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/author-dashboard')}`}
+                      >
+                        <div className="flex items-center">
+                          <LayoutDashboard size={16} className="mr-2" />
+                          Author Dashboard
+                        </div>
+                      </Link>
+                    </li>
+                  )}
+
+                  {/* Admin Panel links in mobile menu (only for Admin users) */}
+                  {localStorage.getItem('role') === 'Admin' && (
                     <>
                       <li>
                         <Link
@@ -281,20 +341,6 @@ const Navbar: React.FC = () => {
                         </Link>
                       </li>
                     </>
-                  )}
-                  {/* Author Dashboard link for Author in mobile menu */}
-                  {isLoggedIn && localStorage.getItem('role') === 'Author' && (
-                    <li>
-                      <Link
-                        to="/copyright-dashboard"
-                        className={`block py-2.5 px-4 hover:bg-gray-800 rounded-md transition-colors ${isActive('/copyright-dashboard')}`}
-                      >
-                        <div className="flex items-center">
-                          <LayoutDashboard size={16} className="mr-2" />
-                          Author Dashboard
-                        </div>
-                      </Link>
-                    </li>
                   )}
                 </>
               )}

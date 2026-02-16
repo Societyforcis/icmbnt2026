@@ -9,7 +9,6 @@ const paymentDoneFinalUserSchema = new mongoose.Schema({
     authorEmail: {
         type: String,
         required: true,
-        unique: true,
         index: true
     },
     authorName: {

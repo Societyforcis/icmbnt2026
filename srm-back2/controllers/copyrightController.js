@@ -3,31 +3,73 @@ import PaymentDoneFinalUser from '../models/PaymentDoneFinalUser.js';
 import FinalAcceptance from '../models/FinalAcceptance.js';
 import ConferenceSelectedUser from '../models/ConferenceSelectedUser.js';
 import { PaperSubmission } from '../models/Paper.js';
+import { MultiplePaperSubmission } from '../models/MultiplePaper.js';
 
-// Author access check middleware/helper
-const checkAuthorEligibility = async (email) => {
-    // Check if the author has a verified payment
-    const payment = await PaymentDoneFinalUser.findOne({
-        authorEmail: email
-    });
-    return payment;
-};
+// Escape regex special characters in a string for safe use in RegExp
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Author: Get Dashboard Data
 export const getAuthorCopyrightDashboard = async (req, res) => {
     try {
         const authorEmail = req.user.email;
+        const safeEmail = escapeRegex(authorEmail);
 
-        // 1. Get all paper submissions
-        const { PaperSubmission } = await import('../models/Paper.js');
-        const { MultiplePaperSubmission } = await import('../models/MultiplePaper.js');
-
-        const [mainPapers, multiPapers] = await Promise.all([
-            PaperSubmission.find({ email: authorEmail }),
-            MultiplePaperSubmission.find({ email: authorEmail })
+        // 1. Get all paper submissions from all possible collections
+        const [mainPapers, multiPapers, finalAcceptedPapers] = await Promise.all([
+            PaperSubmission.find({ email: { $regex: new RegExp(`^${safeEmail}$`, 'i') } }),
+            MultiplePaperSubmission.find({ email: { $regex: new RegExp(`^${safeEmail}$`, 'i') } }),
+            FinalAcceptance.find({ authorEmail: { $regex: new RegExp(`^${safeEmail}$`, 'i') } })
         ]);
 
-        const allPapers = [...mainPapers, ...multiPapers];
+        console.log(`🔍 Dashboard fetch for ${authorEmail}: Found ${mainPapers.length} main, ${multiPapers.length} multi, ${finalAcceptedPapers.length} final accepted.`);
+
+        // 2. Merge and de-duplicate by submissionId using a Map
+        // Strategy: collect all records per submissionId, then merge fields
+        const submissionMap = new Map();
+
+        // Helper: merge a paper record into the map
+        const mergePaper = (p, source) => {
+            const sid = p.submissionId?.toLowerCase();
+            if (!sid) return;
+
+            const pobj = p.toObject ? p.toObject() : { ...p };
+            pobj._source = source; // track origin for debugging
+
+            // Normalize email field (FinalAcceptance uses authorEmail, others use email)
+            if (!pobj.email && pobj.authorEmail) pobj.email = pobj.authorEmail;
+            if (!pobj.authorEmail && pobj.email) pobj.authorEmail = pobj.email;
+
+            if (!submissionMap.has(sid)) {
+                submissionMap.set(sid, pobj);
+            } else {
+                // Merge: fill in missing fields from this source
+                const existing = submissionMap.get(sid);
+                // Prefer FinalAcceptance or later-stage data for status
+                if (source === 'FinalAcceptance') {
+                    // FinalAcceptance is the most authoritative — override status
+                    existing.status = pobj.status || existing.status;
+                    existing.finalDecision = pobj.finalDecision || existing.finalDecision;
+                }
+                // Fill empty fields from the new source
+                for (const key of Object.keys(pobj)) {
+                    if ((existing[key] === undefined || existing[key] === null) && pobj[key] != null) {
+                        existing[key] = pobj[key];
+                    }
+                }
+                // Keep pdfUrl from the most recent source that has one
+                if (pobj.pdfUrl && source === 'FinalAcceptance') {
+                    existing.pdfUrl = pobj.pdfUrl;
+                }
+            }
+        };
+
+        // Process in order: main papers first, then multi, then FinalAcceptance (overrides)
+        mainPapers.forEach(p => mergePaper(p, 'PaperSubmission'));
+        multiPapers.forEach(p => mergePaper(p, 'MultiplePaperSubmission'));
+        finalAcceptedPapers.forEach(p => mergePaper(p, 'FinalAcceptance'));
+
+        const allPapers = Array.from(submissionMap.values());
+        console.log(`✅ Total unique papers found for dashboard: ${allPapers.length}`);
 
         if (allPapers.length === 0) {
             return res.status(200).json({
@@ -37,40 +79,72 @@ export const getAuthorCopyrightDashboard = async (req, res) => {
             });
         }
 
-        // For backward compatibility, the frontend might expect a single 'paper' object.
-        const payment = await PaymentDoneFinalUser.findOne({ authorEmail });
-
+        // 3. Enrich papers with copyright information
         const papersWithCopyright = await Promise.all(allPapers.map(async (p) => {
-            // Get or create copyright record if paper is in acceptable status
-            if (p.status === 'Accepted' || p.status === 'Published') {
-                let copyright = await Copyright.findOne({ submissionId: p.submissionId });
-                if (!copyright) {
+            // p is already a plain object from mergePaper
+            const pobj = p.toObject ? p.toObject() : p;
+            const safeSid = escapeRegex(pobj.submissionId);
+
+            // Try to find an existing copyright record
+            let copyright = await Copyright.findOne({
+                submissionId: { $regex: new RegExp(`^${safeSid}$`, 'i') }
+            });
+
+            // Determine if paper qualifies as accepted
+            const isAccepted = (
+                pobj.status === 'Accepted' ||
+                pobj.status === 'Published' ||
+                pobj.status === 'Certificate Generated' ||
+                pobj.finalDecision === 'Accept'
+            );
+
+            // If paper is Accepted/Published but no copyright record exists, create one
+            if (!copyright && isAccepted) {
+                try {
                     copyright = await Copyright.create({
-                        paperId: p._id,
-                        submissionId: p.submissionId,
+                        paperId: pobj._id,
+                        submissionId: pobj.submissionId,
                         authorEmail: authorEmail,
-                        authorName: p.authorName,
-                        paperTitle: p.paperTitle,
+                        authorName: pobj.authorName || 'Author',
+                        paperTitle: pobj.paperTitle || 'Untitled Paper',
                         status: 'Pending'
                     });
+                    console.log(`📝 Created copyright record for ${pobj.submissionId}`);
+                } catch (err) {
+                    // Duplicate key means copyright was just created by another request — fetch it
+                    if (err.code === 11000) {
+                        copyright = await Copyright.findOne({
+                            submissionId: { $regex: new RegExp(`^${safeSid}$`, 'i') }
+                        });
+                    } else {
+                        console.error(`Error creating copyright for ${pobj.submissionId}:`, err);
+                    }
                 }
-                const pobj = p.toObject ? p.toObject() : p;
-                return { ...pobj, copyright };
             }
-            return p.toObject ? p.toObject() : p;
+
+            return { ...pobj, copyright: copyright || null };
         }));
 
-        const paper = papersWithCopyright[0];
-        const copyright = paper.copyright || null;
+        // Sort: Accepted papers first, then by date
+        papersWithCopyright.sort((a, b) => {
+            const acceptedStatuses = ['Accepted', 'Published', 'Certificate Generated'];
+            const aIsAccepted = acceptedStatuses.includes(a.status) || a.finalDecision === 'Accept';
+            const bIsAccepted = acceptedStatuses.includes(b.status) || b.finalDecision === 'Accept';
+            if (aIsAccepted && !bIsAccepted) return -1;
+            if (!aIsAccepted && bIsAccepted) return 1;
+            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+
+        const payment = await PaymentDoneFinalUser.findOne({ authorEmail: { $regex: new RegExp(`^${safeEmail}$`, 'i') } });
 
         return res.status(200).json({
             success: true,
             hasPaper: true,
             data: {
                 payment,
-                paper,
+                paper: papersWithCopyright[0],
                 allPapers: papersWithCopyright,
-                copyright
+                copyright: papersWithCopyright[0].copyright
             }
         });
     } catch (error) {

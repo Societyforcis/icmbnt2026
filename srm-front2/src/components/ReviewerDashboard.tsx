@@ -86,12 +86,14 @@ const ReviewerDashboard = () => {
 
     useEffect(() => {
         if (selectedPaper) {
-            // AUTO-DETECT ROUND: Check if revision exists
-            // If revision with highlighted PDF exists -> Round 2, else -> Round 1
-            const autoDetectedRound = paperRevisionData?.highlightedPdfUrl ? 2 : 1;
+            // AUTO-DETECT ROUND: Based on total revisions
+            // If there's 1 revision -> Round 2, 2 revisions -> Round 3, etc.
+            // Minimum is Round 1
+            const autoDetectedRound = Math.max(1, totalRevisions + 1);
             setFormData(prev => ({ ...prev, round: autoDetectedRound }));
+            console.log(`🎯 Auto-detected Review Round: ${autoDetectedRound} (Total Revisions: ${totalRevisions})`);
         }
-    }, [selectedPaper, paperRevisionData]);
+    }, [selectedPaper, totalRevisions]);
 
     // Separate useEffect to handle PDF URL changes based on round selection
     useEffect(() => {
@@ -378,7 +380,7 @@ const ReviewerDashboard = () => {
                 const headers = { Authorization: `Bearer ${token}` };
 
                 await axios.post(
-                    `${API_URL}/api/reviewer/papers/${selectedPaper.submissionId}/submit-review`,
+                    `${API_URL}/api/reviewer/papers/${selectedPaper._id}/submit-review`,
                     formData,
                     { headers }
                 );
@@ -621,7 +623,7 @@ const ReviewerDashboard = () => {
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        handleAcceptAssignment(paper.submissionId);
+                                                                        handleAcceptAssignment(paper._id);
                                                                     }}
                                                                     className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs transition shadow-sm hover:shadow-md flex items-center justify-center gap-2"
                                                                 >
@@ -630,7 +632,7 @@ const ReviewerDashboard = () => {
                                                                 </button>
                                                             ) : (['Accepted', 'Submitted', 'Review Submitted'].includes(paper.assignmentDetails.status)) ? (
                                                                 <button
-                                                                    onClick={() => loadPaperForReview(paper.submissionId)}
+                                                                    onClick={() => loadPaperForReview(paper._id)}
                                                                     className="w-full py-2 bg-gray-800 hover:bg-black text-white rounded-lg font-bold text-xs transition shadow-sm hover:shadow-md flex items-center justify-center gap-2"
                                                                 >
                                                                     <FileText className="w-4 h-4" />

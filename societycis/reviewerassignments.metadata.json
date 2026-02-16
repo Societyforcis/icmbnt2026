@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"acceptanceToken":{"$numberInt":"1"}},"name":"acceptanceToken_1","background":true,"unique":true,"sparse":true}],"uuid":"5cbf900de6cc4ad783f7a231a0991915","collectionName":"reviewerassignments","type":"collection"}

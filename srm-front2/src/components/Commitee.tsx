@@ -600,10 +600,10 @@ const ConferenceCommittee: React.FC = () => {
               For inquiries related to the conference, submissions, or other matters, please reach out to our committee at the email below.
             </p>
             <a
-              href="mailto:icmbnt2026@gmail.com"
+              href="mailto:admin@icmbnt2026.societycis.org"
               className="inline-flex items-center px-6 py-3 bg-[#F5A051] text-white font-medium rounded-lg hover:bg-[#e08c3e] transition-colors"
             >
-              icmbnt2026@gmail.com
+              admin@icmbnt2026.societycis.org
               <Mail className="ml-2 w-4 h-4" />
             </a>
           </div>
