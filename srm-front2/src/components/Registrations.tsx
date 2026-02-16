@@ -416,7 +416,7 @@ const Registrations: React.FC = () => {
               </p>
 
               {/* Enhanced Fee Table with country highlighting */}
-              <EnhancedFeeTable membershipStatus={membershipStatus} />
+              <EnhancedFeeTable membershipStatus={membershipStatus} isAccepted={isAccepted || false} />
 
               <div className="bg-gray-50 p-4 sm:p-6 rounded-lg mb-8 border border-gray-100 mt-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">Conference fee includes:</h3>
