@@ -4,17 +4,32 @@ import { Calendar } from "lucide-react";
 
 const timelineData = [
   {
-    date: "10 February 2026",
+    date: (
+      <span>
+        <span className="line-through opacity-60 mr-2 text-red-500">10 February 2026</span>
+        <span className="text-green-600 font-bold">28 February 2026 (Extended)</span>
+      </span>
+    ),
     title: "Manuscript Submission Deadline",
     description: "Last date to submit your research papers and manuscripts"
   },
   {
-    date: "12 February 2026",
+    date: (
+      <span>
+        <span className="line-through opacity-60 mr-2 text-red-500">12 February 2026</span>
+        <span className="text-green-600 font-bold">2 March 2026 (Extended)</span>
+      </span>
+    ),
     title: "Acceptance Notification",
     description: "Authors will be notified about the acceptance of their papers"
   },
   {
-    date: "15 February 2026",
+    date: (
+      <span>
+        <span className="line-through opacity-60 mr-2 text-red-500">15 February 2026</span>
+        <span className="text-green-600 font-bold">5 March 2026 (Extended)</span>
+      </span>
+    ),
     title: "Registration Deadline",
     description: "Last date for conference registration"
   },

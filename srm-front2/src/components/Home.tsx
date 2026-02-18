@@ -129,7 +129,7 @@ const Home = () => {
                 </p>
               </div>
 
- <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center">
                 <img
                   src={kpr}
                   alt="SRM University"
@@ -137,7 +137,7 @@ const Home = () => {
                   loading="lazy"
                 />
                 <p className="text-xs sm:text-sm text-white mt-3 text-center font-medium max-w-[140px] ml-[50px]">
-                  SRM University
+                  KPR Institute of Engineering and Technology
                 </p>
               </div>
               {/* Universitas Pelita Bangsa Logo */}

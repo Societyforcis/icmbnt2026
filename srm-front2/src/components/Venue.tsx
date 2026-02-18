@@ -114,9 +114,9 @@ const Venue = () => {
                   <div>
                     <h4 className="text-lg font-semibold text-gray-800 mb-3">Important Dates</h4>
                     <ul className="space-y-3 text-gray-700">
-                      <li><strong>Paper Submission:</strong> 10 February 2026</li>
-                      <li><strong>Acceptance Notification:</strong> 12 February 2026</li>
-                      <li><strong>Registration Deadline:</strong> 15 February 2026</li>
+                      <li><strong>Paper Submission:</strong> <span className="line-through text-red-500 mr-2">10 Feb 2026</span> <span className="text-green-700 font-semibold">28 Feb 2026</span></li>
+                      <li><strong>Acceptance Notification:</strong> <span className="line-through text-red-500 mr-2">12 Feb 2026</span> <span className="text-green-700 font-semibold">2 March 2026</span></li>
+                      <li><strong>Registration Deadline:</strong> <span className="line-through text-red-500 mr-2">15 Feb 2026</span> <span className="text-green-700 font-semibold">5 March 2026</span></li>
                       <li><strong>Conference Days:</strong> 12-13 March 2026</li>
                     </ul>
                   </div>

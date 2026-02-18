@@ -79,16 +79,31 @@ const CallForPapers = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <DateCard
               title="Manuscript Submission Deadline"
-              date="10 February 2026"
+              date={
+                <span>
+                  <span className="line-through text-red-500 mr-2">10 February 2026</span>
+                  <span className="text-green-600 font-bold italic">28 February 2026 (Extended)</span>
+                </span>
+              }
               isHighlighted={true}
             />
             <DateCard
               title="Acceptance"
-              date="12 February 2026"
+              date={
+                <span>
+                  <span className="line-through text-red-500 mr-2">12 February 2026</span>
+                  <span className="text-green-600 font-bold italic">2 March 2026 (Extended)</span>
+                </span>
+              }
             />
             <DateCard
               title="Registration Date"
-              date="15 February 2026"
+              date={
+                <span>
+                  <span className="line-through text-red-500 mr-2">15 February 2026</span>
+                  <span className="text-green-600 font-bold italic">5 March 2026 (Extended)</span>
+                </span>
+              }
             />
             <DateCard
               title="Date of Conference"
@@ -165,7 +180,7 @@ const CallForPapers = () => {
               </li>
             </ol>
             <div className="mt-6 py-2 px-4 bg-blue-50 border-l-4 border-[#F5A051] text-gray-700">
-              <p><strong>Manuscript Submission Deadline:</strong> 10 February 2026</p>
+              <p><strong>Manuscript Submission Deadline:</strong> <span className="line-through text-red-500 mr-2">10 February 2026</span> <span className="text-green-700 font-bold">28 February 2026 (Extended)</span></p>
             </div>
           </div>
         </section>
