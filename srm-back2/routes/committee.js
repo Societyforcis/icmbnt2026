@@ -1,6 +1,9 @@
 import express from 'express';
 import Committee from '../models/Committee.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
+import { uploadImage } from '../middleware/upload.js';
+import cloudinary from '../config/cloudinary.js';
+import streamifier from 'streamifier';
 
 const router = express.Router();
 
@@ -82,7 +85,7 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
 });
 
 // Create new committee member - Admin only
-router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/', authMiddleware, adminMiddleware, uploadImage.single('image'), async (req, res) => {
     try {
         const {
             name,
@@ -90,7 +93,6 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
             affiliation,
             country,
             designation,
-            image,
             links,
             order,
             active
@@ -104,14 +106,30 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
             });
         }
 
+        let imageUrl = '';
+        if (req.file) {
+            // Upload to Cloudinary from buffer
+            const uploadPromise = new Promise((resolve, reject) => {
+                const uploadStream = cloudinary.uploader.upload_stream(
+                    { folder: 'committee' },
+                    (error, result) => {
+                        if (error) reject(error);
+                        else resolve(result.secure_url);
+                    }
+                );
+                streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+            });
+            imageUrl = await uploadPromise;
+        }
+
         const newMember = new Committee({
             name,
             role,
             affiliation,
             country,
             designation,
-            image,
-            links,
+            image: imageUrl || undefined,
+            links: typeof links === 'string' ? JSON.parse(links) : links,
             order: order || 0,
             active: active !== undefined ? active : true
         });
@@ -136,7 +154,7 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
 });
 
 // Update committee member - Admin only
-router.put('/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.put('/:id', authMiddleware, adminMiddleware, uploadImage.single('image'), async (req, res) => {
     try {
         const {
             name,
@@ -144,7 +162,6 @@ router.put('/:id', authMiddleware, adminMiddleware, async (req, res) => {
             affiliation,
             country,
             designation,
-            image,
             links,
             order,
             active
@@ -159,14 +176,28 @@ router.put('/:id', authMiddleware, adminMiddleware, async (req, res) => {
             });
         }
 
+        // Handle image upload if provided
+        if (req.file) {
+            const uploadPromise = new Promise((resolve, reject) => {
+                const uploadStream = cloudinary.uploader.upload_stream(
+                    { folder: 'committee' },
+                    (error, result) => {
+                        if (error) reject(error);
+                        else resolve(result.secure_url);
+                    }
+                );
+                streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+            });
+            member.image = await uploadPromise;
+        }
+
         // Update fields
         if (name) member.name = name;
         if (role) member.role = role;
         if (affiliation) member.affiliation = affiliation;
         if (country !== undefined) member.country = country;
         if (designation !== undefined) member.designation = designation;
-        if (image) member.image = image;
-        if (links) member.links = links;
+        if (links) member.links = typeof links === 'string' ? JSON.parse(links) : links;
         if (order !== undefined) member.order = order;
         if (active !== undefined) member.active = active;
 
@@ -245,6 +276,44 @@ router.patch('/:id/toggle-active', authMiddleware, adminMiddleware, async (req, 
         res.status(500).json({
             success: false,
             message: 'Failed to toggle committee member status',
+            error: error.message
+        });
+    }
+});
+
+// Bulk reorder committee members - Admin only
+router.post('/reorder', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { orders } = req.body; // Array of { id: string, order: number }
+
+        if (!orders || !Array.isArray(orders)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Orders array is required'
+            });
+        }
+
+        // Bulk update operations
+        const bulkOps = orders.map(({ id, order }) => ({
+            updateOne: {
+                filter: { _id: id },
+                update: { $set: { order } }
+            }
+        }));
+
+        await Committee.bulkWrite(bulkOps);
+
+        console.log('✅ Committee members reordered:', orders.length, 'members');
+
+        res.json({
+            success: true,
+            message: 'Committee members reordered successfully'
+        });
+    } catch (error) {
+        console.error('Error reordering committee members:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reorder committee members',
             error: error.message
         });
     }

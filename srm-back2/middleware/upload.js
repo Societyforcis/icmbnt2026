@@ -63,5 +63,26 @@ export const uploadFinalDocument = multer({
     fileFilter: documentFileFilter
 });
 
+// File filter for images (JPG, PNG, WebP)
+const imageFileFilter = (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (extname && mimetype) {
+        return cb(null, true);
+    }
+    cb(new Error('Only images (JPEG, JPG, PNG, WebP) are allowed'));
+};
+
+// Upload middleware for images
+export const uploadImage = multer({
+    storage: memoryStorage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    },
+    fileFilter: imageFileFilter
+});
+
 // Default export for backward compatibility
 export default uploadPaperPDF;

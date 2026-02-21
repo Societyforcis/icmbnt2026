@@ -664,7 +664,7 @@ export const mapPaperEmail = async (req, res) => {
         const oldEmail = paper.email;
         const submissionId = paper.submissionId;
 
-        // 3. Update the paper's email and author details
+  
         paper.email = author.email;
         paper.authorName = author.username || paper.authorName; // Update name if possible, else keep old
         await paper.save();

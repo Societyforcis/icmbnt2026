@@ -18,12 +18,10 @@ import {
     Filter,
     Check,
     Cloud,
-    Link2,
     RefreshCw,
     Layers,
     MessageSquare,
     Send,
-    RotateCcw
 } from 'lucide-react';
 import ReviewerFilterPanel, { Reviewer } from './ReviewerFilterPanel';
 import ReviewerDetailsPanel from './ReviewerDetailsPanel';
