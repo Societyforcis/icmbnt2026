@@ -583,3 +583,169 @@ export const sendSelectedUserEmail = async (req, res) => {
     }
 };
 
+// Get all papers submitted by admins (where paper email belongs to an admin user)
+export const getAdminSubmittedPapers = async (req, res) => {
+    try {
+        // 1. Get all admin emails
+        const admins = await User.find({ role: 'Admin' }).select('email');
+        const adminEmails = admins.map(a => a.email);
+
+        // 2. Fetch papers from both collections matching these emails
+        const [primaryPapers, multiPapers] = await Promise.all([
+            PaperSubmission.find({ email: { $in: adminEmails } })
+                .select('-pdfBase64 -versions')
+                .populate('assignedEditor', 'username email'),
+            MultiplePaperSubmission.find({ email: { $in: adminEmails } })
+                .select('-pdfBase64 -versions')
+                .populate('assignedEditor', 'username email')
+        ]);
+
+        const papers = [...primaryPapers, ...multiPapers].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        return res.status(200).json({
+            success: true,
+            count: papers.length,
+            papers,
+            adminEmails
+        });
+    } catch (error) {
+        console.error("Error fetching admin submitted papers:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching admin submitted papers",
+            error: error.message
+        });
+    }
+};
+
+// Map a paper from an admin email to a real author email
+export const mapPaperEmail = async (req, res) => {
+    try {
+        const { paperId, newEmail } = req.body;
+
+        if (!paperId || !newEmail) {
+            return res.status(400).json({
+                success: false,
+                message: "Paper ID and new author email are required"
+            });
+        }
+
+        // 1. Verify the new email exists as an Author
+        const author = await User.findOne({
+            email: newEmail.toLowerCase(),
+            role: 'Author'
+        });
+
+        if (!author) {
+            return res.status(404).json({
+                success: false,
+                message: "Author with this email not found in the database. Please ensure they are registered as an Author first."
+            });
+        }
+
+        // 2. Find the paper in either collection
+        let paper = await PaperSubmission.findById(paperId);
+        let collectionType = 'primary';
+
+        if (!paper) {
+            paper = await MultiplePaperSubmission.findById(paperId);
+            collectionType = 'multiple';
+        }
+
+        if (!paper) {
+            return res.status(404).json({
+                success: false,
+                message: "Paper not found"
+            });
+        }
+
+        const oldEmail = paper.email;
+        const submissionId = paper.submissionId;
+
+        // 3. Update the paper's email and author details
+        paper.email = author.email;
+        paper.authorName = author.username || paper.authorName; // Update name if possible, else keep old
+        await paper.save();
+
+        // 4. Update related collections
+        const { Copyright } = await import('../models/Copyright.js');
+        const FinalAcceptance = (await import('../models/FinalAcceptance.js')).default;
+        const ConferenceSelectedUser = (await import('../models/ConferenceSelectedUser.js')).default;
+        const { UserSubmission } = await import('../models/UserSubmission.js');
+        const { Revision } = await import('../models/Revision.js');
+        const RejectedPaper = (await import('../models/RejectedPaper.js')).default;
+        const { PaperMessage } = await import('../models/PaperMessage.js');
+        const PaymentRegistration = (await import('../models/PaymentRegistration.js')).default;
+        const PaymentDoneFinalUser = (await import('../models/PaymentDoneFinalUser.js')).default;
+
+     
+        await Promise.all([
+            // Update Copyright if exists
+            Copyright.updateMany(
+                { submissionId: submissionId, authorEmail: oldEmail },
+                { $set: { authorEmail: author.email, authorName: author.username } }
+            ),
+            // Update FinalAcceptance if exists
+            FinalAcceptance.updateMany(
+                { submissionId: submissionId, authorEmail: oldEmail },
+                { $set: { authorEmail: author.email, authorName: author.username } }
+            ),
+            // Update ConferenceSelectedUser if exists
+            ConferenceSelectedUser.updateMany(
+                { submissionId: submissionId, authorEmail: oldEmail },
+                { $set: { authorEmail: author.email, authorName: author.username } }
+            ),
+            // Update UserSubmission if exists
+            UserSubmission.updateMany(
+                { submissionId: submissionId, email: oldEmail },
+                { $set: { email: author.email } }
+            ),
+            // Update Revision if exists
+            Revision.updateMany(
+                { submissionId: submissionId, authorEmail: oldEmail },
+                { $set: { authorEmail: author.email, authorName: author.username } }
+            ),
+            // Update RejectedPaper if exists
+            RejectedPaper.updateMany(
+                { submissionId: submissionId, authorEmail: oldEmail },
+                { $set: { authorEmail: author.email, authorName: author.username } }
+            ),
+            // Update PaperMessage if exists
+            PaperMessage.updateMany(
+                { submissionId: submissionId, authorEmail: oldEmail },
+                { $set: { authorEmail: author.email } }
+            ),
+            // Update PaymentRegistration if exists
+            PaymentRegistration.updateMany(
+                { submissionId: submissionId, authorEmail: oldEmail },
+                { $set: { authorEmail: author.email, authorName: author.username, userId: author._id } }
+            ),
+            // Update PaymentDoneFinalUser if exists
+            PaymentDoneFinalUser.updateMany(
+                { submissionId: submissionId, authorEmail: oldEmail },
+                { $set: { authorEmail: author.email, authorName: author.username, userId: author._id } }
+            )
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            message: `Paper ${submissionId} successfully remapped to ${author.email}`,
+            updatedDetails: {
+                submissionId,
+                oldEmail,
+                newEmail: author.email,
+                authorName: author.username
+            }
+        });
+
+    } catch (error) {
+        console.error("Error remapping paper email:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error remapping paper email",
+            error: error.message
+        });
+    }
+};

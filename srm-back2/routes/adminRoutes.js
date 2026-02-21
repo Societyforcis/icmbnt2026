@@ -46,4 +46,9 @@ router.post('/selected-users/send-email', requireAdmin, sendSelectedUserEmail);
 router.get('/pdfs', requireAdmin, getAllPdfsAdmin);
 router.delete('/pdfs', requireAdmin, deletePdfAdmin);
 
+// Admin submitted papers management
+import { getAdminSubmittedPapers, mapPaperEmail } from '../controllers/adminController.js';
+router.get('/admin-submitted-papers', requireAdmin, getAdminSubmittedPapers);
+router.post('/map-paper-email', requireAdmin, mapPaperEmail);
+
 export default router;

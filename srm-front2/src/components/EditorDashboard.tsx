@@ -18,10 +18,12 @@ import {
     Filter,
     Check,
     Cloud,
+    Link2,
+    RefreshCw,
+    Layers,
     MessageSquare,
     Send,
-    RefreshCw,
-    Layers
+    RotateCcw
 } from 'lucide-react';
 import ReviewerFilterPanel, { Reviewer } from './ReviewerFilterPanel';
 import ReviewerDetailsPanel from './ReviewerDetailsPanel';
@@ -47,9 +49,9 @@ interface Paper {
 
 interface DashboardStats {
     totalPapers: number;
-    pendingReview: number;
-    reviewsReceived: number;
-    decisionsMade: number;
+    acceptedPapers: number;
+    rejectedPapers: number;
+    underReview: number;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -91,9 +93,9 @@ const EditorDashboard = () => {
     const [reviewers, setReviewers] = useState<Reviewer[]>([]);
     const [stats, setStats] = useState<DashboardStats>({
         totalPapers: 0,
-        pendingReview: 0,
-        reviewsReceived: 0,
-        decisionsMade: 0
+        acceptedPapers: 0,
+        rejectedPapers: 0,
+        underReview: 0
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -271,6 +273,7 @@ const EditorDashboard = () => {
     const fetchDashboardData = async (headers: any) => {
         try {
             console.log('Fetching editor dashboard data...');
+            setLoading(true); // Set loading true at the start of data fetch
 
             // Fetch all papers using new editor API
             try {
@@ -288,9 +291,13 @@ const EditorDashboard = () => {
                 // Calculate stats from papers
                 setStats({
                     totalPapers: allPapers.length,
-                    pendingReview: allPapers.filter((p: any) => p.status === 'Submitted' || p.status === 'Under Review' || p.status === 'Editor Assigned').length,
-                    reviewsReceived: allPapers.filter((p: any) => p.status === 'Review Received').length,
-                    decisionsMade: allPapers.filter((p: any) => p.status === 'Accepted' || p.status === 'Rejected').length
+                    acceptedPapers: allPapers.filter((p: any) => p.status === 'Accepted').length,
+                    rejectedPapers: allPapers.filter((p: any) => p.status === 'Rejected').length,
+                    underReview: allPapers.filter((p: any) =>
+                        p.status !== 'Accepted' &&
+                        p.status !== 'Rejected' &&
+                        p.status !== 'Withdrawn'
+                    ).length
                 });
             } catch (err: any) {
                 console.error('Papers fetch error:', err.response?.data || err.message);
@@ -320,7 +327,7 @@ const EditorDashboard = () => {
             console.error('Error fetching dashboard data:', error);
             setError('Failed to load dashboard data');
         } finally {
-            setLoading(false);
+            setLoading(false); // Set loading false at the end of data fetch
         }
     };
 
@@ -976,7 +983,7 @@ const EditorDashboard = () => {
                 {/* Header */}
                 <div className="bg-white shadow-sm p-6">
                     <h2 className="text-2xl font-bold text-gray-800">
-                        {activeTab === 'dashboard' && 'Dashboard Overview'}
+                        {activeTab === 'dashboard' && 'Editor Dashboard (Integrated Stats)'}
                         {activeTab === 'papers' && 'Manage Papers'}
                         {activeTab === 'pdfs' && 'PDF Management'}
                         {activeTab === 'createReviewer' && 'Create New Reviewer'}
@@ -996,27 +1003,26 @@ const EditorDashboard = () => {
                                     title="Total Papers"
                                     value={stats.totalPapers}
                                     icon={FileText}
-                                    color="bg-blue-500"
-                                    trend="+12% from last month"
+                                    color="bg-blue-600"
+                                    trend={`Incl. Multiple Submissions`}
                                 />
                                 <StatCard
-                                    title="Pending Review"
-                                    value={stats.pendingReview}
-                                    icon={Clock}
-                                    color="bg-yellow-500"
-                                />
-                                <StatCard
-                                    title="Reviews Received"
-                                    value={stats.reviewsReceived}
+                                    title="Accepted"
+                                    value={stats.acceptedPapers}
                                     icon={CheckCircle}
-                                    color="bg-green-500"
-                                    trend="+8% from last week"
+                                    color="bg-green-600"
                                 />
                                 <StatCard
-                                    title="Decisions Made"
-                                    value={stats.decisionsMade}
+                                    title="Rejected"
+                                    value={stats.rejectedPapers}
                                     icon={TrendingUp}
-                                    color="bg-purple-500"
+                                    color="bg-red-600"
+                                />
+                                <StatCard
+                                    title="Under Review"
+                                    value={stats.underReview}
+                                    icon={Clock}
+                                    color="bg-amber-500"
                                 />
                             </div>
 
@@ -1080,25 +1086,48 @@ const EditorDashboard = () => {
                             </div>
                             <div className="p-6">
                                 {(() => {
-                                    const grouped = papers.reduce((acc: any, paper) => {
+                                    const filteredPapers = papers.filter(p => {
+                                        const matchesSearch = !searchTerm ||
+                                            p.paperTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            p.authorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            p.submissionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            p.email.toLowerCase().includes(searchTerm.toLowerCase());
+                                        const matchesStatus = !statusFilter || p.status === statusFilter;
+                                        return matchesSearch && matchesStatus;
+                                    });
+
+                                    const grouped = filteredPapers.reduce((acc: any, paper) => {
                                         if (!acc[paper.email]) acc[paper.email] = [];
                                         acc[paper.email].push(paper);
                                         return acc;
                                     }, {});
 
                                     const multiSubmissions = Object.keys(grouped)
-                                        .filter(email => grouped[email].length > 1)
+                                        .filter(email => {
+                                            // If filters are applied, we show authors who have ANY papers matching the filter
+                                            // But the user might want to only see authors who have MULTIPLE papers in total.
+                                            // Let's stick to the definition: "Authors with Multiple Submissions"
+                                            // We'll show authors who HAVE >1 papers in the global list, but filter their papers.
+                                            const totalPapersForAuthor = papers.filter(p => p.email === email).length;
+                                            return totalPapersForAuthor > 1;
+                                        })
                                         .map(email => ({
                                             email,
-                                            authorName: grouped[email][0].authorName,
-                                            papers: grouped[email]
-                                        }));
+                                            authorName: (grouped[email] || papers.filter(p => p.email === email))[0].authorName,
+                                            papers: grouped[email] || []
+                                        }))
+                                        .filter(author => author.papers.length > 0); // Only show authors who have papers matching the filter
 
                                     if (multiSubmissions.length === 0) {
                                         return (
                                             <div className="text-center py-20 text-gray-400">
                                                 <Users className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                                                <p className="text-lg font-medium">No authors with multiple submissions yet.</p>
+                                                <p className="text-lg font-medium">
+                                                    {searchTerm || statusFilter
+                                                        ? "No multiple submissions match your filters."
+                                                        : "No authors with multiple submissions yet."}
+                                                </p>
                                             </div>
                                         );
                                     }
@@ -1113,14 +1142,17 @@ const EditorDashboard = () => {
                                                             <p className="text-sm text-blue-600 font-medium">{author.email}</p>
                                                         </div>
                                                         <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-xs font-bold shadow-sm">
-                                                            {author.papers.length} Papers
+                                                            {author.papers.length} Papers Found
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                                                         {author.papers.map((paper: any) => (
                                                             <div key={paper._id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center group hover:shadow-md transition">
                                                                 <div className="flex-1">
-                                                                    <p className="text-xs font-bold text-blue-500 mb-1">{paper.submissionId}</p>
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <p className="text-xs font-bold text-blue-500">{paper.submissionId}</p>
+                                                                        <StatusBadge status={paper.status} />
+                                                                    </div>
                                                                     <h5 className="text-sm font-bold text-gray-800 line-clamp-1">{paper.paperTitle}</h5>
                                                                     <p className="text-xs text-gray-500 mt-1">{paper.category}</p>
                                                                 </div>
@@ -1188,13 +1220,23 @@ const EditorDashboard = () => {
                                         </div>
                                     </div>
                                     <p className="text-sm text-gray-500">
-                                        {searchTerm ? `Found ${papers.filter(p =>
-                                            p.paperTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.authorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.submissionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.email.toLowerCase().includes(searchTerm.toLowerCase())
-                                        ).length} paper(s)` : `Showing all ${papers.length} paper(s)`}
+                                        {(() => {
+                                            const filteredCount = papers.filter(p => {
+                                                const matchesSearch = !searchTerm ||
+                                                    p.paperTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                    p.authorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                    p.submissionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                    p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                    p.email.toLowerCase().includes(searchTerm.toLowerCase());
+                                                const matchesStatus = !statusFilter || p.status === statusFilter;
+                                                return matchesSearch && matchesStatus;
+                                            }).length;
+
+                                            if (searchTerm || statusFilter) {
+                                                return `Found ${filteredCount} paper(s) matching your filters (out of ${papers.length} total)`;
+                                            }
+                                            return `Showing all ${papers.length} paper(s)`;
+                                        })()}
                                     </p>
                                 </div>
 
@@ -3317,32 +3359,34 @@ const EditorDashboard = () => {
 
                     {/* Paper Details Modal - Removed (now using side-by-side view instead) */}
                 </div>
-            </div>
+            </div >
 
             {/* Message to Reviewer Modal - REMOVED (showing inline in Reviewers tab instead) */}
             {/* Paper History Modal */}
-            {showHistoryModal && viewingPaper && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
-                    <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-                        <div className="flex items-center justify-between p-4 border-b">
-                            <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                                <History className="w-5 h-5" />
-                                Paper Operation History
-                            </h3>
-                            <button
-                                onClick={() => setShowHistoryModal(false)}
-                                className="p-2 hover:bg-gray-100 rounded-full transition"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-auto p-6">
-                            <PaperHistoryTimeline submissionId={viewingPaper.submissionId} />
+            {
+                showHistoryModal && viewingPaper && (
+                    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+                        <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+                            <div className="flex items-center justify-between p-4 border-b">
+                                <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                                    <History className="w-5 h-5" />
+                                    Paper Operation History
+                                </h3>
+                                <button
+                                    onClick={() => setShowHistoryModal(false)}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-auto p-6">
+                                <PaperHistoryTimeline submissionId={viewingPaper.submissionId} />
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

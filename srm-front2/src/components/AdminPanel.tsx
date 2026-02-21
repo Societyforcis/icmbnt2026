@@ -9,7 +9,7 @@ import AdminSupportMessages from './AdminSupportMessages';
 import AdminSelectedUsers from './AdminSelectedUsers';
 import AdminPdfManagement from './AdminPdfManagement';
 import PaperHistoryTimeline from './PaperHistoryTimeline';
-import { History as HistoryIcon, Search as SearchIcon } from 'lucide-react';
+import { History as HistoryIcon, Search as SearchIcon, Link2, RotateCcw } from 'lucide-react';
 
 const AdminPanel = () => {
   const navigate = useNavigate();
@@ -39,6 +39,12 @@ const AdminPanel = () => {
   const [trackingSubmissionId, setTrackingSubmissionId] = useState('');
   const [selectedTrackingId, setSelectedTrackingId] = useState<string | null>(null);
 
+  // Admin-submitted papers reassignment
+  const [adminSubmittedPapers, setAdminSubmittedPapers] = useState<any[]>([]);
+  const [adminPapersLoading, setAdminPapersLoading] = useState(false);
+  const [mappingEmail, setMappingEmail] = useState<{ paperId: string, email: string } | null>(null);
+  const [isMapping, setIsMapping] = useState(false);
+
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
@@ -54,8 +60,11 @@ const AdminPanel = () => {
       fetchEditors();
       fetchAdminStats();
       fetchAdminPapers();
+      if (activeTab === 'adminPapers') {
+        fetchAdminSubmittedPapers();
+      }
     }
-  }, [isAdmin]);
+  }, [isAdmin, activeTab]);
 
   const checkAdminAccess = async () => {
     try {
@@ -204,6 +213,57 @@ const AdminPanel = () => {
       }
     } catch (error) {
       console.error('Error fetching admin papers:', error);
+    }
+  };
+
+  const fetchAdminSubmittedPapers = async () => {
+    setAdminPapersLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `${apiUrl}/api/admin/admin-submitted-papers`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        setAdminSubmittedPapers(response.data.papers);
+      }
+    } catch (error) {
+      console.error("Error fetching admin papers:", error);
+    } finally {
+      setAdminPapersLoading(false);
+    }
+  };
+
+  const handleMapEmail = async (paperId: string, newEmail: string) => {
+    if (!newEmail.trim()) return;
+    setIsMapping(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${apiUrl}/api/admin/map-paper-email`,
+        { paperId, newEmail },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Paper Remapped',
+          text: response.data.message,
+          confirmButtonColor: '#F5A051'
+        });
+        setMappingEmail(null);
+        fetchAdminSubmittedPapers(); // Refresh list
+        fetchAdminPapers(); // Refresh main papers list too
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Mapping Failed',
+        text: error.response?.data?.message || "Error remapping email",
+        confirmButtonColor: '#F5A051'
+      });
+    } finally {
+      setIsMapping(false);
     }
   };
 
@@ -466,122 +526,153 @@ const AdminPanel = () => {
       <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-8 flex justify-between items-end">
+          <div className="mb-8 flex flex-col xl:flex-row xl:items-end justify-between gap-6">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Panel</h1>
-              <p className="text-gray-600">Overview of system operations and users</p>
+              <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2">Admin Panel</h1>
+              <p className="text-gray-500 font-medium">Overview of system operations and users</p>
             </div>
             {stats && (
-              <div className="flex gap-4">
-                <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-blue-100 flex flex-col items-center">
-                  <span className="text-xs font-bold text-blue-600 uppercase">Total Papers</span>
-                  <span className="text-2xl font-black text-gray-900">{stats.papers.total}</span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-blue-100 flex flex-col items-center justify-center min-w-[100px]">
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Papers</span>
+                  <span className="text-xl font-black text-gray-900">{stats.papers.total}</span>
                 </div>
-                <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-green-100 flex flex-col items-center">
-                  <span className="text-xs font-bold text-green-600 uppercase">Accepted</span>
-                  <span className="text-2xl font-black text-gray-900">{stats.papers.accepted}</span>
+                <div className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-green-100 flex flex-col items-center justify-center min-w-[100px]">
+                  <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Accepted</span>
+                  <span className="text-xl font-black text-gray-900">{stats.papers.accepted}</span>
                 </div>
-                <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-orange-100 flex flex-col items-center">
-                  <span className="text-xs font-bold text-orange-600 uppercase">Users</span>
-                  <span className="text-2xl font-black text-gray-900">{stats.users.total}</span>
+                <div className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-red-100 flex flex-col items-center justify-center min-w-[100px]">
+                  <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">Rejected</span>
+                  <span className="text-xl font-black text-gray-900">{stats.papers.rejected}</span>
+                </div>
+                <div className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-yellow-100 flex flex-col items-center justify-center min-w-[100px]">
+                  <span className="text-[10px] font-black text-yellow-600 uppercase tracking-widest">Under Review</span>
+                  <span className="text-xl font-black text-gray-900">{stats.papers.underReview}</span>
+                </div>
+                <div className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-orange-100 flex flex-col items-center justify-center min-w-[100px]">
+                  <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Users</span>
+                  <span className="text-xl font-black text-gray-900">{stats.users.total}</span>
                 </div>
               </div>
             )}
           </div>
 
           {/* Tabs Navigation */}
-          <div className="mb-8 flex gap-4 border-b border-gray-200">
-            <button
-              onClick={() => { setActiveTab('editors'); fetchEditors(); }}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'editors'
-                ? 'border-[#F5A051] text-[#F5A051]'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              👥 Editors Management
-            </button>
-            <button
-              onClick={() => { setActiveTab('users'); fetchAllUsers(); }}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'users'
-                ? 'border-[#F5A051] text-[#F5A051]'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              👤 All Users
-            </button>
-            <button
-              onClick={() => setActiveTab('payments')}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'payments'
-                ? 'border-[#F5A051] text-[#F5A051]'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              💳 Payment Verification
-            </button>
-            <button
-              onClick={() => navigate('/admin/copyrights')}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'copyrights'
-                ? 'border-[#F5A051] text-[#F5A051]'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              📑 Copyright Forms & Messages
-            </button>
-            <button
-              onClick={() => setActiveTab('support')}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'support'
-                ? 'border-[#F5A051] text-[#F5A051]'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              💬 Support Messages
-            </button>
-            <button
-              onClick={() => setActiveTab('selected')}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'selected'
-                ? 'border-[#F5A051] text-[#F5A051]'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              ✅ Selected Users
-            </button>
-            <button
-              onClick={() => setActiveTab('pdfs')}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'pdfs'
-                ? 'border-[#F5A051] text-[#F5A051]'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              📄 PDF Management
-            </button>
-            <button
-              onClick={() => setActiveTab('multiplePapers')}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'multiplePapers'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              📚 Multiple Submissions
-            </button>
-            <button
-              onClick={() => setActiveTab('allSubmissions')}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'allSubmissions'
-                ? 'border-green-600 text-green-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              📋 All Submissions
-            </button>
-            <button
-              onClick={() => setActiveTab('tracking')}
-              className={`px-6 py-3 font-medium border-b-2 transition-colors ${activeTab === 'tracking'
-                ? 'border-[#3B82F6] text-[#3B82F6]'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              <HistoryIcon className="w-4 h-4 inline mr-2" />
-              Paper Tracking
-            </button>
+          <div className="mb-8 border-b border-gray-200">
+            <div className="flex overflow-x-auto scrollbar-hide gap-1 whitespace-nowrap pb-1">
+              <button
+                onClick={() => { setActiveTab('editors'); fetchEditors(); }}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'editors'
+                  ? 'border-[#F5A051] text-[#F5A051] bg-[#F5A051]/5 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                👥 <span className="hidden md:inline">Editors Management</span>
+                <span className="md:hidden">Editors</span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('users'); fetchAllUsers(); }}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'users'
+                  ? 'border-[#F5A051] text-[#F5A051] bg-[#F5A051]/5 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                👤 <span className="hidden md:inline">All Users</span>
+                <span className="md:hidden">Users</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('payments')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'payments'
+                  ? 'border-[#F5A051] text-[#F5A051] bg-[#F5A051]/5 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                💳 <span className="hidden md:inline">Payment Verification</span>
+                <span className="md:hidden">Payments</span>
+              </button>
+              <button
+                onClick={() => navigate('/admin/copyrights')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'copyrights'
+                  ? 'border-[#F5A051] text-[#F5A051] bg-[#F5A051]/5 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                📑 <span className="hidden md:inline">Copyright Forms & Messages</span>
+                <span className="md:hidden">Copyrights</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('support')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'support'
+                  ? 'border-[#F5A051] text-[#F5A051] bg-[#F5A051]/5 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                💬 <span className="hidden md:inline">Support Messages</span>
+                <span className="md:hidden">Support</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('selected')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'selected'
+                  ? 'border-[#F5A051] text-[#F5A051] bg-[#F5A051]/5 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                ✅ <span className="hidden md:inline">Selected Users</span>
+                <span className="md:hidden">Selected</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('pdfs')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'pdfs'
+                  ? 'border-[#F5A051] text-[#F5A051] bg-[#F5A051]/5 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                📄 <span className="hidden md:inline">PDF Management</span>
+                <span className="md:hidden">PDFs</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('multiplePapers')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'multiplePapers'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                📚 <span className="hidden md:inline">Multiple Submissions</span>
+                <span className="md:hidden">Multiple</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('allSubmissions')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'allSubmissions'
+                  ? 'border-green-600 text-green-600 bg-green-50/50 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                📋 <span className="hidden md:inline">All Submissions</span>
+                <span className="md:hidden">All Subs</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('tracking')}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'tracking'
+                  ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                <HistoryIcon className="w-4 h-4" />
+                <span className="hidden md:inline">Paper Tracking</span>
+                <span className="md:hidden">Tracking</span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('adminPapers'); fetchAdminSubmittedPapers(); }}
+                className={`px-5 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'adminPapers'
+                  ? 'border-orange-600 text-orange-600 bg-orange-50/50 rounded-t-xl'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/50 rounded-t-xl'
+                  }`}
+              >
+                <Link2 className="w-4 h-4" />
+                <span className="hidden md:inline">Map Admin Papers</span>
+                <span className="md:hidden">Map Papers</span>
+              </button>
+            </div>
           </div>
 
           {/* Editors Tab - Two Column Layout */}
@@ -1167,9 +1258,105 @@ const AdminPanel = () => {
               </div>
             </div>
           )}
+
+          {/* Admin Submitted Papers Mapping Tab */}
+          {activeTab === 'adminPapers' && (
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-orange-100">
+              <div className="bg-orange-600 px-8 py-6">
+                <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Link2 className="w-7 h-7" />
+                  Admin Submitted Papers Reassignment
+                </h3>
+                <p className="text-orange-100 text-sm mt-1">
+                  Reassign papers submitted under admin emails to their rightful registered authors.
+                </p>
+              </div>
+
+              <div className="p-8">
+                {adminPapersLoading ? (
+                  <div className="flex justify-center items-center py-20">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600"></div>
+                  </div>
+                ) : adminSubmittedPapers.length === 0 ? (
+                  <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                    <FileText className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                    <p className="text-gray-400 font-bold text-xl">No papers found with admin email.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b-2 border-gray-100">
+                          <th className="py-4 px-4 font-black text-xs text-gray-400 uppercase tracking-widest">Submission ID</th>
+                          <th className="py-4 px-4 font-black text-xs text-gray-400 uppercase tracking-widest">Paper Title</th>
+                          <th className="py-4 px-4 font-black text-xs text-gray-400 uppercase tracking-widest">Current Email</th>
+                          <th className="py-4 px-4 font-black text-xs text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {adminSubmittedPapers.map((paper) => (
+                          <tr key={paper._id} className="hover:bg-gray-50 transition-colors group">
+                            <td className="py-5 px-4">
+                              <span className="font-black text-blue-600 bg-blue-50 px-3 py-1 rounded text-sm">{paper.submissionId}</span>
+                            </td>
+                            <td className="py-5 px-4">
+                              <p className="font-bold text-gray-900 group-hover:text-orange-600 transition-colors line-clamp-1">{paper.paperTitle}</p>
+                              <p className="text-[10px] text-gray-400 font-black uppercase tracking-tight mt-1">{paper.category}</p>
+                            </td>
+                            <td className="py-5 px-4">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold text-gray-700">{paper.email}</span>
+                                <span className="text-[10px] text-orange-600 font-black bg-orange-50 inline-block px-2 py-0.5 rounded w-fit mt-1 uppercase tracking-tighter border border-orange-100">ADMIN SUBMITTED</span>
+                              </div>
+                            </td>
+                            <td className="py-5 px-4 text-right">
+                              {mappingEmail?.paperId === paper._id ? (
+                                <div className="flex items-center gap-2 justify-end animate-in fade-in slide-in-from-right-4 duration-300">
+                                  <input
+                                    type="email"
+                                    placeholder="Registered Author Email"
+                                    className="text-sm border-2 border-orange-200 rounded-xl px-4 py-2 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 outline-none w-64 font-medium transition-all"
+                                    value={mappingEmail?.email || ''}
+                                    onChange={(e) => setMappingEmail(prev => prev ? { ...prev, email: e.target.value } : null)}
+                                  />
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => mappingEmail && handleMapEmail(paper._id, mappingEmail.email)}
+                                      disabled={isMapping}
+                                      className="bg-green-600 text-white p-2.5 rounded-xl hover:bg-green-700 transition"
+                                    >
+                                      {isMapping ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                    </button>
+                                    <button
+                                      onClick={() => setMappingEmail(null)}
+                                      className="bg-gray-100 text-gray-400 p-2.5 rounded-xl hover:bg-gray-200 transition"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setMappingEmail({ paperId: paper._id, email: '' })}
+                                  className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-2.5 rounded-xl hover:shadow-lg transition font-black text-xs uppercase tracking-widest"
+                                >
+                                  <Link2 className="w-4 h-4" />
+                                  Map Author
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </PageTransition >
+    </PageTransition>
   );
 };
 
